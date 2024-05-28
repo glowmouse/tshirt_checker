@@ -14,7 +14,7 @@ impl Default for TemplateApp {
     fn default() -> Self {
         Self {
             // Example stuff:
-            label: "Hello World 3!".to_owned(),
+            label: "AHello World 3!".to_owned(),
             value: 2.7,
             picked_path: None,
         }
@@ -29,9 +29,9 @@ impl TemplateApp {
 
         // Load previous app state (if any).
         // Note that you must enable the `persistence` feature for this to work.
-        if let Some(storage) = cc.storage {
-            return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
-        }
+        //if let Some(storage) = cc.storage {
+        //    return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
+        //}
 
         Default::default()
     }
@@ -95,6 +95,9 @@ impl eframe::App for TemplateApp {
                 };
                 let data = async_std::task::block_on(future);
                 ui.close_menu();
+                let x:u32 = 500;
+                self.label = x.to_string();  // len(data);
+
                 //if let Some(path) = rfd::FileDialog::new().pick_file() {
                 //    self.picked_path = Some(path.display().to_string());
                 //}
