@@ -7,6 +7,7 @@ pub struct TemplateApp {
 
     #[serde(skip)] // This how you opt-out of serialization of a field
     value: f32,
+    picked_path: Option<String>,
 }
 
 impl Default for TemplateApp {
@@ -15,6 +16,7 @@ impl Default for TemplateApp {
             // Example stuff:
             label: "Hello World 3!".to_owned(),
             value: 2.7,
+            picked_path: None,
         }
     }
 }
@@ -85,6 +87,19 @@ impl eframe::App for TemplateApp {
                 "https://github.com/emilk/eframe_template/blob/main/",
                 "Source code."
             ));
+
+            if ui.button("Open file…").clicked() {
+                let future = async {
+                    let file = rfd::AsyncFileDialog::new().pick_file().await;
+                    file.unwrap().read().await
+                };
+                let data = async_std::task::block_on(future);
+                ui.close_menu();
+                //if let Some(path) = rfd::FileDialog::new().pick_file() {
+                //    self.picked_path = Some(path.display().to_string());
+                //}
+            }
+
 
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                 powered_by_egui_and_eframe(ui);
