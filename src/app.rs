@@ -7,8 +7,14 @@ pub struct TemplateApp {
 
     #[serde(skip)] // This how you opt-out of serialization of a field
     value: f32,
-    picked_path: Option<String>,
+    count: u32,
+    #[serde(skip)] // This how you opt-out of serialization of a field
+    dialog_handle: Option<async_std::task::JoinHandle<Vec<u8>>>
 }
+
+// Sketchy global so I can test stuff out while I struggle with the
+// file dialog box code.
+static mut HELLO: String = String::new();
 
 impl Default for TemplateApp {
     fn default() -> Self {
@@ -16,14 +22,15 @@ impl Default for TemplateApp {
             // Example stuff:
             label: "AHello World 3!".to_owned(),
             value: 2.7,
-            picked_path: None,
+            count: 0,
+            dialog_handle: None
         }
     }
 }
 
 impl TemplateApp {
     /// Called once before the first frame.
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
 
@@ -54,14 +61,27 @@ impl eframe::App for TemplateApp {
             egui::menu::bar(ui, |ui| {
                 // NOTE: no File->Quit on web pages!
                 let is_web = cfg!(target_arch = "wasm32");
-                if !is_web {
-                    ui.menu_button("File", |ui| {
+                ui.menu_button("File", |ui| {
+                    if !is_web {
                         if ui.button("Quit").clicked() {
                             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                         }
-                    });
-                    ui.add_space(16.0);
-                }
+                    }
+                    if ui.button("Load").clicked() {
+                        async_std::task::block_on(
+                            async {
+                                let file = rfd::AsyncFileDialog::new().pick_file().await;
+                                let data : Vec<u8> = file.unwrap().read().await;
+                                unsafe {
+                                    HELLO = data.len().to_string();
+                                }
+                                return data;
+                            }
+                        );
+                        ui.close_menu();
+                    }
+                });
+                ui.add_space(16.0);
 
                 egui::widgets::global_dark_light_mode_buttons(ui);
             });
@@ -69,46 +89,23 @@ impl eframe::App for TemplateApp {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             // The central panel the region left after adding TopPanel's and SidePanel's
-            ui.heading("eframe template");
-
-            ui.horizontal(|ui| {
-                ui.label("Write something new: ");
-                ui.text_edit_singleline(&mut self.label);
-            });
-
-            ui.add(egui::Slider::new(&mut self.value, 0.0..=10.0).text("new value"));
-            if ui.button("Increment").clicked() {
-                self.value += 1.0;
-            }
-
-            ui.separator();
-
-            ui.add(egui::github_link_file!(
-                "https://github.com/emilk/eframe_template/blob/main/",
-                "Source code."
-            ));
-
-            if ui.button("Open file…").clicked() {
-                let future = async {
-                    let file = rfd::AsyncFileDialog::new().pick_file().await;
-                    file.unwrap().read().await
-                };
-                let data = async_std::task::block_on(future);
-                ui.close_menu();
-                let x:u32 = 500;
-                self.label = x.to_string();  // len(data);
-
-                //if let Some(path) = rfd::FileDialog::new().pick_file() {
-                //    self.picked_path = Some(path.display().to_string());
-                //}
-            }
-
-
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
+                ui.horizontal(|ui| {
+                    unsafe {
+                    ui.label("Bytes in file: ");
+                    ui.label(&HELLO);
+                    }
+                });
+
                 powered_by_egui_and_eframe(ui);
                 egui::warn_if_debug_build(ui);
             });
         });
+        if self.dialog_handle.is_some() {
+            let _handle = self.dialog_handle.as_ref().unwrap();
+            self.label = "unwrapped handle ".to_string() + &(self.count.to_string());
+            self.count += 1;
+        }
     }
 }
 
