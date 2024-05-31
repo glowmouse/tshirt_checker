@@ -88,6 +88,25 @@ impl eframe::App for TemplateApp {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
+ui.heading("eframe template");
+ui.heading("eframe template2");
+ui.heading("eframe template2");
+
+              //let my_plot = Plot::new("My Plot").legend(Legend::default());
+
+              //let inner = my_plot.show(ui, |plot_ui| {
+            //});
+
+
+//            egui::ScrollArea::both().show(ui, |ui| {
+//                ui.add(
+//                    egui::Image::new("https://picsum.photos/seed/1.759706314/1024").rounding(10.0),
+//                );
+//            });
+//                ui.add(
+//                    egui::Image::new("https://picsum.photos/seed/1.759706314/1024").rounding(10.0),
+//                );
+
             // The central panel the region left after adding TopPanel's and SidePanel's
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                 ui.horizontal(|ui| {
