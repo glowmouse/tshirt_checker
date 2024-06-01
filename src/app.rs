@@ -106,7 +106,7 @@ ui.heading("eframe template");
 ui.heading("eframe template2");
 ui.heading("eframe template2");
 
-        let image_result = load_image_from_memory(&self.image_data);
+        let _image_result = load_image_from_memory(&self.image_data);
 
             egui::ScrollArea::both().show(ui, |ui| {
                 ui.add(
