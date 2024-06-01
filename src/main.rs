@@ -8,8 +8,7 @@ fn main() -> eframe::Result<()> {
 
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([400.0, 300.0])
-            .with_min_inner_size([300.0, 220.0])
+            .with_inner_size([600.0, 800.0])
             .with_icon(
                 // NOTE: Adding an icon is optional
                 eframe::icon_data::from_png_bytes(&include_bytes!("../assets/icon-256.png")[..])
@@ -18,7 +17,7 @@ fn main() -> eframe::Result<()> {
         ..Default::default()
     };
     eframe::run_native(
-        "eframe template",
+        "T-Shirt Checker",
         native_options,
         Box::new(|cc| { 
             egui_extras::install_image_loaders(&cc.egui_ctx);
@@ -40,9 +39,10 @@ fn main() {
             .start(
                 "the_canvas_id", // hardcode it
                 web_options,
-                Box::new(|cc| Box::new(
-                    eframe_template::TemplateApp::new(cc))
-                ),
+                Box::new(|cc| {
+                    egui_extras::install_image_loaders(&cc.egui_ctx);
+                    Box::new( eframe_template::TemplateApp::new(cc))
+                }),
             )
             .await
             .expect("failed to start eframe");

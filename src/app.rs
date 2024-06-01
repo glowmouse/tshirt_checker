@@ -102,18 +102,19 @@ impl eframe::App for TemplateApp {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-ui.heading("eframe template");
-ui.heading("eframe template2");
-ui.heading("eframe template2");
 
         let _image_result = load_image_from_memory(&self.image_data);
 
+            ui.heading("From Local");
+            ui.image(egui::include_image!("ferris.svg"));
+            ui.heading("From Web");
             egui::ScrollArea::both().show(ui, |ui| {
                 ui.add(
 //                    egui::Image::new("https://en.wikipedia.org/wiki/PNG#/media/File:PNG_transparency_demonstration_1.png").rounding(10.0),
                     egui::Image::new("https://picsum.photos/seed/1.759706314/1024").rounding(10.0),
                 );
             });
+            ui.heading("Done From Local");
 
 //            egui::ScrollArea::both().show(ui, |ui| {
 //                ui.add(
