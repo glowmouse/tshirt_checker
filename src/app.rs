@@ -9,12 +9,25 @@ pub struct TemplateApp {
     value: f32,
     count: u32,
     #[serde(skip)] // This how you opt-out of serialization of a field
-    dialog_handle: Option<async_std::task::JoinHandle<Vec<u8>>>
+    dialog_handle: Option<async_std::task::JoinHandle<Vec<u8>>>,
+    #[serde(skip)] // This how you opt-out of serialization of a field
+    image_data: [u8; 512*512 ],
 }
 
 // Sketchy global so I can test stuff out while I struggle with the
 // file dialog box code.
 static mut HELLO: String = String::new();
+
+fn load_image_from_memory(image_data: &[u8]) -> Result<egui::ColorImage, image::ImageError> {
+    let image = image::load_from_memory(image_data)?;
+    let size = [image.width() as _, image.height() as _];
+    let image_buffer = image.to_rgba8();
+    let pixels = image_buffer.as_flat_samples();
+    Ok(egui::ColorImage::from_rgba_unmultiplied(
+        size,
+        pixels.as_slice(),
+    ))
+}
 
 impl Default for TemplateApp {
     fn default() -> Self {
@@ -23,7 +36,8 @@ impl Default for TemplateApp {
             label: "AHello World 3!".to_owned(),
             value: 2.7,
             count: 0,
-            dialog_handle: None
+            dialog_handle: None,
+            image_data: [0; 512*512 ],
         }
     }
 }
@@ -92,20 +106,20 @@ ui.heading("eframe template");
 ui.heading("eframe template2");
 ui.heading("eframe template2");
 
-              //let my_plot = Plot::new("My Plot").legend(Legend::default());
+        let image_result = load_image_from_memory(&self.image_data);
 
-              //let inner = my_plot.show(ui, |plot_ui| {
-            //});
-
+            egui::ScrollArea::both().show(ui, |ui| {
+                ui.add(
+//                    egui::Image::new("https://en.wikipedia.org/wiki/PNG#/media/File:PNG_transparency_demonstration_1.png").rounding(10.0),
+                    egui::Image::new("https://picsum.photos/seed/1.759706314/1024").rounding(10.0),
+                );
+            });
 
 //            egui::ScrollArea::both().show(ui, |ui| {
 //                ui.add(
 //                    egui::Image::new("https://picsum.photos/seed/1.759706314/1024").rounding(10.0),
 //                );
 //            });
-//                ui.add(
-//                    egui::Image::new("https://picsum.photos/seed/1.759706314/1024").rounding(10.0),
-//                );
 
             // The central panel the region left after adding TopPanel's and SidePanel's
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {

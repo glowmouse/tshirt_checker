@@ -12,8 +12,9 @@ targets = ["x86_64-unknown-linux-gnu", "wasm32-unknown-unknown"]
 
 [dependencies]
 egui = "0.27.0"
-egui_extras = "0.27.0"
-egui_plot = "0.27.0"
+egui_extras = { version = "0.27.0", features = ["default", "all_loaders"] }
+epaint = "0.27.0"
+image = { workspace = "0.25", features = ["jpeg", "png" ] }
 eframe = { version = "0.27.0", default-features = false, features = [
     "accesskit",     # Make egui comptaible with screen readers. NOTE: adds a lot of dependencies.
     "default_fonts", # Embed the default egui fonts.
