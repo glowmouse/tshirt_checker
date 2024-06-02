@@ -8,6 +8,7 @@ dist
 target
 target_ra
 target_wasm
+Cargo.lock
 
 # https://github.com/lycheeverse/lychee
 .lycheecache

@@ -18,16 +18,16 @@ pub struct TemplateApp {
 // file dialog box code.
 static mut HELLO: String = String::new();
 
-fn load_image_from_memory(image_data: &[u8]) -> Result<egui::ColorImage, image::ImageError> {
-    let image = image::load_from_memory(image_data)?;
-    let size = [image.width() as _, image.height() as _];
-    let image_buffer = image.to_rgba8();
-    let pixels = image_buffer.as_flat_samples();
-    Ok(egui::ColorImage::from_rgba_unmultiplied(
-        size,
-        pixels.as_slice(),
-    ))
-}
+//fn load_image_from_memory(image_data: &[u8]) -> Result<egui::ColorImage, image::ImageError> {
+//    let image = image::load_from_memory(image_data)?;
+//    let size = [image.width() as _, image.height() as _];
+//    let image_buffer = image.to_rgba8();
+//    let pixels = image_buffer.as_flat_samples();
+//    Ok(egui::ColorImage::from_rgba_unmultiplied(
+//        size,
+//        pixels.as_slice(),
+//    ))
+//}
 
 impl Default for TemplateApp {
     fn default() -> Self {
@@ -103,18 +103,17 @@ impl eframe::App for TemplateApp {
 
         egui::CentralPanel::default().show(ctx, |ui| {
 
-        let _image_result = load_image_from_memory(&self.image_data);
+        //let _image_result = load_image_from_memory(&self.image_data);
 
-            ui.heading("From Local");
-            ui.image(egui::include_image!("ferris.svg"));
-            ui.heading("From Web");
             egui::ScrollArea::both().show(ui, |ui| {
+            ui.heading("From Web");
                 ui.add(
-//                    egui::Image::new("https://en.wikipedia.org/wiki/PNG#/media/File:PNG_transparency_demonstration_1.png").rounding(10.0),
                     egui::Image::new("https://picsum.photos/seed/1.759706314/1024").rounding(10.0),
                 );
+            ui.heading("From Local!");
+            ui.image(egui::include_image!("ferris.svg"));
             });
-            ui.heading("Done From Local");
+            ui.heading("Done From Local!");
 
 //            egui::ScrollArea::both().show(ui, |ui| {
 //                ui.add(
@@ -127,7 +126,8 @@ impl eframe::App for TemplateApp {
                 ui.horizontal(|ui| {
                     unsafe {
                     ui.label("Bytes in file: ");
-                    ui.label(&HELLO);
+                    let copy = HELLO.clone();
+                    ui.label(&copy);
                     }
                 });
 
