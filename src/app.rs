@@ -58,6 +58,10 @@ impl TemplateApp {
     }
 }
 
+fn mtext( text : &str ) -> egui::widget_text::RichText {
+  return egui::widget_text::RichText::from(text).size(25.0)
+}
+
 impl eframe::App for TemplateApp {
     /// Called by the frame work to save state before shutdown.
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
@@ -75,7 +79,7 @@ impl eframe::App for TemplateApp {
             egui::menu::bar(ui, |ui| {
                 // NOTE: no File->Quit on web pages!
                 let is_web = cfg!(target_arch = "wasm32");
-                ui.menu_button("File", |ui| {
+                ui.menu_button(mtext("File"), |ui| {
                     if !is_web {
                         if ui.button("Quit").clicked() {
                             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
@@ -97,29 +101,17 @@ impl eframe::App for TemplateApp {
                 });
                 ui.add_space(16.0);
 
-                egui::widgets::global_dark_light_mode_buttons(ui);
+                //egui::widgets::global_dark_light_mode_buttons(ui);
             });
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
 
-        //let _image_result = load_image_from_memory(&self.image_data);
-
             egui::ScrollArea::both().show(ui, |ui| {
-            ui.heading("From Web");
                 ui.add(
                     egui::Image::new("https://picsum.photos/seed/1.759706314/1024").rounding(10.0),
                 );
-            ui.heading("From Local!");
-            ui.image(egui::include_image!("ferris.svg"));
             });
-            ui.heading("Done From Local!");
-
-//            egui::ScrollArea::both().show(ui, |ui| {
-//                ui.add(
-//                    egui::Image::new("https://picsum.photos/seed/1.759706314/1024").rounding(10.0),
-//                );
-//            });
 
             // The central panel the region left after adding TopPanel's and SidePanel's
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {

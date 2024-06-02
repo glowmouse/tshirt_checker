@@ -28,7 +28,7 @@ log = "0.4"
 serde = { version = "1", features = ["derive"] }
 
 # For file loading.
-rfd = "0.13"
+rfd = "0.14.1"
 async-std="1.12"
 
 # native:

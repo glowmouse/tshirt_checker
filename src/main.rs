@@ -20,6 +20,11 @@ fn main() -> eframe::Result<()> {
         "T-Shirt Checker",
         native_options,
         Box::new(|cc| { 
+            let style = egui::Style {
+              visuals: egui::Visuals::light(),
+              ..egui::Style::default()
+            };
+            cc.egui_ctx.set_style(style);
             egui_extras::install_image_loaders(&cc.egui_ctx);
             Box::new( eframe_template::TemplateApp::new(cc) )
         }),
@@ -40,8 +45,13 @@ fn main() {
                 "the_canvas_id", // hardcode it
                 web_options,
                 Box::new(|cc| {
-                    egui_extras::install_image_loaders(&cc.egui_ctx);
-                    Box::new( eframe_template::TemplateApp::new(cc))
+                  let style = egui::Style {
+                      visuals: egui::Visuals::light(),
+                      ..egui::Style::default()
+                  };
+                  cc.egui_ctx.set_style(style);
+                  egui_extras::install_image_loaders(&cc.egui_ctx);
+                  Box::new( eframe_template::TemplateApp::new(cc))
                 }),
             )
             .await
