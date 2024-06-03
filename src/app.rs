@@ -59,7 +59,7 @@ impl TemplateApp {
 }
 
 fn mtext( text : &str ) -> egui::widget_text::RichText {
-  return egui::widget_text::RichText::from(text).size(25.0)
+  egui::widget_text::RichText::from(text).size(25.0)
 }
 
 impl eframe::App for TemplateApp {
@@ -74,35 +74,19 @@ impl eframe::App for TemplateApp {
         // For inspiration and more examples, go to https://emilk.github.io/egui
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            // The top panel is often a good place for a menu bar:
 
-            egui::menu::bar(ui, |ui| {
-                // NOTE: no File->Quit on web pages!
-                let is_web = cfg!(target_arch = "wasm32");
-                ui.menu_button(mtext("File"), |ui| {
-                    if !is_web {
-                        if ui.button("Quit").clicked() {
-                            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                        }
+            if ui.button(mtext("Load")).clicked() {
+              async_std::task::block_on(
+                    async {
+                      let file = rfd::AsyncFileDialog::new().pick_file().await;
+                      let data : Vec<u8> = file.unwrap().read().await;
+                      unsafe {
+                        HELLO = data.len().to_string();
+                      }
+                      data
                     }
-                    if ui.button("Load").clicked() {
-                        async_std::task::block_on(
-                            async {
-                                let file = rfd::AsyncFileDialog::new().pick_file().await;
-                                let data : Vec<u8> = file.unwrap().read().await;
-                                unsafe {
-                                    HELLO = data.len().to_string();
-                                }
-                                return data;
-                            }
-                        );
-                        ui.close_menu();
-                    }
-                });
-                ui.add_space(16.0);
-
-                //egui::widgets::global_dark_light_mode_buttons(ui);
-            });
+                  );
+            }
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
