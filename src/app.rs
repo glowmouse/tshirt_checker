@@ -11,7 +11,7 @@ pub struct TemplateApp {
     #[serde(skip)] // This how you opt-out of serialization of a field
     dialog_handle: Option<async_std::task::JoinHandle<Vec<u8>>>,
     #[serde(skip)] // This how you opt-out of serialization of a field
-    image_data: [u8; 512*512 ],
+    image_data: [u8; 512 * 512],
 }
 
 // Sketchy global so I can test stuff out while I struggle with the
@@ -37,7 +37,7 @@ impl Default for TemplateApp {
             value: 2.7,
             count: 0,
             dialog_handle: None,
-            image_data: [0; 512*512 ],
+            image_data: [0; 512 * 512],
         }
     }
 }
@@ -58,8 +58,8 @@ impl TemplateApp {
     }
 }
 
-fn mtext( text : &str ) -> egui::widget_text::RichText {
-  egui::widget_text::RichText::from(text).size(25.0)
+fn mtext(text: &str) -> egui::widget_text::RichText {
+    egui::widget_text::RichText::from(text).size(25.0)
 }
 
 impl eframe::App for TemplateApp {
@@ -74,23 +74,19 @@ impl eframe::App for TemplateApp {
         // For inspiration and more examples, go to https://emilk.github.io/egui
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-
             if ui.button(mtext("Load")).clicked() {
-              async_std::task::block_on(
-                    async {
-                      let file = rfd::AsyncFileDialog::new().pick_file().await;
-                      let data : Vec<u8> = file.unwrap().read().await;
-                      unsafe {
+                async_std::task::block_on(async {
+                    let file = rfd::AsyncFileDialog::new().pick_file().await;
+                    let data: Vec<u8> = file.unwrap().read().await;
+                    unsafe {
                         HELLO = data.len().to_string();
-                      }
-                      data
                     }
-                  );
+                    data
+                });
             }
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-
             egui::ScrollArea::both().show(ui, |ui| {
                 ui.add(
                     egui::Image::new("https://picsum.photos/seed/1.759706314/1024").rounding(10.0),
@@ -99,12 +95,10 @@ impl eframe::App for TemplateApp {
 
             // The central panel the region left after adding TopPanel's and SidePanel's
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                ui.horizontal(|ui| {
-                    unsafe {
+                ui.horizontal(|ui| unsafe {
                     ui.label("Bytes in file: ");
                     let copy = HELLO.clone();
                     ui.label(&copy);
-                    }
                 });
 
                 powered_by_egui_and_eframe(ui);
