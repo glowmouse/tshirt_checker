@@ -1,11 +1,6 @@
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
-#[derive(serde::Deserialize, serde::Serialize)]
-#[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct TShirtCheckerApp {
     // Example stuff:
-    footer: String,
-
-    #[serde(skip)] // This how you opt-out of serialization of a field
     image_data: [u8; 262 * 304 * 4],
 }
 
@@ -27,7 +22,6 @@ static mut HELLO: String = String::new();
 impl Default for TShirtCheckerApp {
     fn default() -> Self {
         Self {
-            footer: "".to_owned(),
             image_data: [0; 262 * 304 * 4],
         }
     }
@@ -55,8 +49,7 @@ fn mtext(text: &str) -> egui::widget_text::RichText {
 
 impl eframe::App for TShirtCheckerApp {
     /// Called by the frame work to save state before shutdown.
-    fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        eframe::set_value(storage, eframe::APP_KEY, self);
+    fn save(&mut self, _storage: &mut dyn eframe::Storage) {
     }
 
     /// Called each time the UI needs repainting, which may be many times per second.
