@@ -1,9 +1,9 @@
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
-pub struct TemplateApp {
+pub struct TShirtCheckerApp {
     // Example stuff:
-    label: String,
+    footer: String,
 
     #[serde(skip)] // This how you opt-out of serialization of a field
     value: f32,
@@ -29,11 +29,11 @@ static mut HELLO: String = String::new();
 //    ))
 //}
 
-impl Default for TemplateApp {
+impl Default for TShirtCheckerApp {
     fn default() -> Self {
         Self {
             // Example stuff:
-            label: "AHello World 3!".to_owned(),
+            footer: "".to_owned(),
             value: 2.7,
             count: 0,
             dialog_handle: None,
@@ -42,7 +42,7 @@ impl Default for TemplateApp {
     }
 }
 
-impl TemplateApp {
+impl TShirtCheckerApp {
     /// Called once before the first frame.
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         // This is also where you can customize the look and feel of egui using
@@ -62,7 +62,7 @@ fn mtext(text: &str) -> egui::widget_text::RichText {
     egui::widget_text::RichText::from(text).size(25.0)
 }
 
-impl eframe::App for TemplateApp {
+impl eframe::App for TShirtCheckerApp {
     /// Called by the frame work to save state before shutdown.
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eframe::set_value(storage, eframe::APP_KEY, self);
@@ -107,7 +107,7 @@ impl eframe::App for TemplateApp {
         });
         if self.dialog_handle.is_some() {
             let _handle = self.dialog_handle.as_ref().unwrap();
-            self.label = "unwrapped handle ".to_string() + &(self.count.to_string());
+            self.footer = "unwrapped handle ".to_string() + &(self.count.to_string());
             self.count += 1;
         }
     }

@@ -26,7 +26,7 @@ fn main() -> eframe::Result<()> {
             };
             cc.egui_ctx.set_style(style);
             egui_extras::install_image_loaders(&cc.egui_ctx);
-            Box::new(eframe_template::TemplateApp::new(cc))
+            Box::new(tshirt_checker::TShirtCheckerApp::new(cc))
         }),
     )
 }
@@ -51,7 +51,7 @@ fn main() {
                     };
                     cc.egui_ctx.set_style(style);
                     egui_extras::install_image_loaders(&cc.egui_ctx);
-                    Box::new(eframe_template::TemplateApp::new(cc))
+                    Box::new(tshirt_checker::TShirtCheckerApp::new(cc))
                 }),
             )
             .await
