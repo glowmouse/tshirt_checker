@@ -1,12 +1,33 @@
+use log::{info};
+
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 pub struct TShirtCheckerApp {
     // Example stuff:
-    image_data: [u8; 262 * 304 * 4],
+    _image_data: [u8; 262 * 304 * 4],
 }
 
 // Sketchy global so I can test stuff out while I struggle with the
 // file dialog box code.
 static mut HELLO: String = String::new();
+
+//
+// Copied from https://github.com/PolyMeilex/rfd/blob/master/examples/async.rs
+//
+// My current understanding (new to this) is that nothing executed in web 
+// assembly can block the main thread...  and the thread mechanism used by
+// web assembly won't return the thread's output.
+//
+use std::future::Future;
+
+#[cfg(not(target_arch = "wasm32"))]
+fn app_execute<F: Future<Output = ()> + Send + 'static>(f: F) {
+    // this is stupid... use any executor of your choice instead
+    std::thread::spawn(move || async_std::task::block_on(f));
+}
+#[cfg(target_arch = "wasm32")]
+fn app_execute<F: Future<Output = ()> + 'static>(f: F) {
+    wasm_bindgen_futures::spawn_local(f);
+}
 
 //fn load_image_from_memory(image_data: &[u8]) -> Result<egui::ColorImage, image::ImageError> {
 //    let image = image::load_from_memory(image_data)?;
@@ -22,7 +43,7 @@ static mut HELLO: String = String::new();
 impl Default for TShirtCheckerApp {
     fn default() -> Self {
         Self {
-            image_data: [0; 262 * 304 * 4],
+            _image_data: [0; 262 * 304 * 4],
         }
     }
 }
@@ -59,13 +80,14 @@ impl eframe::App for TShirtCheckerApp {
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             if ui.button(mtext("Load")).clicked() {
-                async_std::task::block_on(async {
+                info!("1 2 3 4");
+                // Execute in another thread
+                app_execute(async {
                     let file = rfd::AsyncFileDialog::new().pick_file().await;
                     let data: Vec<u8> = file.unwrap().read().await;
                     unsafe {
                         HELLO = data.len().to_string();
                     }
-                    data
                 });
             }
         });
