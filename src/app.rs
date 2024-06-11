@@ -88,9 +88,7 @@ impl eframe::App for TShirtCheckerApp {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::ScrollArea::both().show(ui, |ui| {
-                ui.add(
-                    egui::Image::new("https://picsum.photos/seed/1.759706314/1024").rounding(10.0),
-                );
+                ui.image(egui::include_image!("blue_tshirt.png"))
             });
 
             // The central panel the region left after adding TopPanel's and SidePanel's
