@@ -1,7 +1,8 @@
-use log::{info};
+use image::{RgbImage, Rgb};
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 pub struct TShirtCheckerApp {
+    image_buffer: image::ImageBuffer<Rgb<u8>, std::vec::Vec<u8>>,
     // Example stuff:
     _image_data: [u8; 262 * 304 * 4],
 }
@@ -43,6 +44,7 @@ fn app_execute<F: Future<Output = ()> + 'static>(f: F) {
 impl Default for TShirtCheckerApp {
     fn default() -> Self {
         Self {
+            image_buffer: RgbImage::new(32,32),
             _image_data: [0; 262 * 304 * 4],
         }
     }
@@ -75,15 +77,28 @@ impl eframe::App for TShirtCheckerApp {
 
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Put your widgets into a `SidePanel`, `TopBottomPanel`, `CentralPanel`, `Window` or `Area`.
-        // For inspiration and more examples, go to https://emilk.github.io/egui
+
+        for x in 15..=17 {
+            for y in 8..24 {
+                self.image_buffer.put_pixel(x, y, Rgb([255, 0, 0]));
+                self.image_buffer.put_pixel(y, x, Rgb([255, 0, 0]));
+            }
+        }
+        unsafe {
+            HELLO = self.image_buffer.as_raw().len().to_string();
+        }
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             if ui.button(mtext("Load")).clicked() {
-                info!("1 2 3 4");
                 // Execute in another thread
                 app_execute(async {
+                    unsafe {
+                        HELLO = "here".to_string();
+                    }
                     let file = rfd::AsyncFileDialog::new().pick_file().await;
+                    unsafe {
+                        HELLO = "there".to_string();
+                    }
                     let data: Vec<u8> = file.unwrap().read().await;
                     unsafe {
                         HELLO = data.len().to_string();
@@ -92,9 +107,18 @@ impl eframe::App for TShirtCheckerApp {
             }
         });
 
+        //let my_image = image::load_from_memory(self.image_buffer.as_raw()).unwrap();
+        //let my_image_buffer = my_image.to_rgba8();
+        //let my_size = [my_image.width() as _, my_image.height() as _];
+        //let my_pixels = my_image_buffer.as_flat_samples();
+        //let _my_something = egui::ColorImage::from_rgba_unmultiplied(
+        //    my_size,
+        //    my_pixels.as_slice(),
+        //);
+
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::ScrollArea::both().show(ui, |ui| {
-                ui.image(egui::include_image!("blue_tshirt.png"))
+                ui.image(egui::include_image!("blue_tshirt.png"));
             });
 
             // The central panel the region left after adding TopPanel's and SidePanel's
