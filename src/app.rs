@@ -6,12 +6,7 @@ pub struct TShirtCheckerApp {
     footer: String,
 
     #[serde(skip)] // This how you opt-out of serialization of a field
-    value: f32,
-    count: u32,
-    #[serde(skip)] // This how you opt-out of serialization of a field
-    dialog_handle: Option<async_std::task::JoinHandle<Vec<u8>>>,
-    #[serde(skip)] // This how you opt-out of serialization of a field
-    image_data: [u8; 512 * 512],
+    image_data: [u8; 262 * 304 * 4],
 }
 
 // Sketchy global so I can test stuff out while I struggle with the
@@ -32,12 +27,8 @@ static mut HELLO: String = String::new();
 impl Default for TShirtCheckerApp {
     fn default() -> Self {
         Self {
-            // Example stuff:
             footer: "".to_owned(),
-            value: 2.7,
-            count: 0,
-            dialog_handle: None,
-            image_data: [0; 512 * 512],
+            image_data: [0; 262 * 304 * 4],
         }
     }
 }
@@ -103,11 +94,6 @@ impl eframe::App for TShirtCheckerApp {
                 egui::warn_if_debug_build(ui);
             });
         });
-        if self.dialog_handle.is_some() {
-            let _handle = self.dialog_handle.as_ref().unwrap();
-            self.footer = "unwrapped handle ".to_string() + &(self.count.to_string());
-            self.count += 1;
-        }
     }
 }
 
