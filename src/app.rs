@@ -1,10 +1,13 @@
-use image::{RgbImage, Rgb};
+use rand::Rng;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
-pub struct TShirtCheckerApp {
-    image_buffer: image::ImageBuffer<Rgb<u8>, std::vec::Vec<u8>>,
+pub struct TShirtCheckerApp<'a> {
     // Example stuff:
     _image_data: [u8; 262 * 304 * 4],
+    rng: rand::rngs::ThreadRng,
+    test_out: String,
+    t_shirt_2: egui::Image<'a>,
+    t_shirt: std::option::Option<egui::load::SizedTexture>
 }
 
 // Sketchy global so I can test stuff out while I struggle with the
@@ -30,27 +33,19 @@ fn app_execute<F: Future<Output = ()> + 'static>(f: F) {
     wasm_bindgen_futures::spawn_local(f);
 }
 
-//fn load_image_from_memory(image_data: &[u8]) -> Result<egui::ColorImage, image::ImageError> {
-//    let image = image::load_from_memory(image_data)?;
-//    let size = [image.width() as _, image.height() as _];
-//    let image_buffer = image.to_rgba8();
-//    let pixels = image_buffer.as_flat_samples();
-//    Ok(egui::ColorImage::from_rgba_unmultiplied(
-//        size,
-//        pixels.as_slice(),
-//    ))
-//}
-
-impl Default for TShirtCheckerApp {
+impl Default for TShirtCheckerApp<'_> {
     fn default() -> Self {
         Self {
-            image_buffer: RgbImage::new(32,32),
             _image_data: [0; 262 * 304 * 4],
+            rng: rand::thread_rng(),
+            test_out: "".to_string(),
+            t_shirt_2: egui::Image::new(egui::include_image!("blue_tshirt.png")) ,
+            t_shirt: None
         }
     }
 }
 
-impl TShirtCheckerApp {
+impl TShirtCheckerApp<'_> {
     /// Called once before the first frame.
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         // This is also where you can customize the look and feel of egui using
@@ -62,7 +57,22 @@ impl TShirtCheckerApp {
         //    return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
         //}
 
-        Default::default()
+        let defaults : Self = Default::default();
+                
+        let test = egui::include_image!("blue_tshirt.png");
+        let mut _nbytes: usize = 0;
+        match test.clone() {
+            egui::ImageSource::Uri(_a) => {
+            },
+            egui::ImageSource::Texture(_a) => {
+            },
+            egui::ImageSource::Bytes{uri : _, bytes } => {
+                _nbytes = bytes.len();
+            }
+        }
+
+
+        defaults                                                 
     }
 }
 
@@ -70,22 +80,37 @@ fn mtext(text: &str) -> egui::widget_text::RichText {
     egui::widget_text::RichText::from(text).size(25.0)
 }
 
-impl eframe::App for TShirtCheckerApp {
-    /// Called by the frame work to save state before shutdown.
-    fn save(&mut self, _storage: &mut dyn eframe::Storage) {
-    }
+impl eframe::App for TShirtCheckerApp<'_> {
 
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
 
-        for x in 15..=17 {
-            for y in 8..24 {
-                self.image_buffer.put_pixel(x, y, Rgb([255, 0, 0]));
-                self.image_buffer.put_pixel(y, x, Rgb([255, 0, 0]));
+        if Option::is_none(&self.t_shirt ) {
+            let load_result = self.t_shirt_2.load_for_size( ctx, egui::Vec2::new(400.0,600.0) );
+            if Result::is_ok(&load_result) {
+                let texture_poll = load_result.unwrap();
+                let osize = texture_poll.size();
+                let oid = texture_poll.texture_id();
+                if Option::is_some( &osize ) {
+                    let size = osize.unwrap();
+                    self.test_out = format!("size {} {} ", size[0], size[1] );
+                }
+                else {
+                    self.test_out.push_str("no size ");
+                }
+                if Option::is_some( &oid ) {
+                    self.test_out.push_str("Has ID");
+                }
+                else {
+                    self.test_out.push_str("No ID ");
+                }
+                if Option::is_some( &osize ) && Option::is_some( &oid ) {
+                    self.t_shirt = Some(egui::load::SizedTexture::new(oid.unwrap(), osize.unwrap()));
+                }
             }
-        }
-        unsafe {
-            HELLO = self.image_buffer.as_raw().len().to_string();
+            else {
+                self.test_out = "load failed".to_string();
+            }
         }
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
@@ -107,26 +132,31 @@ impl eframe::App for TShirtCheckerApp {
             }
         });
 
-        //let my_image = image::load_from_memory(self.image_buffer.as_raw()).unwrap();
-        //let my_image_buffer = my_image.to_rgba8();
-        //let my_size = [my_image.width() as _, my_image.height() as _];
-        //let my_pixels = my_image_buffer.as_flat_samples();
-        //let _my_something = egui::ColorImage::from_rgba_unmultiplied(
-        //    my_size,
-        //    my_pixels.as_slice(),
-        //);
-
         egui::CentralPanel::default().show(ctx, |ui| {
-            egui::ScrollArea::both().show(ui, |ui| {
-                ui.image(egui::include_image!("blue_tshirt.png"));
-            });
-
+            let (mut _response, painter ) =ui.allocate_painter(ui.available_size_before_wrap(), egui::Sense::drag() );
+            if Option::is_some(&self.t_shirt ) {
+                let sized_texture = self.t_shirt.unwrap();
+                painter.image( 
+                    sized_texture.id,
+                    egui::Rect::from_min_max(egui::Pos2::new(0.0, 100.0), egui::Pos2::new(262.0*2.0, 304.0*2.0+100.0)),
+                    egui::Rect::from_min_max(egui::Pos2::new(0.0, 0.0), egui::Pos2::new(1.0, 1.0)),
+                    egui::Color32::WHITE );
+            }
+            let pos1 = egui::Pos2::new( self.rng.gen_range(0..500) as f32, self.rng.gen_range(0..500) as f32 );
+            let pos2 = egui::Pos2::new( 150.0, 150.0 );
+            painter.circle_filled( pos1, 60.0, egui::Color32::from_rgb(0, 255, 0 ));
+            painter.circle_filled( pos2, 30.0, egui::Color32::from_rgb(255, 0, 0 ));
+            
             // The central panel the region left after adding TopPanel's and SidePanel's
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                 ui.horizontal(|ui| unsafe {
                     ui.label("Bytes in file: ");
                     let copy = HELLO.clone();
                     ui.label(&copy);
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Test Output  : ");
+                    ui.label( &self.test_out );
                 });
 
                 powered_by_egui_and_eframe(ui);
