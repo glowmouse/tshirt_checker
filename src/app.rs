@@ -7,7 +7,9 @@ pub struct TShirtCheckerApp<'a> {
     footer_debug_0: String,
     footer_debug_1: String,
     t_shirt_img_src: egui::Image<'a>,
-    t_shirt: std::option::Option<egui::load::SizedTexture>
+    test_artwork_src: egui::Image<'a>,
+    t_shirt: std::option::Option<egui::load::SizedTexture>,
+    artwork: std::option::Option<egui::load::SizedTexture>,
 }
 
 // Sketchy global so I can test stuff out while I struggle with the
@@ -40,7 +42,9 @@ impl Default for TShirtCheckerApp<'_> {
             footer_debug_0: "".to_string(),
             footer_debug_1: "".to_string(),
             t_shirt_img_src: egui::Image::new(egui::include_image!("blue_tshirt.png")) ,
-            t_shirt: None
+            test_artwork_src: egui::Image::new(egui::include_image!("test_artwork.png")) ,
+            t_shirt: None,
+            artwork: None,
         }
     }
 }
@@ -116,6 +120,18 @@ impl TShirtCheckerApp<'_> {
                 }
             }
         }
+
+        if Option::is_none(&self.artwork) {
+            let load_result = self.test_artwork_src.load_for_size( ctx, egui::Vec2::new(1.0,1.0) );
+            if Result::is_ok(&load_result) {
+                let texture_poll = load_result.unwrap();
+                let osize = texture_poll.size();
+                let oid = texture_poll.texture_id();
+                if Option::is_some( &osize ) && Option::is_some( &oid ) {
+                    self.artwork = Some(egui::load::SizedTexture::new(oid.unwrap(), osize.unwrap()));
+                }
+            }
+        }
     }
 
     fn do_bottom_panel(&self, ctx: &egui::Context ) {
@@ -141,28 +157,58 @@ impl TShirtCheckerApp<'_> {
 
     fn do_central_panel(&mut self, ctx: &egui::Context ) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            let panel_size = ui.available_size_before_wrap();
+            let panel_size_vec = ui.available_size_before_wrap();
+            let panel_size = egui::Pos2{ x: panel_size_vec[0], y: panel_size_vec[1] };
 
-            let xscale = panel_size[0] / 262.0;
-            let yscale = panel_size[1] / 304.0;
-            let scale = f32::min( xscale, yscale );
-            let uv0 = egui::Pos2{ x: 0.0, y: 0.0 };
-            let uv1 = egui::Pos2{ x: 1.0, y: 1.0 };
-            let img_size = egui::Pos2{ x: 262.0*scale, y: 304.0*scale };
-            let s0  = egui::Pos2{ x: (panel_size[0] - img_size.x)/2.0, y: (panel_size[1] - img_size.y)/ 2.0 };
-            let s1  = egui::Pos2{ x: s0.x + img_size.x, y: s0.y + img_size.y };
-
-            //self.footer_debug_0 = format!("{} {}", panel_size[0], panel_size[1] );
-            self.footer_debug_1 = format!("{} {}", s1[0], s1[1] );
-
-            let (mut _response, painter ) =ui.allocate_painter(panel_size, egui::Sense::drag() );
             if Option::is_some(&self.t_shirt ) {
-                let sized_texture = self.t_shirt.unwrap();
+                let t_shirt_texture = self.t_shirt.unwrap();
+                let tshirt_size = t_shirt_texture.size;
+                let xscale = panel_size[0] / tshirt_size.x;
+                let yscale = panel_size[1] / tshirt_size.y;
+                let scale = f32::min( xscale, yscale );
+                let uv0 = egui::Pos2{ x: 0.0, y: 0.0 };
+                let uv1 = egui::Pos2{ x: 1.0, y: 1.0 };
+                let img_size = tshirt_size * scale;
+                let s0  = ( panel_size - img_size ) * 0.5;
+                let s1  = s0 + img_size;
+
+                let (mut _response, painter ) =ui.allocate_painter(panel_size_vec, egui::Sense::drag() );
                 painter.image( 
-                    sized_texture.id,
+                    t_shirt_texture.id,
                     egui::Rect::from_min_max(s0, s1 ),
                     egui::Rect::from_min_max(uv0, uv1 ),
                     egui::Color32::WHITE );
+                if Option::is_some(&self.artwork) {
+                    let art_texture = self.artwork.unwrap();
+                    let art_size= art_texture.size;
+
+                    let xcenter = img_size.x * 0.50;
+                    let xwidth_max = img_size.x * 0.48;
+                    let ycenter = img_size.y * 0.45;
+                    let ywidth_max = xwidth_max / 11.0 * 14.0;
+
+                    let xartscale = xwidth_max / art_size.x;
+                    let yartscale = ywidth_max / art_size.y;
+                    let artscale = f32::min( xartscale, yartscale );
+
+                    let xwidth = art_size.x * artscale;
+                    let ywidth = art_size.y * artscale;
+                    //let xwidth = xwidth_max;
+                    //let ywidth = ywidth_max;
+
+                    let x0 = xcenter - xwidth /2.0;
+                    let x1 = xcenter + xwidth /2.0;
+                    let y0 = ycenter - ywidth /2.0;
+                    let y1 = ycenter + ywidth /2.0;
+
+                    let a0 = egui::Pos2{ x: x0 + s0.x, y: y0 + s0.y }; 
+                    let a1 = egui::Pos2{ x: x1 + s0.x, y: y1 + s0.y }; 
+                    painter.image( 
+                        art_texture.id,
+                        egui::Rect::from_min_max(a0, a1),
+                        egui::Rect::from_min_max(uv0, uv1 ),
+                        egui::Color32::WHITE );
+                }
             }
         });
     }
