@@ -1,12 +1,12 @@
-use rand::Rng;
+//use rand::Rng;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 pub struct TShirtCheckerApp<'a> {
     // Example stuff:
-    _image_data: [u8; 262 * 304 * 4],
-    rng: rand::rngs::ThreadRng,
-    test_out: String,
-    t_shirt_2: egui::Image<'a>,
+    _rng: rand::rngs::ThreadRng,
+    footer_debug_0: String,
+    footer_debug_1: String,
+    t_shirt_img_src: egui::Image<'a>,
     t_shirt: std::option::Option<egui::load::SizedTexture>
 }
 
@@ -24,26 +24,51 @@ static mut HELLO: String = String::new();
 use std::future::Future;
 
 #[cfg(not(target_arch = "wasm32"))]
-fn app_execute<F: Future<Output = ()> + Send + 'static>(f: F) {
+fn _app_execute<F: Future<Output = ()> + Send + 'static>(f: F) {
     // this is stupid... use any executor of your choice instead
     std::thread::spawn(move || async_std::task::block_on(f));
 }
 #[cfg(target_arch = "wasm32")]
-fn app_execute<F: Future<Output = ()> + 'static>(f: F) {
+fn _app_execute<F: Future<Output = ()> + 'static>(f: F) {
     wasm_bindgen_futures::spawn_local(f);
 }
 
 impl Default for TShirtCheckerApp<'_> {
     fn default() -> Self {
         Self {
-            _image_data: [0; 262 * 304 * 4],
-            rng: rand::thread_rng(),
-            test_out: "".to_string(),
-            t_shirt_2: egui::Image::new(egui::include_image!("blue_tshirt.png")) ,
+            _rng: rand::thread_rng(),
+            footer_debug_0: "".to_string(),
+            footer_debug_1: "".to_string(),
+            t_shirt_img_src: egui::Image::new(egui::include_image!("blue_tshirt.png")) ,
             t_shirt: None
         }
     }
 }
+
+        /*
+        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+            let size = ui.available_size_before_wrap();
+            self.footer_debug = format!("{} {}", size[0], size[1] );
+
+            if ui.button(mtext("Load")).clicked() {
+                // Execute in another thread
+                app_execute(async {
+                    unsafe {
+                        HELLO = "here".to_string();
+                    }
+                    let file = rfd::AsyncFileDialog::new().pick_file().await;
+                    unsafe {
+                        HELLO = "there".to_string();
+                    }
+                    let data: Vec<u8> = file.unwrap().read().await;
+                    unsafe {
+                        HELLO = data.len().to_string();
+                    }
+                });
+            }
+        });
+        */
+
 
 impl TShirtCheckerApp<'_> {
     /// Called once before the first frame.
@@ -74,6 +99,86 @@ impl TShirtCheckerApp<'_> {
 
         defaults                                                 
     }
+
+    fn do_texture_loads(&mut self, ctx: &egui::Context ) {
+        // If we don't have a Texture ID for the T-Shirt, push on the load.
+        // The T-Shirt is compiled into the binary, so I don't expect to
+        // see any weird load problems.
+        // 
+        if Option::is_none(&self.t_shirt ) {
+            let load_result = self.t_shirt_img_src.load_for_size( ctx, egui::Vec2::new(1.0,1.0) );
+            if Result::is_ok(&load_result) {
+                let texture_poll = load_result.unwrap();
+                let osize = texture_poll.size();
+                let oid = texture_poll.texture_id();
+                if Option::is_some( &osize ) && Option::is_some( &oid ) {
+                    self.t_shirt = Some(egui::load::SizedTexture::new(oid.unwrap(), osize.unwrap()));
+                }
+            }
+        }
+    }
+
+    fn do_bottom_panel(&self, ctx: &egui::Context ) {
+        egui::TopBottomPanel::bottom("bot_panel").show(ctx, |ui| {
+                ui.horizontal(|ui| unsafe {
+                    ui.label("Bytes in file: ");
+                    let copy = HELLO.clone();
+                    ui.label(&copy);
+                });
+                ui.horizontal(|ui| {
+                    ui.label("footer_debug_0: ");
+                    ui.label( &self.footer_debug_0 );
+                });
+                ui.horizontal(|ui| {
+                    ui.label("footer_debug_1: ");
+                    ui.label( &self.footer_debug_1 );
+                });
+
+                powered_by_egui_and_eframe(ui);
+                egui::warn_if_debug_build(ui);
+        });
+    }
+
+    fn do_central_panel(&mut self, ctx: &egui::Context ) {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            let panel_size = ui.available_size_before_wrap();
+
+            let xscale = panel_size[0] / 262.0;
+            let yscale = panel_size[1] / 304.0;
+            let scale = f32::min( xscale, yscale );
+            let uv0 = egui::Pos2{ x: 0.0, y: 0.0 };
+            let uv1 = egui::Pos2{ x: 1.0, y: 1.0 };
+            let img_size = egui::Pos2{ x: 262.0*scale, y: 304.0*scale };
+            let s0  = egui::Pos2{ x: (panel_size[0] - img_size.x)/2.0, y: (panel_size[1] - img_size.y)/ 2.0 };
+            let s1  = egui::Pos2{ x: s0.x + img_size.x, y: s0.y + img_size.y };
+
+            //self.footer_debug_0 = format!("{} {}", panel_size[0], panel_size[1] );
+            self.footer_debug_1 = format!("{} {}", s1[0], s1[1] );
+
+            let (mut _response, painter ) =ui.allocate_painter(panel_size, egui::Sense::drag() );
+            if Option::is_some(&self.t_shirt ) {
+                let sized_texture = self.t_shirt.unwrap();
+                painter.image( 
+                    sized_texture.id,
+                    egui::Rect::from_min_max(s0, s1 ),
+                    egui::Rect::from_min_max(uv0, uv1 ),
+                    egui::Color32::WHITE );
+            }
+        });
+    }
+
+    fn do_right_panel(&mut self, ctx: &egui::Context ) {
+        egui::SidePanel::right("stuff")
+            .resizable(false)
+            .default_width(200.0)
+            .show(ctx, |ui| {
+             ui.vertical_centered(|ui| {
+                let panel_size = ui.available_size_before_wrap();
+                self.footer_debug_0 = format!("{} {}", panel_size[0], panel_size[1] );
+                ui.heading(mtext("T-Shirt Check"));
+            })
+        });
+    }
 }
 
 fn mtext(text: &str) -> egui::widget_text::RichText {
@@ -82,87 +187,13 @@ fn mtext(text: &str) -> egui::widget_text::RichText {
 
 impl eframe::App for TShirtCheckerApp<'_> {
 
+
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-
-        if Option::is_none(&self.t_shirt ) {
-            let load_result = self.t_shirt_2.load_for_size( ctx, egui::Vec2::new(400.0,600.0) );
-            if Result::is_ok(&load_result) {
-                let texture_poll = load_result.unwrap();
-                let osize = texture_poll.size();
-                let oid = texture_poll.texture_id();
-                if Option::is_some( &osize ) {
-                    let size = osize.unwrap();
-                    self.test_out = format!("size {} {} ", size[0], size[1] );
-                }
-                else {
-                    self.test_out.push_str("no size ");
-                }
-                if Option::is_some( &oid ) {
-                    self.test_out.push_str("Has ID");
-                }
-                else {
-                    self.test_out.push_str("No ID ");
-                }
-                if Option::is_some( &osize ) && Option::is_some( &oid ) {
-                    self.t_shirt = Some(egui::load::SizedTexture::new(oid.unwrap(), osize.unwrap()));
-                }
-            }
-            else {
-                self.test_out = "load failed".to_string();
-            }
-        }
-
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            if ui.button(mtext("Load")).clicked() {
-                // Execute in another thread
-                app_execute(async {
-                    unsafe {
-                        HELLO = "here".to_string();
-                    }
-                    let file = rfd::AsyncFileDialog::new().pick_file().await;
-                    unsafe {
-                        HELLO = "there".to_string();
-                    }
-                    let data: Vec<u8> = file.unwrap().read().await;
-                    unsafe {
-                        HELLO = data.len().to_string();
-                    }
-                });
-            }
-        });
-
-        egui::CentralPanel::default().show(ctx, |ui| {
-            let (mut _response, painter ) =ui.allocate_painter(ui.available_size_before_wrap(), egui::Sense::drag() );
-            if Option::is_some(&self.t_shirt ) {
-                let sized_texture = self.t_shirt.unwrap();
-                painter.image( 
-                    sized_texture.id,
-                    egui::Rect::from_min_max(egui::Pos2::new(0.0, 100.0), egui::Pos2::new(262.0*2.0, 304.0*2.0+100.0)),
-                    egui::Rect::from_min_max(egui::Pos2::new(0.0, 0.0), egui::Pos2::new(1.0, 1.0)),
-                    egui::Color32::WHITE );
-            }
-            let pos1 = egui::Pos2::new( self.rng.gen_range(0..500) as f32, self.rng.gen_range(0..500) as f32 );
-            let pos2 = egui::Pos2::new( 150.0, 150.0 );
-            painter.circle_filled( pos1, 60.0, egui::Color32::from_rgb(0, 255, 0 ));
-            painter.circle_filled( pos2, 30.0, egui::Color32::from_rgb(255, 0, 0 ));
-            
-            // The central panel the region left after adding TopPanel's and SidePanel's
-            ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                ui.horizontal(|ui| unsafe {
-                    ui.label("Bytes in file: ");
-                    let copy = HELLO.clone();
-                    ui.label(&copy);
-                });
-                ui.horizontal(|ui| {
-                    ui.label("Test Output  : ");
-                    ui.label( &self.test_out );
-                });
-
-                powered_by_egui_and_eframe(ui);
-                egui::warn_if_debug_build(ui);
-            });
-        });
+        self.do_texture_loads( ctx ); 
+        self.do_bottom_panel( ctx );
+        self.do_right_panel( ctx );
+        self.do_central_panel( ctx );
     }
 }
 
