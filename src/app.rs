@@ -1,5 +1,8 @@
 //use rand::Rng;
 
+extern crate nalgebra as na;
+use na::{Matrix3, matrix, dvector, vector};
+
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 pub struct TShirtCheckerApp<'a> {
     // Example stuff:
@@ -42,7 +45,9 @@ impl Default for TShirtCheckerApp<'_> {
             footer_debug_0: "".to_string(),
             footer_debug_1: "".to_string(),
             t_shirt_img_src: egui::Image::new(egui::include_image!("blue_tshirt.png")) ,
-            test_artwork_src: egui::Image::new(egui::include_image!("test_artwork.png")) ,
+            //test_artwork_src: egui::Image::new(egui::include_image!("hortest.png")) ,
+            test_artwork_src: egui::Image::new(egui::include_image!("starfest-2024-attendee-v2.png")) ,
+            //test_artwork_src: egui::Image::new(egui::include_image!("test_artwork.png")) ,
             t_shirt: None,
             artwork: None,
         }
@@ -87,20 +92,6 @@ impl TShirtCheckerApp<'_> {
         //}
 
         let defaults : Self = Default::default();
-                
-        let test = egui::include_image!("blue_tshirt.png");
-        let mut _nbytes: usize = 0;
-        match test.clone() {
-            egui::ImageSource::Uri(_a) => {
-            },
-            egui::ImageSource::Texture(_a) => {
-            },
-            egui::ImageSource::Bytes{uri : _, bytes } => {
-                _nbytes = bytes.len();
-            }
-        }
-
-
         defaults                                                 
     }
 
@@ -155,54 +146,185 @@ impl TShirtCheckerApp<'_> {
         });
     }
 
+    // 
+    // Transforms from "t shirt space", where (0,0) is the top
+    // left corner of the t shirt image and (1,1) is the bottom
+    // right corner of the t-shirt image, to the display.
+    // 
+    fn tshirt_to_display(&self, ui: &egui::Ui) -> Matrix3<f32> {
+        std::assert!(Option::is_some(&self.t_shirt ));
+        let panel_size   = ui.available_size_before_wrap();
+        let panel_aspect = panel_size[0] / panel_size[1];
+
+        let t_shirt_texture = self.t_shirt.unwrap();
+        let tshirt_size = t_shirt_texture.size;
+        let tshirt_aspect = tshirt_size.x / tshirt_size.y;
+
+        if panel_aspect > tshirt_aspect {
+            // panel is wider than the t-shirt
+            let x_width  = panel_size[0] * tshirt_aspect / panel_aspect;
+            let x_margin = (panel_size[0] - x_width) / 2.0;
+            return matrix![  x_width,    0.0,             x_margin;
+                             0.0,        panel_size[1],   0.0;
+                             0.0,        0.0,             1.0  ];
+        }
+        // panel is higher than the t-shirt
+        let y_width  = panel_size[1] / tshirt_aspect * panel_aspect;
+        let y_margin = (panel_size[1] - y_width) / 2.0;
+        return matrix![  panel_size[0],    0.0,             0.0;
+                         0.0,              y_width,         y_margin;
+                         0.0,              0.0,             1.0  ];
+    }
+
+    fn art_to_art_space( &self ) -> Matrix3<f32> {
+        std::assert!(Option::is_some(&self.artwork ));
+        
+        let artspace_size   = vector!( 11.0, 14.0 );
+        let artspace_aspect = artspace_size.x / artspace_size.y;
+
+        let art_texture     = self.artwork.unwrap();
+        let art_size        = art_texture.size;
+        let art_aspect      = art_size.x / art_size.y;
+
+        if artspace_aspect > art_aspect {
+            // space for art is wider than the artwork
+            let x_width  = artspace_size.x * art_aspect / artspace_aspect;
+            let x_margin = (artspace_size.x - x_width) / 2.0;
+            return matrix![  x_width,    0.0,               x_margin;
+                             0.0,        artspace_size.y,   0.0;
+                             0.0,        0.0,               1.0  ];
+        }
+        // panel is higher than the t-shirt
+        let y_width  = artspace_size.y / art_aspect * artspace_aspect;
+        let y_margin = (artspace_size.y - y_width) / 2.0;
+        return matrix![  artspace_size.x,    0.0,             0.0;
+                         0.0,                y_width,         y_margin;
+                         0.0,                0.0,             1.0  ];
+    }
+
+    // 
+    // Transforms from "t shirt artwork space", where (0,0) is 
+    // the top corner of the artwork and (11.0, 14.0) is the
+    // bottom corner, into "t shirt" space.
+    // 
+    // 11.0 x 14.0 is the working area for the artwork in inches
+    // 
+    fn art_space_to_tshirt( &self ) -> Matrix3<f32> {
+        std::assert!(Option::is_some(&self.t_shirt ));
+
+        let tshirt_texture     = self.t_shirt.unwrap();
+        let tshirt_size        = tshirt_texture.size;
+        let tshirt_aspect      = tshirt_size.x / tshirt_size.y;
+
+        let xcenter = 0.50;  // center artwork mid point for X
+        let ycenter = 0.45;  // center artwork 45% down for Y
+                            
+        let xarea   = 0.48 / 11.0;  // Artwork on 48% of the horizontal image
+        // Artwork as 11 x 14 inches, so use that to compute y area
+        let yarea   = xarea * tshirt_aspect;
+
+        return matrix![  xarea,          0.0,               xcenter - xarea * 11.0 / 2.0;
+                         0.0,            yarea,             ycenter - yarea * 14.0 / 2.0;
+                         0.0,            0.0,               1.0 ];
+    }
+
+
+    // 
+    // Transforms from "t shirt artwork space", where (0,0) is 
+    // the top corner of the artwork and (11.0, 14.0) is the
+    // bottom corner, into "t shirt" space.
+    // 
+    // 11.0 x 14.0 is the working area for the artwork in inches
+    // 
+    /*
+    fn art_space_to_tshirt( &self ) -> Matrix3<f32> {
+        std::assert!(Option::is_some(&self.t_shirt ));
+
+        let t_shirt_texture = self.t_shirt.unwrap();
+        let tshirt_size = t_shirt_texture.size;
+        let tshirt_aspect = tshirt_size.x / tshirt_size.y;
+
+        let xcenter = 0.50;  // center artwork mid point for X
+        let ycenter = 0.45;  // center artwork 45% down for Y
+                            
+        let xarea   = 0.48 / 11.0;  // Artwork on 48% of the horizontal image
+        // Artwork as 11 x 14 inches, so use that to compute y area
+        let yarea   = xarea;
+
+        return matrix![  xarea,          0.0,               xcenter - xarea * 11.0 / 2.0;
+                         0.0,            yarea,             ycenter - yarea * 14.0 / 2.0;
+                         0.0,            0.0,               1.0 ];
+        let art_texture = self.artwork.unwrap();
+
+    }
+    */
+
     fn do_central_panel(&mut self, ctx: &egui::Context ) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            let panel_size_vec = ui.available_size_before_wrap();
-            let panel_size = egui::Pos2{ x: panel_size_vec[0], y: panel_size_vec[1] };
+            //let panel_size_vec = ui.available_size_before_wrap();
+            //let panel_size = egui::Pos2{ x: panel_size_vec[0], y: panel_size_vec[1] };
 
             if Option::is_some(&self.t_shirt ) {
+                let tshirt_to_display = self.tshirt_to_display(ui);
                 let t_shirt_texture = self.t_shirt.unwrap();
-                let tshirt_size = t_shirt_texture.size;
-                let xscale = panel_size[0] / tshirt_size.x;
-                let yscale = panel_size[1] / tshirt_size.y;
-                let scale = f32::min( xscale, yscale );
+                ////let tshirt_size = t_shirt_texture.size;
+                //let xscale = panel_size[0] / tshirt_size.x;
+                //let yscale = panel_size[1] / tshirt_size.y;
+                //let scale = f32::min( xscale, yscale );
                 let uv0 = egui::Pos2{ x: 0.0, y: 0.0 };
                 let uv1 = egui::Pos2{ x: 1.0, y: 1.0 };
-                let img_size = tshirt_size * scale;
-                let s0  = ( panel_size - img_size ) * 0.5;
-                let s1  = s0 + img_size;
 
-                let (mut _response, painter ) =ui.allocate_painter(panel_size_vec, egui::Sense::drag() );
+                let s0_pos = tshirt_to_display * dvector![0.0, 0.0, 1.0]; 
+                let s1_pos = tshirt_to_display * dvector![1.0, 1.0, 1.0]; 
+
+                let s0 = egui::Pos2{ x: s0_pos.x, y: s0_pos.y };
+                let s1 = egui::Pos2{ x: s1_pos.x, y: s1_pos.y };
+
+                //let img_size = tshirt_size * scale;
+                //let s0  = ( panel_size - img_size ) * 0.5;
+                //let s1  = s0 + img_size;
+
+                let (mut _response, painter ) =ui.allocate_painter(ui.available_size_before_wrap(), egui::Sense::drag() );
                 painter.image( 
                     t_shirt_texture.id,
                     egui::Rect::from_min_max(s0, s1 ),
                     egui::Rect::from_min_max(uv0, uv1 ),
                     egui::Color32::WHITE );
                 if Option::is_some(&self.artwork) {
+
                     let art_texture = self.artwork.unwrap();
-                    let art_size= art_texture.size;
+                    //let art_size= art_texture.size;
 
-                    let xcenter = img_size.x * 0.50;
-                    let xwidth_max = img_size.x * 0.48;
-                    let ycenter = img_size.y * 0.45;
-                    let ywidth_max = xwidth_max / 11.0 * 14.0;
+                    let art_space_to_display = tshirt_to_display * self.art_space_to_tshirt() * self.art_to_art_space();
 
-                    let xartscale = xwidth_max / art_size.x;
-                    let yartscale = ywidth_max / art_size.y;
-                    let artscale = f32::min( xartscale, yartscale );
+                    let a0_pos = art_space_to_display * dvector![0.0,  0.0,  1.0]; 
+                    let a1_pos = art_space_to_display * dvector![1.0,  1.0,  1.0]; 
 
-                    let xwidth = art_size.x * artscale;
-                    let ywidth = art_size.y * artscale;
+                    let a0 = egui::Pos2{ x: a0_pos.x, y: a0_pos.y };
+                    let a1 = egui::Pos2{ x: a1_pos.x, y: a1_pos.y };
+
+
+                    //let xcenter = img_size.x * 0.50;
+                    //let xwidth_max = img_size.x * 0.48;
+                    //let ycenter = img_size.y * 0.45;
+                    //let ywidth_max = xwidth_max / 11.0 * 14.0;
+
+                    //let xartscale = xwidth_max / art_size.x;
+                    //let yartscale = ywidth_max / art_size.y;
+                    //let artscale = f32::min( xartscale, yartscale );
+
+                    //let xwidth = art_size.x * artscale;
+                    //let ywidth = art_size.y * artscale;
                     //let xwidth = xwidth_max;
                     //let ywidth = ywidth_max;
 
-                    let x0 = xcenter - xwidth /2.0;
-                    let x1 = xcenter + xwidth /2.0;
-                    let y0 = ycenter - ywidth /2.0;
-                    let y1 = ycenter + ywidth /2.0;
+                    //let x0 = xcenter - xwidth /2.0;
+                    //let x1 = xcenter + xwidth /2.0;
+                    //let y0 = ycenter - ywidth /2.0;
+                    //let y1 = ycenter + ywidth /2.0;
 
-                    let a0 = egui::Pos2{ x: x0 + s0.x, y: y0 + s0.y }; 
-                    let a1 = egui::Pos2{ x: x1 + s0.x, y: y1 + s0.y }; 
+                    //let a0 = egui::Pos2{ x: x0 + s0.x, y: y0 + s0.y }; 
+                    //let a1 = egui::Pos2{ x: x1 + s0.x, y: y1 + s0.y }; 
                     painter.image( 
                         art_texture.id,
                         egui::Rect::from_min_max(a0, a1),
@@ -213,6 +335,14 @@ impl TShirtCheckerApp<'_> {
         });
     }
 
+    /*
+    fn report_dpi(&self, ui: &egui::Ui) {
+        if Option::is_some(&self.artwork) {
+            let size= self.artwork.unwrap().size;
+        }
+    }
+    */
+
     fn do_right_panel(&mut self, ctx: &egui::Context ) {
         egui::SidePanel::right("stuff")
             .resizable(false)
@@ -222,6 +352,7 @@ impl TShirtCheckerApp<'_> {
                 let panel_size = ui.available_size_before_wrap();
                 self.footer_debug_0 = format!("{} {}", panel_size[0], panel_size[1] );
                 ui.heading(mtext("T-Shirt Check"));
+                //self.report_dpi(ui);
             })
         });
     }
