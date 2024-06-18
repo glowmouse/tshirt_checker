@@ -1,7 +1,7 @@
 //use rand::Rng;
 
 extern crate nalgebra as na;
-use na::{Matrix3, matrix, dvector, vector};
+use na::{Matrix3, matrix, dvector, vector, Vector3};
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 pub struct TShirtCheckerApp<'a> {
@@ -28,6 +28,18 @@ static mut HELLO: String = String::new();
 //
 use std::future::Future;
 
+fn v3_to_egui(item : Vector3<f32> ) -> egui::Pos2 {
+    egui::Pos2{ x: item.x, y: item.y }
+}
+
+fn _eguip_to_v3(item : egui::Pos2 ) -> Vector3<f32> {
+    vector![ item.x, item.y, 1.0 ] 
+}
+
+fn _eguiv_to_v3(item : egui::Vec2 ) -> Vector3<f32> {
+    vector![ item[0], item[1], 1.0 ] 
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 fn _app_execute<F: Future<Output = ()> + Send + 'static>(f: F) {
     // this is stupid... use any executor of your choice instead
@@ -46,8 +58,8 @@ impl Default for TShirtCheckerApp<'_> {
             footer_debug_1: "".to_string(),
             t_shirt_img_src: egui::Image::new(egui::include_image!("blue_tshirt.png")) ,
             //test_artwork_src: egui::Image::new(egui::include_image!("hortest.png")) ,
-            test_artwork_src: egui::Image::new(egui::include_image!("starfest-2024-attendee-v2.png")) ,
-            //test_artwork_src: egui::Image::new(egui::include_image!("test_artwork.png")) ,
+            //test_artwork_src: egui::Image::new(egui::include_image!("starfest-2024-attendee-v2.png")) ,
+            test_artwork_src: egui::Image::new(egui::include_image!("test_artwork.png")) ,
             t_shirt: None,
             artwork: None,
         }
@@ -240,11 +252,8 @@ impl TShirtCheckerApp<'_> {
                 let uv0 = egui::Pos2{ x: 0.0, y: 0.0 };
                 let uv1 = egui::Pos2{ x: 1.0, y: 1.0 };
 
-                let s0_pos = tshirt_to_display * dvector![0.0, 0.0, 1.0]; 
-                let s1_pos = tshirt_to_display * dvector![1.0, 1.0, 1.0]; 
-
-                let s0 = egui::Pos2{ x: s0_pos.x, y: s0_pos.y };
-                let s1 = egui::Pos2{ x: s1_pos.x, y: s1_pos.y };
+                let s0 = v3_to_egui(tshirt_to_display * dvector![0.0, 0.0, 1.0]); 
+                let s1 = v3_to_egui(tshirt_to_display * dvector![1.0, 1.0, 1.0]); 
 
                 let (mut _response, painter ) =ui.allocate_painter(ui.available_size_before_wrap(), egui::Sense::drag() );
                 painter.image( 
@@ -258,11 +267,8 @@ impl TShirtCheckerApp<'_> {
                     let art_texture = self.artwork.unwrap();
                     let art_space_to_display = tshirt_to_display * self.art_space_to_tshirt() * self.art_to_art_space();
 
-                    let a0_pos = art_space_to_display * dvector![0.0,  0.0,  1.0]; 
-                    let a1_pos = art_space_to_display * dvector![1.0,  1.0,  1.0]; 
-
-                    let a0 = egui::Pos2{ x: a0_pos.x, y: a0_pos.y };
-                    let a1 = egui::Pos2{ x: a1_pos.x, y: a1_pos.y };
+                    let a0 = v3_to_egui( art_space_to_display * dvector![0.0,  0.0,  1.0] ); 
+                    let a1 = v3_to_egui( art_space_to_display * dvector![1.0,  1.0,  1.0] ); 
 
                     painter.image( 
                         art_texture.id,
@@ -274,30 +280,51 @@ impl TShirtCheckerApp<'_> {
         });
     }
 
-    /*
-    fn report_dpi(&self, ui: &egui::Ui) {
-        if Option::is_some(&self.artwork) {
-            let size= self.artwork.unwrap().size;
+    fn gen_status(&self, state : i32 ) -> &str {
+        match state {
+            0 => "Fail",
+            1 => "Warn",
+            _ => "Pass"
         }
     }
-    */
+
+    fn report_dpi(&self, ui: &mut egui::Ui) {
+        if Option::is_some(&self.artwork) {
+            let art_texture   = self.artwork.unwrap();
+            let top_corner    = self.art_to_art_space() * dvector![ 0.0, 0.0, 1.0 ]; 
+            let bot_corner    = self.art_to_art_space() * dvector![ 1.0, 1.0, 1.0 ];
+            let dim_in_inches = bot_corner - top_corner;
+            let dpi = (art_texture.size.x / dim_in_inches.x) as i32;
+            let status : &str = self.gen_status( match dpi {
+                0..=74 => 0,
+                75 ..=149 => 1,
+                _ => 2
+            });
+            ui.label(mtexts(&format!("{} DPI {}", status, dpi )));
+        }
+    }
 
     fn do_right_panel(&mut self, ctx: &egui::Context ) {
         egui::SidePanel::right("stuff")
-            .resizable(false)
-            .default_width(200.0)
+            .resizable(true)
+            .min_width(200.0)
             .show(ctx, |ui| {
-             ui.vertical_centered(|ui| {
+             ui.vertical(|ui| {
                 let panel_size = ui.available_size_before_wrap();
                 self.footer_debug_0 = format!("{} {}", panel_size[0], panel_size[1] );
-                ui.heading(mtext("T-Shirt Check"));
-                //self.report_dpi(ui);
+                ui.heading(mtext("T-Shirt Checker"));
+                ui.add_space(10.0);
+                self.report_dpi(ui);
             })
         });
     }
 }
 
 fn mtext(text: &str) -> egui::widget_text::RichText {
+    egui::widget_text::RichText::from(text).size(25.0)
+}
+
+fn mtexts(text: &String) -> egui::widget_text::RichText {
     egui::widget_text::RichText::from(text).size(25.0)
 }
 
