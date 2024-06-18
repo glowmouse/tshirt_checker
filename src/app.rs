@@ -1,7 +1,7 @@
 //use rand::Rng;
 
 extern crate nalgebra as na;
-use na::{Matrix3, matrix, dvector, vector, Vector3};
+use na::{Matrix3, matrix, dvector, vector, Vector3, Vector2};
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 pub struct TShirtCheckerApp<'a> {
@@ -13,6 +13,9 @@ pub struct TShirtCheckerApp<'a> {
     test_artwork_src: egui::Image<'a>,
     t_shirt: std::option::Option<egui::load::SizedTexture>,
     artwork: std::option::Option<egui::load::SizedTexture>,
+    zoom: f32,
+    target: Vector2<f32>,
+    //zoom_dir : f32
 }
 
 // Sketchy global so I can test stuff out while I struggle with the
@@ -62,6 +65,9 @@ impl Default for TShirtCheckerApp<'_> {
             test_artwork_src: egui::Image::new(egui::include_image!("test_artwork.png")) ,
             t_shirt: None,
             artwork: None,
+            zoom: 1.0,
+            target: vector![ 0.5, 0.5 ],
+            //zoom_dir: 0.05,
         }
     }
 }
@@ -172,20 +178,35 @@ impl TShirtCheckerApp<'_> {
         let tshirt_size = t_shirt_texture.size;
         let tshirt_aspect = tshirt_size.x / tshirt_size.y;
 
+        let move_from_center: Matrix3<f32> = 
+            matrix![ 1.0,  0.0,  -self.target.x;   
+                     0.0,  1.0,  -self.target.y;
+                     0.0,  0.0,  1.0 ];
+        let move_to_center: Matrix3<f32> = 
+            matrix![ 1.0,  0.0,  self.target.x;   
+                     0.0,  1.0,  self.target.y;
+                     0.0,  0.0,  1.0 ];
+        let scale : Matrix3<f32> =
+            matrix![ self.zoom,  0.0,        0.0;   
+                     0.0,        self.zoom,  0.0;
+                     0.0,        0.0,        1.0 ];
+
+        let scale_centered = move_to_center * scale * move_from_center;
+
         if panel_aspect > tshirt_aspect {
             // panel is wider than the t-shirt
             let x_width  = panel_size[0] * tshirt_aspect / panel_aspect;
             let x_margin = (panel_size[0] - x_width) / 2.0;
             return matrix![  x_width,    0.0,             x_margin;
                              0.0,        panel_size[1],   0.0;
-                             0.0,        0.0,             1.0  ];
+                             0.0,        0.0,             1.0  ] * scale_centered;
         }
         // panel is higher than the t-shirt
         let y_width  = panel_size[1] / tshirt_aspect * panel_aspect;
         let y_margin = (panel_size[1] - y_width) / 2.0;
         return matrix![  panel_size[0],    0.0,             0.0;
                          0.0,              y_width,         y_margin;
-                         0.0,              0.0,             1.0  ];
+                         0.0,              0.0,             1.0  ] * scale_centered;
     }
 
     fn art_to_art_space( &self ) -> Matrix3<f32> {
@@ -333,6 +354,12 @@ impl eframe::App for TShirtCheckerApp<'_> {
 
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+
+        //self.zoom = self.zoom + self.zoom_dir;
+        //if self.zoom <= 1.0 || self.zoom >= 5.0 {
+        //    self.zoom_dir = - self.zoom_dir
+       // }
+
         self.do_texture_loads( ctx ); 
         self.do_bottom_panel( ctx );
         self.do_right_panel( ctx );
