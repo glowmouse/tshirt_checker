@@ -228,37 +228,6 @@ impl TShirtCheckerApp<'_> {
                          0.0,            0.0,               1.0 ];
     }
 
-
-    // 
-    // Transforms from "t shirt artwork space", where (0,0) is 
-    // the top corner of the artwork and (11.0, 14.0) is the
-    // bottom corner, into "t shirt" space.
-    // 
-    // 11.0 x 14.0 is the working area for the artwork in inches
-    // 
-    /*
-    fn art_space_to_tshirt( &self ) -> Matrix3<f32> {
-        std::assert!(Option::is_some(&self.t_shirt ));
-
-        let t_shirt_texture = self.t_shirt.unwrap();
-        let tshirt_size = t_shirt_texture.size;
-        let tshirt_aspect = tshirt_size.x / tshirt_size.y;
-
-        let xcenter = 0.50;  // center artwork mid point for X
-        let ycenter = 0.45;  // center artwork 45% down for Y
-                            
-        let xarea   = 0.48 / 11.0;  // Artwork on 48% of the horizontal image
-        // Artwork as 11 x 14 inches, so use that to compute y area
-        let yarea   = xarea;
-
-        return matrix![  xarea,          0.0,               xcenter - xarea * 11.0 / 2.0;
-                         0.0,            yarea,             ycenter - yarea * 14.0 / 2.0;
-                         0.0,            0.0,               1.0 ];
-        let art_texture = self.artwork.unwrap();
-
-    }
-    */
-
     fn do_central_panel(&mut self, ctx: &egui::Context ) {
         egui::CentralPanel::default().show(ctx, |ui| {
             //let panel_size_vec = ui.available_size_before_wrap();
@@ -267,10 +236,7 @@ impl TShirtCheckerApp<'_> {
             if Option::is_some(&self.t_shirt ) {
                 let tshirt_to_display = self.tshirt_to_display(ui);
                 let t_shirt_texture = self.t_shirt.unwrap();
-                ////let tshirt_size = t_shirt_texture.size;
-                //let xscale = panel_size[0] / tshirt_size.x;
-                //let yscale = panel_size[1] / tshirt_size.y;
-                //let scale = f32::min( xscale, yscale );
+
                 let uv0 = egui::Pos2{ x: 0.0, y: 0.0 };
                 let uv1 = egui::Pos2{ x: 1.0, y: 1.0 };
 
@@ -280,21 +246,16 @@ impl TShirtCheckerApp<'_> {
                 let s0 = egui::Pos2{ x: s0_pos.x, y: s0_pos.y };
                 let s1 = egui::Pos2{ x: s1_pos.x, y: s1_pos.y };
 
-                //let img_size = tshirt_size * scale;
-                //let s0  = ( panel_size - img_size ) * 0.5;
-                //let s1  = s0 + img_size;
-
                 let (mut _response, painter ) =ui.allocate_painter(ui.available_size_before_wrap(), egui::Sense::drag() );
                 painter.image( 
                     t_shirt_texture.id,
                     egui::Rect::from_min_max(s0, s1 ),
                     egui::Rect::from_min_max(uv0, uv1 ),
                     egui::Color32::WHITE );
+
                 if Option::is_some(&self.artwork) {
 
                     let art_texture = self.artwork.unwrap();
-                    //let art_size= art_texture.size;
-
                     let art_space_to_display = tshirt_to_display * self.art_space_to_tshirt() * self.art_to_art_space();
 
                     let a0_pos = art_space_to_display * dvector![0.0,  0.0,  1.0]; 
@@ -303,28 +264,6 @@ impl TShirtCheckerApp<'_> {
                     let a0 = egui::Pos2{ x: a0_pos.x, y: a0_pos.y };
                     let a1 = egui::Pos2{ x: a1_pos.x, y: a1_pos.y };
 
-
-                    //let xcenter = img_size.x * 0.50;
-                    //let xwidth_max = img_size.x * 0.48;
-                    //let ycenter = img_size.y * 0.45;
-                    //let ywidth_max = xwidth_max / 11.0 * 14.0;
-
-                    //let xartscale = xwidth_max / art_size.x;
-                    //let yartscale = ywidth_max / art_size.y;
-                    //let artscale = f32::min( xartscale, yartscale );
-
-                    //let xwidth = art_size.x * artscale;
-                    //let ywidth = art_size.y * artscale;
-                    //let xwidth = xwidth_max;
-                    //let ywidth = ywidth_max;
-
-                    //let x0 = xcenter - xwidth /2.0;
-                    //let x1 = xcenter + xwidth /2.0;
-                    //let y0 = ycenter - ywidth /2.0;
-                    //let y1 = ycenter + ywidth /2.0;
-
-                    //let a0 = egui::Pos2{ x: x0 + s0.x, y: y0 + s0.y }; 
-                    //let a1 = egui::Pos2{ x: x1 + s0.x, y: y1 + s0.y }; 
                     painter.image( 
                         art_texture.id,
                         egui::Rect::from_min_max(a0, a1),
