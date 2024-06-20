@@ -188,16 +188,16 @@ impl TShirtCheckerApp<'_> {
             matrix![ 1.0,  0.0,  -self.target.x;   
                      0.0,  1.0,  -self.target.y;
                      0.0,  0.0,  1.0 ];
-        let _move_to_center: Matrix3<f32> = 
-            matrix![ 1.0,  0.0,  self.target.x;   
-                     0.0,  1.0,  self.target.y;
+        let move_to_center: Matrix3<f32> = 
+            matrix![ 1.0,  0.0,  0.5;
+                     0.0,  1.0,  0.5;
                      0.0,  0.0,  1.0 ];
         let scale : Matrix3<f32> =
             matrix![ self.zoom,  0.0,        0.0;   
                      0.0,        self.zoom,  0.0;
                      0.0,        0.0,        1.0 ];
 
-        let scale_centered = /*move_to_center **/ scale * move_from_center;
+        let scale_centered = move_to_center * scale * move_from_center;
 
         if panel_aspect > tshirt_aspect {
             // panel is wider than the t-shirt
@@ -280,7 +280,7 @@ impl TShirtCheckerApp<'_> {
                 let s0 = v3_to_egui(tshirt_to_display * dvector![0.0, 0.0, 1.0]); 
                 let s1 = v3_to_egui(tshirt_to_display * dvector![1.0, 1.0, 1.0]); 
 
-                let (response, painter ) =ui.allocate_painter(ui.available_size_before_wrap(), egui::Sense::drag() );
+                let (response, painter ) =ui.allocate_painter(ui.available_size_before_wrap(), egui::Sense::click_and_drag() );
                 painter.image( 
                     t_shirt_texture.id,
                     egui::Rect::from_min_max(s0, s1 ),
@@ -315,7 +315,17 @@ impl TShirtCheckerApp<'_> {
                         self.drag_display_to_tshirt = None;
                     }
 
-                    self.footer_debug_1 = format!("drag count {}", self.drag_count );
+                    if response.hovered() {
+                        let zoom_delta = 1.0 + ui.ctx().input(|i| i.smooth_scroll_delta)[1] / 200.0;
+                        self.footer_debug_1 = format!("drag count {} zoom delta {}", self.drag_count, zoom_delta);
+                        self.zoom = self.zoom * zoom_delta;
+                        if self.zoom < 1.0 {
+                            self.zoom = 1.0;
+                        }
+                    }
+                    else {
+                        self.footer_debug_1 = "".to_string();
+                    }
 
                     painter.image( 
                         art_texture.id,
