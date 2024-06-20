@@ -1,7 +1,7 @@
 //use rand::Rng;
 
 extern crate nalgebra as na;
-use na::{Matrix3, matrix, dvector, vector, Vector3, Vector2};
+use na::{Matrix3, matrix, dvector, vector, Vector3};
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 pub struct TShirtCheckerApp<'a> {
@@ -14,7 +14,10 @@ pub struct TShirtCheckerApp<'a> {
     t_shirt: std::option::Option<egui::load::SizedTexture>,
     artwork: std::option::Option<egui::load::SizedTexture>,
     zoom: f32,
-    target: Vector2<f32>,
+    target: Vector3<f32>,
+    last_drag_pos: std::option::Option<Vector3<f32>>,
+    drag_display_to_tshirt: std::option::Option<Matrix3<f32>>,
+    drag_count: i32
     //zoom_dir : f32
 }
 
@@ -66,7 +69,10 @@ impl Default for TShirtCheckerApp<'_> {
             t_shirt: None,
             artwork: None,
             zoom: 1.0,
-            target: vector![ 0.5, 0.5 ],
+            target: vector![ 0.25, 0.25, 1.0 ],
+            last_drag_pos: None,
+            drag_display_to_tshirt: None,
+            drag_count: 0,
             //zoom_dir: 0.05,
         }
     }
@@ -182,7 +188,7 @@ impl TShirtCheckerApp<'_> {
             matrix![ 1.0,  0.0,  -self.target.x;   
                      0.0,  1.0,  -self.target.y;
                      0.0,  0.0,  1.0 ];
-        let move_to_center: Matrix3<f32> = 
+        let _move_to_center: Matrix3<f32> = 
             matrix![ 1.0,  0.0,  self.target.x;   
                      0.0,  1.0,  self.target.y;
                      0.0,  0.0,  1.0 ];
@@ -191,7 +197,7 @@ impl TShirtCheckerApp<'_> {
                      0.0,        self.zoom,  0.0;
                      0.0,        0.0,        1.0 ];
 
-        let scale_centered = move_to_center * scale * move_from_center;
+        let scale_centered = /*move_to_center **/ scale * move_from_center;
 
         if panel_aspect > tshirt_aspect {
             // panel is wider than the t-shirt
@@ -263,8 +269,6 @@ impl TShirtCheckerApp<'_> {
 
     fn do_central_panel(&mut self, ctx: &egui::Context ) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            //let panel_size_vec = ui.available_size_before_wrap();
-            //let panel_size = egui::Pos2{ x: panel_size_vec[0], y: panel_size_vec[1] };
 
             if Option::is_some(&self.t_shirt ) {
                 let tshirt_to_display = self.tshirt_to_display(ui);
@@ -276,7 +280,7 @@ impl TShirtCheckerApp<'_> {
                 let s0 = v3_to_egui(tshirt_to_display * dvector![0.0, 0.0, 1.0]); 
                 let s1 = v3_to_egui(tshirt_to_display * dvector![1.0, 1.0, 1.0]); 
 
-                let (mut _response, painter ) =ui.allocate_painter(ui.available_size_before_wrap(), egui::Sense::drag() );
+                let (response, painter ) =ui.allocate_painter(ui.available_size_before_wrap(), egui::Sense::drag() );
                 painter.image( 
                     t_shirt_texture.id,
                     egui::Rect::from_min_max(s0, s1 ),
@@ -290,6 +294,28 @@ impl TShirtCheckerApp<'_> {
 
                     let a0 = v3_to_egui( art_space_to_display * dvector![0.0,  0.0,  1.0] ); 
                     let a1 = v3_to_egui( art_space_to_display * dvector![1.0,  1.0,  1.0] ); 
+
+                    if let Some(pointer_pos) = response.interact_pointer_pos() {
+                        let current_drag_pos = vector!( pointer_pos[0], pointer_pos[1], 1.0 );
+
+                        if let Some(last_drag_pos ) = self.last_drag_pos {
+                            let display_to_artspace = self.drag_display_to_tshirt.unwrap();
+                            let last = display_to_artspace * last_drag_pos;
+                            let curr = display_to_artspace * current_drag_pos;
+                            self.target = self.target + last - curr;
+                        }
+                        else {
+                            self.drag_display_to_tshirt = Some(tshirt_to_display.try_inverse().unwrap());
+                            self.drag_count = self.drag_count + 1
+                        }
+                        self.last_drag_pos = Some(current_drag_pos);
+                    }
+                    else {
+                        self.last_drag_pos = None;
+                        self.drag_display_to_tshirt = None;
+                    }
+
+                    self.footer_debug_1 = format!("drag count {}", self.drag_count );
 
                     painter.image( 
                         art_texture.id,
