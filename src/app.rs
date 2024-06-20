@@ -5,20 +5,39 @@ use na::{Matrix3, matrix, dvector, vector, Vector3};
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 pub struct TShirtCheckerApp<'a> {
-    // Example stuff:
-    _rng: rand::rngs::ThreadRng,
-    footer_debug_0: String,
-    footer_debug_1: String,
-    t_shirt_img_src: egui::Image<'a>,
-    test_artwork_src: egui::Image<'a>,
-    t_shirt: std::option::Option<egui::load::SizedTexture>,
-    artwork: std::option::Option<egui::load::SizedTexture>,
-    zoom: f32,
-    target: Vector3<f32>,
-    last_drag_pos: std::option::Option<Vector3<f32>>,
+    _rng:                   rand::rngs::ThreadRng,
+    footer_debug_0:         String,
+    footer_debug_1:         String,
+    t_shirt_img_src:        egui::Image<'a>,
+    test_artwork_src:       egui::Image<'a>,
+    t_shirt:                std::option::Option<egui::load::SizedTexture>,
+    artwork:                std::option::Option<egui::load::SizedTexture>,
+    zoom:                   f32,
+    target:                 Vector3<f32>,
+    last_drag_pos:          std::option::Option<Vector3<f32>>,
     drag_display_to_tshirt: std::option::Option<Matrix3<f32>>,
-    drag_count: i32
-    //zoom_dir : f32
+    drag_count:             i32
+}
+
+impl Default for TShirtCheckerApp<'_> {
+    fn default() -> Self {
+        Self {
+            _rng: rand::thread_rng(),
+            footer_debug_0:         String::new(),
+            footer_debug_1:         String::new(),
+            t_shirt_img_src:        egui::Image::new(egui::include_image!("blue_tshirt.png")) ,
+            //test_artwork_src:     egui::Image::new(egui::include_image!("hortest.png")) ,
+            //test_artwork_src:     egui::Image::new(egui::include_image!("starfest-2024-attendee-v2.png")) ,
+            test_artwork_src:       egui::Image::new(egui::include_image!("sf2024-attendee-v1.png")) ,
+            t_shirt:                None,
+            artwork:                None,
+            zoom:                   1.0,
+            target:                 vector![ 0.50, 0.50, 1.0 ],
+            last_drag_pos:          None,
+            drag_display_to_tshirt: None,
+            drag_count:             0,
+        }
+    }
 }
 
 // Sketchy global so I can test stuff out while I struggle with the
@@ -56,27 +75,6 @@ fn _app_execute<F: Future<Output = ()> + 'static>(f: F) {
     wasm_bindgen_futures::spawn_local(f);
 }
 
-impl Default for TShirtCheckerApp<'_> {
-    fn default() -> Self {
-        Self {
-            _rng: rand::thread_rng(),
-            footer_debug_0: "".to_string(),
-            footer_debug_1: "".to_string(),
-            t_shirt_img_src: egui::Image::new(egui::include_image!("blue_tshirt.png")) ,
-            //test_artwork_src: egui::Image::new(egui::include_image!("hortest.png")) ,
-            //test_artwork_src: egui::Image::new(egui::include_image!("starfest-2024-attendee-v2.png")) ,
-            test_artwork_src: egui::Image::new(egui::include_image!("test_artwork.png")) ,
-            t_shirt: None,
-            artwork: None,
-            zoom: 1.0,
-            target: vector![ 0.25, 0.25, 1.0 ],
-            last_drag_pos: None,
-            drag_display_to_tshirt: None,
-            drag_count: 0,
-            //zoom_dir: 0.05,
-        }
-    }
-}
 
         /*
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
@@ -125,7 +123,7 @@ impl TShirtCheckerApp<'_> {
         // see any weird load problems.
         // 
         if Option::is_none(&self.t_shirt ) {
-            let load_result = self.t_shirt_img_src.load_for_size( ctx, egui::Vec2::new(1.0,1.0) );
+            let load_result = self.t_shirt_img_src.load_for_size( ctx, egui::Vec2{ x: 1.0, y: 1.0 } );
             if Result::is_ok(&load_result) {
                 let texture_poll = load_result.unwrap();
                 let osize = texture_poll.size();
@@ -137,7 +135,7 @@ impl TShirtCheckerApp<'_> {
         }
 
         if Option::is_none(&self.artwork) {
-            let load_result = self.test_artwork_src.load_for_size( ctx, egui::Vec2::new(1.0,1.0) );
+            let load_result = self.test_artwork_src.load_for_size( ctx, egui::Vec2{ x: 1.0, y: 1.0 } );
             if Result::is_ok(&load_result) {
                 let texture_poll = load_result.unwrap();
                 let osize = texture_poll.size();
@@ -390,12 +388,6 @@ impl eframe::App for TShirtCheckerApp<'_> {
 
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-
-        //self.zoom = self.zoom + self.zoom_dir;
-        //if self.zoom <= 1.0 || self.zoom >= 5.0 {
-        //    self.zoom_dir = - self.zoom_dir
-       // }
-
         self.do_texture_loads( ctx ); 
         self.do_bottom_panel( ctx );
         self.do_right_panel( ctx );
