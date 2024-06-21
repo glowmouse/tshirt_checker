@@ -9,13 +9,6 @@ pub struct LoadedImage {
 }
 
 impl LoadedImage {
-    pub fn new( uncompressed_image_arg: egui::ColorImage, texture_arg: egui::TextureHandle ) -> Self {
-      Self {
-          uncompressed_image:   uncompressed_image_arg,
-          texture:              texture_arg
-      }
-    }
-
     pub fn id(&self) -> egui::TextureId {
       self.texture.id()
     }
@@ -27,47 +20,42 @@ impl LoadedImage {
     pub fn pixels(&self) -> &Vec<egui::Color32> {
       &self.uncompressed_image.pixels
     }
+
+    pub fn size_as_array(&self) -> &[usize; 2 ] {
+      &self.uncompressed_image.size
+    }
 }
 
 fn load_image_from_trusted_source( bytes : &[u8],  name: impl Into<String>, ctx: &egui::Context ) -> LoadedImage 
 {
     let uncompressed_image = egui_extras::image::load_image_bytes( bytes ).unwrap();
-    let xsize = uncompressed_image.size[0];
-    let ysize = uncompressed_image.size[1];
-    let xsize_f = f32::from(i16::try_from(xsize).unwrap());
-    let ysize_f = f32::from(i16::try_from(ysize).unwrap());
     let handle: egui::TextureHandle = ctx.load_texture( name, uncompressed_image.clone(), Default::default() );
     LoadedImage{ uncompressed_image: uncompressed_image, texture: handle }
- }
+}
 
-/*
-  self.t_shirt_colorimage = Some( egui_extras::image::load_image_bytes( self.t_shirt_bytes ).unwrap() );
+fn load_image_from_existing_image( 
+  existing: &LoadedImage, 
+  mutator: fn( &egui::Color32 ) -> egui::Color32, 
+  name: impl Into<String>, ctx: &egui::Context ) -> LoadedImage 
+{
+  let mut new_image : Vec<egui::Color32> = vec![];
 
+  for color in existing.pixels().iter() {
+    new_image.push( mutator( color ));
+  } 
 
-        if Option::is_none(&self.t_shirt_colorimage) {
-            // Prototyping off https://docs.rs/egui/latest/egui/struct.Context.html#method.load_texture
-            self.t_shirt_colorimage = Some( egui_extras::image::load_image_bytes( self.t_shirt_bytes ).unwrap() );
-            let xsize = self.t_shirt_colorimage.as_ref().unwrap().size[0];
-            let ysize = self.t_shirt_colorimage.as_ref().unwrap().size[1];
-            let xsize_f = f32::from(i16::try_from(xsize).unwrap());
-            let ysize_f = f32::from(i16::try_from(ysize).unwrap());
-
-            let tshirt_size = handle.size_vec2();
-            self.footer_debug_1 = format!("t_shirt size {} {} - {} {} - {} {}", xsize_f, ysize_f, handle.size_vec2().x, handle.size_vec2().y, tshirt_size.x, tshirt_size.y );
-            self.t_shirt_2 = Some(handle);
-        }
-*/
-
+  let uncompressed_image = egui::ColorImage { size: existing.size_as_array().clone(), pixels: new_image };
+  let handle: egui::TextureHandle = ctx.load_texture( name, uncompressed_image.clone(), Default::default() );
+  LoadedImage{ uncompressed_image: uncompressed_image, texture: handle }
+}
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 pub struct TShirtCheckerApp<'a> {
     footer_debug_0:         String,
     footer_debug_1:         String,
-    t_shirt_bytes:          &'a[u8],
-    t_shirt_colorimage:     std::option::Option<egui::ColorImage>,
     test_artwork_src:       egui::Image<'a>,
-    t_shirt_2:              std::option::Option<egui::TextureHandle>,
     t_shirt:                LoadedImage,
+    _red_t_shirt:            LoadedImage,
     artwork:                std::option::Option<egui::load::SizedTexture>,
     zoom:                   f32,
     target:                 Vector3<f32>,
@@ -75,29 +63,6 @@ pub struct TShirtCheckerApp<'a> {
     drag_display_to_tshirt: std::option::Option<Matrix3<f32>>,
     drag_count:             i32
 }
-
-/*
-impl Default for TShirtCheckerApp<'_> {
-    fn default() -> Self {
-        Self {
-            footer_debug_0:         String::new(),
-            footer_debug_1:         String::new(),
-            t_shirt_bytes:          include_bytes!("blue_tshirt.png"),         
-            t_shirt_colorimage:     None,
-            //test_artwork_src:     egui::Image::new(egui::include_image!("hortest.png")) ,
-            //test_artwork_src:     egui::Image::new(egui::include_image!("starfest-2024-attendee-v2.png")) ,
-            test_artwork_src:       egui::Image::new(egui::include_image!("sf2024-attendee-v1.png")) ,
-            t_shirt_2:              None,
-            artwork:                None,
-            zoom:                   1.0,
-            target:                 vector![ 0.50, 0.50, 1.0 ],
-            last_drag_pos:          None,
-            drag_display_to_tshirt: None,
-            drag_count:             0,
-        }
-    }
-}
-*/
 
 // Sketchy global so I can test stuff out while I struggle with the
 // file dialog box code.
@@ -165,17 +130,17 @@ impl TShirtCheckerApp<'_> {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
-
+        let blue_shirt : LoadedImage = load_image_from_trusted_source(include_bytes!("blue_tshirt.png"), "blue_shirt", &cc.egui_ctx  );
+        let red_shirt : LoadedImage = load_image_from_existing_image( &blue_shirt, | c : &egui::Color32 | -> egui::Color32 { *c }, "red_shirt", &cc.egui_ctx ); 
+ 
         Self {
             footer_debug_0:         String::new(),
             footer_debug_1:         String::new(),
-            t_shirt_bytes:          include_bytes!("blue_tshirt.png"),         
-            t_shirt_colorimage:     None,
             //test_artwork_src:     egui::Image::new(egui::include_image!("hortest.png")) ,
             //test_artwork_src:     egui::Image::new(egui::include_image!("starfest-2024-attendee-v2.png")) ,
             test_artwork_src:       egui::Image::new(egui::include_image!("sf2024-attendee-v1.png")) ,
-            t_shirt_2:              None,
-            t_shirt:                load_image_from_trusted_source(include_bytes!("blue_tshirt.png"), "blue_shirt", &cc.egui_ctx  ),
+            t_shirt:                blue_shirt,
+            _red_t_shirt:            red_shirt,           
             artwork:                None,
             zoom:                   1.0,
             target:                 vector![ 0.50, 0.50, 1.0 ],
@@ -197,20 +162,6 @@ impl TShirtCheckerApp<'_> {
                     self.artwork = Some(egui::load::SizedTexture::new(oid.unwrap(), osize.unwrap()));
                 }
             }
-        }
-
-        if Option::is_none(&self.t_shirt_colorimage) {
-            // Prototyping off https://docs.rs/egui/latest/egui/struct.Context.html#method.load_texture
-            self.t_shirt_colorimage = Some( egui_extras::image::load_image_bytes( self.t_shirt_bytes ).unwrap() );
-            let xsize = self.t_shirt_colorimage.as_ref().unwrap().size[0];
-            let ysize = self.t_shirt_colorimage.as_ref().unwrap().size[1];
-            let xsize_f = f32::from(i16::try_from(xsize).unwrap());
-            let ysize_f = f32::from(i16::try_from(ysize).unwrap());
-            let handle: egui::TextureHandle = ctx.load_texture( "my_blue", self.t_shirt_colorimage.as_ref().unwrap().clone(), Default::default() );
-
-            let tshirt_size = handle.size_vec2();
-            self.footer_debug_1 = format!("t_shirt size {} {} - {} {} - {} {}", xsize_f, ysize_f, handle.size_vec2().x, handle.size_vec2().y, tshirt_size.x, tshirt_size.y );
-            self.t_shirt_2 = Some(handle);
         }
     }
 
@@ -241,12 +192,10 @@ impl TShirtCheckerApp<'_> {
     // right corner of the t-shirt image, to the display.
     // 
     fn tshirt_to_display(&self, ui: &egui::Ui) -> Matrix3<f32> {
-        std::assert!(Option::is_some( &self.t_shirt_2 ));
         let panel_size   = ui.available_size_before_wrap();
         let panel_aspect = panel_size[0] / panel_size[1];
 
-        let t_shirt_texture = self.t_shirt_2.as_ref().unwrap();
-        let tshirt_size = t_shirt_texture.size_vec2();
+        let tshirt_size = self.t_shirt.size();
         let tshirt_aspect = tshirt_size.x / tshirt_size.y;
 
         let move_from_center: Matrix3<f32> = 
@@ -314,10 +263,7 @@ impl TShirtCheckerApp<'_> {
     // 11.0 x 14.0 is the working area for the artwork in inches
     // 
     fn art_space_to_tshirt( &self ) -> Matrix3<f32> {
-        std::assert!(Option::is_some( &self.t_shirt_2 ));
-
-        let tshirt_texture     = self.t_shirt_2.as_ref().unwrap();
-        let tshirt_size        = tshirt_texture.size_vec2();
+        let tshirt_size        = self.t_shirt.size();
         let tshirt_aspect      = tshirt_size.x / tshirt_size.y;
 
         let xcenter = 0.50;  // center artwork mid point for X
@@ -336,10 +282,8 @@ impl TShirtCheckerApp<'_> {
         egui::CentralPanel::default().show(ctx, |ui| {
 
             //if Option::is_some(&self.t_shirt_2 ) {
-            if Option::is_some(&self.t_shirt_2 ) {
+            if true {
                 let tshirt_to_display = self.tshirt_to_display(ui);
-                let t_shirt_texture = self.t_shirt_2.as_ref().unwrap();
-                //let t_shirt_texture = self.t_shirt.unwrap();
 
                 let uv0 = egui::Pos2{ x: 0.0, y: 0.0 };
                 let uv1 = egui::Pos2{ x: 1.0, y: 1.0 };
@@ -349,7 +293,7 @@ impl TShirtCheckerApp<'_> {
 
                 let (response, painter ) =ui.allocate_painter(ui.available_size_before_wrap(), egui::Sense::click_and_drag() );
                 painter.image( 
-                    t_shirt_texture.id(),
+                    self.t_shirt.id(),
                     egui::Rect::from_min_max(s0, s1 ),
                     egui::Rect::from_min_max(uv0, uv1 ),
                     egui::Color32::WHITE );
