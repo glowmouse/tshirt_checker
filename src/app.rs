@@ -1,11 +1,9 @@
-//use rand::Rng;
 
 extern crate nalgebra as na;
 use na::{Matrix3, matrix, dvector, vector, Vector3};
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 pub struct TShirtCheckerApp<'a> {
-    _rng:                   rand::rngs::ThreadRng,
     footer_debug_0:         String,
     footer_debug_1:         String,
     t_shirt_bytes:          &'a[u8],
@@ -23,7 +21,6 @@ pub struct TShirtCheckerApp<'a> {
 impl Default for TShirtCheckerApp<'_> {
     fn default() -> Self {
         Self {
-            _rng: rand::thread_rng(),
             footer_debug_0:         String::new(),
             footer_debug_1:         String::new(),
             t_shirt_bytes:          include_bytes!("blue_tshirt.png"),         
