@@ -8,9 +8,12 @@ pub struct TShirtCheckerApp<'a> {
     _rng:                   rand::rngs::ThreadRng,
     footer_debug_0:         String,
     footer_debug_1:         String,
+    t_shirt_bytes:          &'a[u8],
+    t_shirt_colorimage:     std::option::Option<egui::ColorImage>,
     t_shirt_img_src:        egui::Image<'a>,
     test_artwork_src:       egui::Image<'a>,
     t_shirt:                std::option::Option<egui::load::SizedTexture>,
+    t_shirt_2:              std::option::Option<egui::load::SizedTexture>,
     artwork:                std::option::Option<egui::load::SizedTexture>,
     zoom:                   f32,
     target:                 Vector3<f32>,
@@ -25,11 +28,14 @@ impl Default for TShirtCheckerApp<'_> {
             _rng: rand::thread_rng(),
             footer_debug_0:         String::new(),
             footer_debug_1:         String::new(),
+            t_shirt_bytes:          include_bytes!("blue_tshirt.png"),         
+            t_shirt_colorimage:     None,
             t_shirt_img_src:        egui::Image::new(egui::include_image!("blue_tshirt.png")) ,
             //test_artwork_src:     egui::Image::new(egui::include_image!("hortest.png")) ,
             //test_artwork_src:     egui::Image::new(egui::include_image!("starfest-2024-attendee-v2.png")) ,
             test_artwork_src:       egui::Image::new(egui::include_image!("sf2024-attendee-v1.png")) ,
             t_shirt:                None,
+            t_shirt_2:              None,
             artwork:                None,
             zoom:                   1.0,
             target:                 vector![ 0.50, 0.50, 1.0 ],
@@ -137,6 +143,21 @@ impl TShirtCheckerApp<'_> {
                     self.artwork = Some(egui::load::SizedTexture::new(oid.unwrap(), osize.unwrap()));
                 }
             }
+        }
+
+        if Option::is_none(&self.t_shirt_colorimage) {
+            // Prototyping off https://docs.rs/egui/latest/egui/struct.Context.html#method.load_texture
+            self.t_shirt_colorimage = Some( egui_extras::image::load_image_bytes( self.t_shirt_bytes ).unwrap() );
+            //self.t_shirt_colorimage = Some(egui::ColorImage::example());
+            let xsize = self.t_shirt_colorimage.as_ref().unwrap().size[0];
+            let ysize = self.t_shirt_colorimage.as_ref().unwrap().size[1];
+            let xsize_f = f32::from(i16::try_from(xsize).unwrap());
+            let ysize_f = f32::from(i16::try_from(ysize).unwrap());
+            let handle: egui::TextureHandle = ctx.load_texture( "my_blue", self.t_shirt_colorimage.as_ref().unwrap().clone(), Default::default() );
+            self.t_shirt_2 = Some(egui::load::SizedTexture{ id : handle.id(), size : egui::Vec2{ x: xsize_f, y: ysize_f }});
+
+            let tshirt_size = self.t_shirt_2.unwrap().size;
+            self.footer_debug_1 = format!("t_shirt size {} {} - {} {} - {} {}", xsize_f, ysize_f, handle.size_vec2().x, handle.size_vec2().y, tshirt_size.x, tshirt_size.y );
         }
     }
 
@@ -261,8 +282,10 @@ impl TShirtCheckerApp<'_> {
     fn do_central_panel(&mut self, ctx: &egui::Context ) {
         egui::CentralPanel::default().show(ctx, |ui| {
 
+            //if Option::is_some(&self.t_shirt_2 ) {
             if Option::is_some(&self.t_shirt ) {
                 let tshirt_to_display = self.tshirt_to_display(ui);
+                //let t_shirt_texture = self.t_shirt_2.unwrap();
                 let t_shirt_texture = self.t_shirt.unwrap();
 
                 let uv0 = egui::Pos2{ x: 0.0, y: 0.0 };
@@ -311,14 +334,10 @@ impl TShirtCheckerApp<'_> {
                         let zoom_delta_1 = ui.ctx().input(|i| i.zoom_delta());
                         let zoom_delta = if zoom_delta_0 != 1.0 { zoom_delta_0} else {zoom_delta_1};
 
-                        self.footer_debug_1 = format!("drag count {} zoom delta {}", self.drag_count, zoom_delta);
                         self.zoom = self.zoom * zoom_delta;
                         if self.zoom < 1.0 {
                             self.zoom = 1.0;
                         }
-                    }
-                    else {
-                        self.footer_debug_1 = "".to_string();
                     }
 
                     painter.image( 
