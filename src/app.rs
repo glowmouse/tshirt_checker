@@ -307,7 +307,10 @@ impl TShirtCheckerApp<'_> {
                     }
 
                     if response.hovered() {
-                        let zoom_delta = 1.0 + ui.ctx().input(|i| i.smooth_scroll_delta)[1] / 200.0;
+                        let zoom_delta_0 = 1.0 + ui.ctx().input(|i| i.smooth_scroll_delta)[1] / 200.0;
+                        let zoom_delta_1 = ui.ctx().input(|i| i.zoom_delta());
+                        let zoom_delta = if zoom_delta_0 != 1.0 { zoom_delta_0} else {zoom_delta_1};
+
                         self.footer_debug_1 = format!("drag count {} zoom delta {}", self.drag_count, zoom_delta);
                         self.zoom = self.zoom * zoom_delta;
                         if self.zoom < 1.0 {
