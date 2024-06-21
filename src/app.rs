@@ -2,6 +2,63 @@
 extern crate nalgebra as na;
 use na::{Matrix3, matrix, dvector, vector, Vector3};
 
+/// My image abstraction
+pub struct LoadedImage {
+    uncompressed_image:     egui::ColorImage,
+    texture:                egui::TextureHandle,
+}
+
+impl LoadedImage {
+    pub fn new( uncompressed_image_arg: egui::ColorImage, texture_arg: egui::TextureHandle ) -> Self {
+      Self {
+          uncompressed_image:   uncompressed_image_arg,
+          texture:              texture_arg
+      }
+    }
+
+    pub fn id(&self) -> egui::TextureId {
+      self.texture.id()
+    }
+
+    pub fn size(&self) -> egui::Vec2 {
+      self.texture.size_vec2()
+    }
+
+    pub fn pixels(&self) -> &Vec<egui::Color32> {
+      &self.uncompressed_image.pixels
+    }
+}
+
+fn load_image_from_trusted_source( bytes : &[u8],  name: impl Into<String>, ctx: &egui::Context ) -> LoadedImage 
+{
+    let uncompressed_image = egui_extras::image::load_image_bytes( bytes ).unwrap();
+    let xsize = uncompressed_image.size[0];
+    let ysize = uncompressed_image.size[1];
+    let xsize_f = f32::from(i16::try_from(xsize).unwrap());
+    let ysize_f = f32::from(i16::try_from(ysize).unwrap());
+    let handle: egui::TextureHandle = ctx.load_texture( name, uncompressed_image.clone(), Default::default() );
+    LoadedImage{ uncompressed_image: uncompressed_image, texture: handle }
+ }
+
+/*
+  self.t_shirt_colorimage = Some( egui_extras::image::load_image_bytes( self.t_shirt_bytes ).unwrap() );
+
+
+        if Option::is_none(&self.t_shirt_colorimage) {
+            // Prototyping off https://docs.rs/egui/latest/egui/struct.Context.html#method.load_texture
+            self.t_shirt_colorimage = Some( egui_extras::image::load_image_bytes( self.t_shirt_bytes ).unwrap() );
+            let xsize = self.t_shirt_colorimage.as_ref().unwrap().size[0];
+            let ysize = self.t_shirt_colorimage.as_ref().unwrap().size[1];
+            let xsize_f = f32::from(i16::try_from(xsize).unwrap());
+            let ysize_f = f32::from(i16::try_from(ysize).unwrap());
+
+            let tshirt_size = handle.size_vec2();
+            self.footer_debug_1 = format!("t_shirt size {} {} - {} {} - {} {}", xsize_f, ysize_f, handle.size_vec2().x, handle.size_vec2().y, tshirt_size.x, tshirt_size.y );
+            self.t_shirt_2 = Some(handle);
+        }
+*/
+
+
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 pub struct TShirtCheckerApp<'a> {
     footer_debug_0:         String,
@@ -10,6 +67,7 @@ pub struct TShirtCheckerApp<'a> {
     t_shirt_colorimage:     std::option::Option<egui::ColorImage>,
     test_artwork_src:       egui::Image<'a>,
     t_shirt_2:              std::option::Option<egui::TextureHandle>,
+    t_shirt:                LoadedImage,
     artwork:                std::option::Option<egui::load::SizedTexture>,
     zoom:                   f32,
     target:                 Vector3<f32>,
@@ -18,6 +76,7 @@ pub struct TShirtCheckerApp<'a> {
     drag_count:             i32
 }
 
+/*
 impl Default for TShirtCheckerApp<'_> {
     fn default() -> Self {
         Self {
@@ -38,6 +97,7 @@ impl Default for TShirtCheckerApp<'_> {
         }
     }
 }
+*/
 
 // Sketchy global so I can test stuff out while I struggle with the
 // file dialog box code.
@@ -102,11 +162,27 @@ fn _app_execute<F: Future<Output = ()> + 'static>(f: F) {
 
 impl TShirtCheckerApp<'_> {
     /// Called once before the first frame.
-    pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
 
-        Default::default()
+        Self {
+            footer_debug_0:         String::new(),
+            footer_debug_1:         String::new(),
+            t_shirt_bytes:          include_bytes!("blue_tshirt.png"),         
+            t_shirt_colorimage:     None,
+            //test_artwork_src:     egui::Image::new(egui::include_image!("hortest.png")) ,
+            //test_artwork_src:     egui::Image::new(egui::include_image!("starfest-2024-attendee-v2.png")) ,
+            test_artwork_src:       egui::Image::new(egui::include_image!("sf2024-attendee-v1.png")) ,
+            t_shirt_2:              None,
+            t_shirt:                load_image_from_trusted_source(include_bytes!("blue_tshirt.png"), "blue_shirt", &cc.egui_ctx  ),
+            artwork:                None,
+            zoom:                   1.0,
+            target:                 vector![ 0.50, 0.50, 1.0 ],
+            last_drag_pos:          None,
+            drag_display_to_tshirt: None,
+            drag_count:             0,
+        }
     }
 
     fn do_texture_loads(&mut self, ctx: &egui::Context ) {
