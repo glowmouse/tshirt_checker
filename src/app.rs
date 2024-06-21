@@ -13,7 +13,7 @@ pub struct TShirtCheckerApp<'a> {
     t_shirt_img_src:        egui::Image<'a>,
     test_artwork_src:       egui::Image<'a>,
     t_shirt:                std::option::Option<egui::load::SizedTexture>,
-    t_shirt_2:              std::option::Option<egui::load::SizedTexture>,
+    t_shirt_2:              std::option::Option<egui::TextureHandle>,
     artwork:                std::option::Option<egui::load::SizedTexture>,
     zoom:                   f32,
     target:                 Vector3<f32>,
@@ -148,16 +148,15 @@ impl TShirtCheckerApp<'_> {
         if Option::is_none(&self.t_shirt_colorimage) {
             // Prototyping off https://docs.rs/egui/latest/egui/struct.Context.html#method.load_texture
             self.t_shirt_colorimage = Some( egui_extras::image::load_image_bytes( self.t_shirt_bytes ).unwrap() );
-            //self.t_shirt_colorimage = Some(egui::ColorImage::example());
             let xsize = self.t_shirt_colorimage.as_ref().unwrap().size[0];
             let ysize = self.t_shirt_colorimage.as_ref().unwrap().size[1];
             let xsize_f = f32::from(i16::try_from(xsize).unwrap());
             let ysize_f = f32::from(i16::try_from(ysize).unwrap());
             let handle: egui::TextureHandle = ctx.load_texture( "my_blue", self.t_shirt_colorimage.as_ref().unwrap().clone(), Default::default() );
-            self.t_shirt_2 = Some(egui::load::SizedTexture{ id : handle.id(), size : egui::Vec2{ x: xsize_f, y: ysize_f }});
 
-            let tshirt_size = self.t_shirt_2.unwrap().size;
+            let tshirt_size = handle.size_vec2();
             self.footer_debug_1 = format!("t_shirt size {} {} - {} {} - {} {}", xsize_f, ysize_f, handle.size_vec2().x, handle.size_vec2().y, tshirt_size.x, tshirt_size.y );
+            self.t_shirt_2 = Some(handle);
         }
     }
 
@@ -179,6 +178,10 @@ impl TShirtCheckerApp<'_> {
 
                 powered_by_egui_and_eframe(ui);
                 egui::warn_if_debug_build(ui);
+
+            if Option::is_some(&self.t_shirt_2 ) {
+              ui.image((self.t_shirt_2.as_ref().unwrap().id(), self.t_shirt_2.as_ref().unwrap().size_vec2()));
+            }
         });
     }
 
@@ -285,8 +288,8 @@ impl TShirtCheckerApp<'_> {
             //if Option::is_some(&self.t_shirt_2 ) {
             if Option::is_some(&self.t_shirt ) {
                 let tshirt_to_display = self.tshirt_to_display(ui);
-                //let t_shirt_texture = self.t_shirt_2.unwrap();
                 let t_shirt_texture = self.t_shirt.unwrap();
+                //let t_shirt_texture = self.t_shirt.unwrap();
 
                 let uv0 = egui::Pos2{ x: 0.0, y: 0.0 };
                 let uv1 = egui::Pos2{ x: 1.0, y: 1.0 };
