@@ -21,7 +21,7 @@ eframe = { version= "0.27.2", features = [
     "persistence",   # Enable restoring app state when restarting the app.
 ] }
 egui_extras = { version = "0.27.2", features = ["default", "all_loaders"] }
-#image = { version = "0.24", features = ["jpeg", "png" ] }
+image = { version = "0.24", features = ["jpeg", "png" ] }
 log = "0.4"
 
 # For file loading.
