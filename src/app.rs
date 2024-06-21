@@ -10,9 +10,7 @@ pub struct TShirtCheckerApp<'a> {
     footer_debug_1:         String,
     t_shirt_bytes:          &'a[u8],
     t_shirt_colorimage:     std::option::Option<egui::ColorImage>,
-    t_shirt_img_src:        egui::Image<'a>,
     test_artwork_src:       egui::Image<'a>,
-    t_shirt:                std::option::Option<egui::load::SizedTexture>,
     t_shirt_2:              std::option::Option<egui::TextureHandle>,
     artwork:                std::option::Option<egui::load::SizedTexture>,
     zoom:                   f32,
@@ -30,11 +28,9 @@ impl Default for TShirtCheckerApp<'_> {
             footer_debug_1:         String::new(),
             t_shirt_bytes:          include_bytes!("blue_tshirt.png"),         
             t_shirt_colorimage:     None,
-            t_shirt_img_src:        egui::Image::new(egui::include_image!("blue_tshirt.png")) ,
             //test_artwork_src:     egui::Image::new(egui::include_image!("hortest.png")) ,
             //test_artwork_src:     egui::Image::new(egui::include_image!("starfest-2024-attendee-v2.png")) ,
             test_artwork_src:       egui::Image::new(egui::include_image!("sf2024-attendee-v1.png")) ,
-            t_shirt:                None,
             t_shirt_2:              None,
             artwork:                None,
             zoom:                   1.0,
@@ -117,21 +113,6 @@ impl TShirtCheckerApp<'_> {
     }
 
     fn do_texture_loads(&mut self, ctx: &egui::Context ) {
-        // If we don't have a Texture ID for the T-Shirt, push on the load.
-        // The T-Shirt is compiled into the binary, so I don't expect to
-        // see any weird load problems.
-        // 
-        if Option::is_none(&self.t_shirt ) {
-            let load_result = self.t_shirt_img_src.load_for_size( ctx, egui::Vec2{ x: 1.0, y: 1.0 } );
-            if Result::is_ok(&load_result) {
-                let texture_poll = load_result.unwrap();
-                let osize = texture_poll.size();
-                let oid = texture_poll.texture_id();
-                if Option::is_some( &osize ) && Option::is_some( &oid ) {
-                    self.t_shirt = Some(egui::load::SizedTexture::new(oid.unwrap(), osize.unwrap()));
-                }
-            }
-        }
 
         if Option::is_none(&self.artwork) {
             let load_result = self.test_artwork_src.load_for_size( ctx, egui::Vec2{ x: 1.0, y: 1.0 } );
@@ -178,10 +159,6 @@ impl TShirtCheckerApp<'_> {
 
                 powered_by_egui_and_eframe(ui);
                 egui::warn_if_debug_build(ui);
-
-            if Option::is_some(&self.t_shirt_2 ) {
-              ui.image((self.t_shirt_2.as_ref().unwrap().id(), self.t_shirt_2.as_ref().unwrap().size_vec2()));
-            }
         });
     }
 
@@ -191,12 +168,12 @@ impl TShirtCheckerApp<'_> {
     // right corner of the t-shirt image, to the display.
     // 
     fn tshirt_to_display(&self, ui: &egui::Ui) -> Matrix3<f32> {
-        std::assert!(Option::is_some(&self.t_shirt ));
+        std::assert!(Option::is_some( &self.t_shirt_2 ));
         let panel_size   = ui.available_size_before_wrap();
         let panel_aspect = panel_size[0] / panel_size[1];
 
-        let t_shirt_texture = self.t_shirt.unwrap();
-        let tshirt_size = t_shirt_texture.size;
+        let t_shirt_texture = self.t_shirt_2.as_ref().unwrap();
+        let tshirt_size = t_shirt_texture.size_vec2();
         let tshirt_aspect = tshirt_size.x / tshirt_size.y;
 
         let move_from_center: Matrix3<f32> = 
@@ -264,10 +241,10 @@ impl TShirtCheckerApp<'_> {
     // 11.0 x 14.0 is the working area for the artwork in inches
     // 
     fn art_space_to_tshirt( &self ) -> Matrix3<f32> {
-        std::assert!(Option::is_some(&self.t_shirt ));
+        std::assert!(Option::is_some( &self.t_shirt_2 ));
 
-        let tshirt_texture     = self.t_shirt.unwrap();
-        let tshirt_size        = tshirt_texture.size;
+        let tshirt_texture     = self.t_shirt_2.as_ref().unwrap();
+        let tshirt_size        = tshirt_texture.size_vec2();
         let tshirt_aspect      = tshirt_size.x / tshirt_size.y;
 
         let xcenter = 0.50;  // center artwork mid point for X
@@ -286,9 +263,9 @@ impl TShirtCheckerApp<'_> {
         egui::CentralPanel::default().show(ctx, |ui| {
 
             //if Option::is_some(&self.t_shirt_2 ) {
-            if Option::is_some(&self.t_shirt ) {
+            if Option::is_some(&self.t_shirt_2 ) {
                 let tshirt_to_display = self.tshirt_to_display(ui);
-                let t_shirt_texture = self.t_shirt.unwrap();
+                let t_shirt_texture = self.t_shirt_2.as_ref().unwrap();
                 //let t_shirt_texture = self.t_shirt.unwrap();
 
                 let uv0 = egui::Pos2{ x: 0.0, y: 0.0 };
@@ -299,7 +276,7 @@ impl TShirtCheckerApp<'_> {
 
                 let (response, painter ) =ui.allocate_painter(ui.available_size_before_wrap(), egui::Sense::click_and_drag() );
                 painter.image( 
-                    t_shirt_texture.id,
+                    t_shirt_texture.id(),
                     egui::Rect::from_min_max(s0, s1 ),
                     egui::Rect::from_min_max(uv0, uv1 ),
                     egui::Color32::WHITE );
