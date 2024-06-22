@@ -84,12 +84,8 @@ impl Into<egui::Color32> for HSLA {
     }
 
     fn hue_to_rgb( t1 : i32, t2 : i32, h: i32 ) -> u8 {
-      let tmp2 = hue_to_rgb_2( t1, t2, h );
-      let tmp = if tmp2 == 256 { 255 } else { tmp2 };
-      let tmp = if tmp2 < 0 { 0 } else { tmp2 };
-      std::assert!( tmp >= 0 );
-      std::assert!( tmp <= 256 );
-      std::assert!( tmp <  256 );
+      // we sometimes get small negatives.  skill issue/ bug.
+      let tmp = std::cmp::min(255, std::cmp::max( 0, hue_to_rgb_2( t1, t2, h )));
       u8::try_from( tmp ).unwrap()
     }
 
@@ -102,7 +98,7 @@ impl Into<egui::Color32> for HSLA {
 }
 
 fn blue_to_red( input : egui::Color32 ) -> egui::Color32 {
-  let hsla = HSLA::from( input )
+  let hsla = HSLA::from( input );
   // -324 adjusts the original blue green shirt to a primary color
   // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
   // 1024 to adjust the primary color to red.
@@ -110,6 +106,29 @@ fn blue_to_red( input : egui::Color32 ) -> egui::Color32 {
   red_adjust.into()
 } 
 
+fn int_gamma( input : u8, gamma : f32 ) -> u8 {
+    let finput = ( input as f32 ) / 255.0;
+    let fout = f32::powf( finput, gamma ) * 255.0;
+    fout as u8
+}
+
+fn blue_to_dgreen( input : egui::Color32 ) -> egui::Color32 {
+  let hsla = HSLA::from( input );
+  // -324 adjusts the original blue green shirt to a primary color
+  // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
+  // 1024 to adjust the primary color to red.
+  let dgreen_adjust = HSLA{ h: ( hsla.h + 6 * 256 - 324 + 38 ) % ( 6 * 256 ), s: hsla.s, l : int_gamma(hsla.l, 1.7), a: hsla.a };
+  dgreen_adjust.into()
+}
+
+fn blue_to_burg( input : egui::Color32 ) -> egui::Color32 {
+  let hsla = HSLA::from( input );
+  // -324 adjusts the original blue green shirt to a primary color
+  // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
+  // 1024 to adjust the primary color to red.
+  let burg_adjust = HSLA{ h: ( hsla.h + 6 * 256 - 324 + 439 + 512 ) % ( 6 * 256 ), s: hsla.s, l : int_gamma(hsla.l, 1.7), a: hsla.a };
+  burg_adjust.into()
+} 
 
 /// My image abstraction
 pub struct LoadedImage {
@@ -126,6 +145,10 @@ impl Clone for LoadedImage {
 impl LoadedImage {
     pub fn id(&self) -> egui::TextureId {
       self.texture.id()
+    }
+
+    pub fn texture_handle(&self) -> &egui::TextureHandle {
+      &self.texture
     }
 
     pub fn size(&self) -> egui::Vec2 {
@@ -173,6 +196,8 @@ pub struct TShirtCheckerApp<'a> {
     test_artwork_src:       egui::Image<'a>,
     blue_t_shirt:           LoadedImage,
     red_t_shirt:            LoadedImage,
+    dgreen_t_shirt:         LoadedImage,
+    burg_t_shirt:           LoadedImage,
     t_shirt:                LoadedImage,
     artwork:                std::option::Option<egui::load::SizedTexture>,
     zoom:                   f32,
@@ -250,6 +275,8 @@ impl TShirtCheckerApp<'_> {
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
         let blue_shirt : LoadedImage = load_image_from_trusted_source(include_bytes!("blue_tshirt.png"), "blue_shirt", &cc.egui_ctx  );
         let red_shirt : LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_red, "red_shirt", &cc.egui_ctx ); 
+        let dgreen_shirt: LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_dgreen, "dgreen_shirt", &cc.egui_ctx ); 
+        let burg_shirt: LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_burg, "burg_shirt", &cc.egui_ctx ); 
  
         Self {
             footer_debug_0:         String::new(),
@@ -259,6 +286,8 @@ impl TShirtCheckerApp<'_> {
             test_artwork_src:       egui::Image::new(egui::include_image!("sf2024-attendee-v1.png")) ,
             blue_t_shirt:           blue_shirt,
             red_t_shirt:            red_shirt.clone(),           
+            dgreen_t_shirt:         dgreen_shirt,
+            burg_t_shirt:           burg_shirt,
             t_shirt:                red_shirt,           
             artwork:                None,
             zoom:                   1.0,
@@ -500,6 +529,12 @@ impl TShirtCheckerApp<'_> {
                 self.footer_debug_0 = format!("{} {}", panel_size[0], panel_size[1] );
                 ui.heading(mtext("T-Shirt Checker"));
                 ui.add_space(10.0);
+                ui.add(egui::widgets::ImageButton::new( egui::Image::from_texture( self.burg_t_shirt.texture_handle() )));
+                ui.add(egui::widgets::ImageButton::new( egui::Image::from_texture( self.dgreen_t_shirt.texture_handle() )));
+                ui.add(egui::widgets::ImageButton::new( egui::Image::from_texture( self.blue_t_shirt.texture_handle() ))); 
+                ui.add(egui::widgets::ImageButton::new( egui::Image::from_texture( self.red_t_shirt.texture_handle() )));
+                ui.end_row();
+
                 self.report_dpi(ui);
             })
         });
