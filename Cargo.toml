@@ -27,6 +27,7 @@ log = "0.4"
 # For file loading.
 rfd = "0.14.1"
 async-std="1.12"
+web-time ="1.1.0"
 #rand ="0.8.5"
 #getrandom = { version = "0.2", features = ["js"] }
 nalgebra="0.32.6"

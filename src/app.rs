@@ -1,3 +1,4 @@
+use web_time::{SystemTime};
 
 extern crate nalgebra as na;
 use na::{Matrix3, matrix, dvector, vector, Vector3};
@@ -215,7 +216,8 @@ pub struct TShirtCheckerApp {
     target:                 Vector3<f32>,
     last_drag_pos:          std::option::Option<Vector3<f32>>,
     drag_display_to_tshirt: std::option::Option<Matrix3<f32>>,
-    drag_count:             i32
+    drag_count:             i32,
+    start_time:             SystemTime
 }
 
 // Sketchy global so I can test stuff out while I struggle with the
@@ -316,6 +318,7 @@ impl TShirtCheckerApp {
             last_drag_pos:          None,
             drag_display_to_tshirt: None,
             drag_count:             0,
+            start_time:             SystemTime::now()
         }
     }
 
@@ -485,8 +488,15 @@ impl TShirtCheckerApp {
                         }
                     }
 
+                    let time_in_ms = self.start_time.elapsed().unwrap().as_millis();
+                    let state = ( time_in_ms / 500 ) & 2;
+                    let texture_to_display = match state {
+                        0 => self.artwork.id(),
+                        _ => self.fixed_artwork.id()
+                    };
+
                     painter.image( 
-                        self.artwork.id(),
+                        texture_to_display,
                         egui::Rect::from_min_max(a0, a1),
                         egui::Rect::from_min_max(uv0, uv1 ),
                         egui::Color32::WHITE );
@@ -582,6 +592,7 @@ impl eframe::App for TShirtCheckerApp {
 
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.footer_debug_1 = format!("time {}", self.start_time.elapsed().unwrap().as_millis());
         self.do_bottom_panel( ctx );
         self.do_right_panel( ctx );
         self.do_central_panel( ctx );
