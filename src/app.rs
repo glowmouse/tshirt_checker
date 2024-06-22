@@ -132,7 +132,7 @@ fn blue_to_burg( input : egui::Color32 ) -> egui::Color32 {
   burg_adjust.into()
 }
 
-fn correct_for_gamma( input : egui::Color32 ) -> egui::Color32 {
+fn correct_alpha_for_tshirt( input : egui::Color32 ) -> egui::Color32 {
     let new_a = if input.a() == 0 { 0 } else { 255 };
     return egui::Color32::from_rgba_unmultiplied( input.r(), input.g(), input.b(), new_a );
 }
@@ -209,6 +209,8 @@ pub struct TShirtCheckerApp {
     fail:                   LoadedImage,
     t_shirt:                egui::TextureId,
     artwork:                LoadedImage,
+    fixed_artwork:          LoadedImage,
+    art_needs_fixing:       bool,
     zoom:                   f32,
     target:                 Vector3<f32>,
     last_drag_pos:          std::option::Option<Vector3<f32>>,
@@ -284,6 +286,7 @@ impl TShirtCheckerApp {
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
         let blue_shirt : LoadedImage = load_image_from_trusted_source(include_bytes!("blue_tshirt.png"), "blue_shirt", &cc.egui_ctx  );
         let default_art: LoadedImage = load_image_from_trusted_source(include_bytes!("sf2024-attendee-v1.png"), "default_art", &cc.egui_ctx  );
+        let default_fixed_art: LoadedImage = load_image_from_existing_image( &default_art, correct_alpha_for_tshirt, "fixed default art", &cc.egui_ctx ); 
         let red_shirt : LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_red, "red_shirt", &cc.egui_ctx ); 
         let dgreen_shirt: LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_dgreen, "dgreen_shirt", &cc.egui_ctx ); 
         let burg_shirt: LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_burg, "burg_shirt", &cc.egui_ctx ); 
@@ -305,7 +308,9 @@ impl TShirtCheckerApp {
             pass:                   pass,           
             warn:                   warn,
             fail:                   fail,
+            art_needs_fixing:       default_art.pixels() != default_fixed_art.pixels(),
             artwork:                default_art,
+            fixed_artwork:          default_fixed_art,
             zoom:                   1.0,
             target:                 vector![ 0.50, 0.50, 1.0 ],
             last_drag_pos:          None,
@@ -512,6 +517,17 @@ impl TShirtCheckerApp {
             });
     }
 
+    fn report_transparency(&self, ui: &mut egui::Ui) {
+        let status = self.gen_status( match self.art_needs_fixing {
+            false => 2,
+            true  => 0
+        });
+        ui.horizontal(|ui| {
+            ui.add( status );
+            ui.label(mtexts(&format!("Transparency")));
+            });
+    }
+
     fn do_right_panel(&mut self, ctx: &egui::Context ) {
         egui::SidePanel::right("stuff")
             .resizable(true)
@@ -522,8 +538,13 @@ impl TShirtCheckerApp {
                 self.footer_debug_0 = format!("{} {}", panel_size[0], panel_size[1] );
                 ui.add_space(10.0);
                 ui.vertical_centered(|ui| {
-                ui.heading(mtext("T-Shirt Checker"));
+                ui.heading(mtext("T Shirt Checker"));
                 });
+                ui.add_space(10.0);
+                self.report_dpi(ui);
+                self.report_transparency(ui);
+                ui.add_space(10.0);
+                ui.separator();
                 ui.add_space(10.0);
                 //let max_size = egui::Vec2{ x: 30.0, y: 30.0 };
                 ui.horizontal(|ui| {
@@ -543,7 +564,6 @@ impl TShirtCheckerApp {
                     }
                 });
 
-                self.report_dpi(ui);
             })
         });
     }
