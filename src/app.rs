@@ -2,10 +2,119 @@
 extern crate nalgebra as na;
 use na::{Matrix3, matrix, dvector, vector, Vector3};
 
+pub struct HSLA {
+  h:      u16,
+  s:      u8,
+  l:      u8,
+  a:      u8,
+}
+
+impl From<egui::Color32> for HSLA {
+  fn from( item: egui::Color32 ) -> Self {
+    let r : i32 = i32::from(item.r());
+    let g : i32 = i32::from(item.g());
+    let b : i32 = i32::from(item.b());
+
+    let min : i32 = core::cmp::min( core::cmp::min( r, g ), b );
+    let max : i32 = core::cmp::max( core::cmp::max( r, g ), b );
+
+    let l : i32 = (min + max ) / 2;
+
+    if min == max {
+      return HSLA{ h : 0, s: 0, l: u8::try_from(l).unwrap(), a: item.a() }; 
+    }
+
+
+    let half : i32 = 128;
+    let two  : i32 = 512;
+    let four : i32 = 1024;
+
+    let s2 : i32 = 
+        if l <= half          { (( max - min ) << 8 ) / ( max + min )       }
+        else                  { (( max - min ) << 8 ) / ( two - max - min ) };
+
+    let s = if s2 == 256 { 255 } else { s2 };
+
+    let ht : i32 =
+        if      r == max      {         (( g - b ) << 8 ) / (max - min ) }
+        else if g == max      { two  +  (( b - r ) << 8 ) / (max - min ) }
+        else                  { four +  (( r - g ) << 8 ) / (max - min ) };
+
+    let h = (ht + 256*6 ) % ( 256 * 6 );
+
+    std::assert!( l >= 0 && l < 256 );
+    std::assert!( s >= 0 );
+    std::assert!( s <= 256 );
+    std::assert!( s < 256 );
+    std::assert!( h >= 0 );
+    std::assert!( h <= 256 * 6 ); 
+
+    HSLA{ h : u16::try_from(h).unwrap(), s : u8::try_from(s).unwrap(), l : u8::try_from(l).unwrap(), a : item.a() }
+  }
+}
+
+impl Into<egui::Color32> for HSLA {
+
+  // https://www.niwa.nu/2013/05/math-behind-colorspace-conversions-rgb-hsl/
+
+  fn into(self) -> egui::Color32 {
+    if self.s == 0 {
+      return egui::Color32::from_rgba_unmultiplied( self.l, self.l, self.l, self.a );
+    }
+    let half : i32 = 128;
+    let one  : i32 = 256;
+    let h    : i32 = i32::from( self.h );
+    let s    : i32 = i32::from( self.s );
+    let l    : i32 = i32::from( self.l );
+
+    let temp1 : i32 = 
+        if l < half    { (l * ( one + s )) >> 8  }
+        else           { l + s - (( l * s ) >> 8 ) };
+    let temp2 : i32 = 2 * l - temp1;
+
+    fn hue_to_rgb_2( p: i32, q: i32, targ : i32 ) -> i32 {
+      let t = targ % ( 6 * 256 );
+      let one   : i32 = 256;
+      let three : i32 = 256*3;
+      let four  : i32 = 256*4;
+      if        t < one       { p + (q - p ) * t / 256 }
+      else if   t < three     { q }
+      else if   t < four      { p + (q - p ) * ( four - t ) / 256 }
+      else                    { p } 
+    }
+
+    fn hue_to_rgb( p : i32, q : i32, t: i32 ) -> u8 {
+      let tmp = hue_to_rgb_2( p, q, t );
+      std::assert!( tmp >= 0 );
+      std::assert!( tmp <= 256 );
+      std::assert!( tmp <  256 );
+      u8::try_from( tmp ).unwrap()
+    }
+
+    let r = hue_to_rgb( temp1, temp2, h + 256/3 );
+    let g = hue_to_rgb( temp1, temp2, h         );
+    let b = hue_to_rgb( temp1, temp2, h - 256/3 );
+
+    return egui::Color32::from_rgba_unmultiplied( r, g, b, self.a );
+  }
+}
+
+fn blue_to_red( input : egui::Color32 ) -> egui::Color32 {
+  let hsla = HSLA::from( input );
+  hsla.into()
+} 
+
+
 /// My image abstraction
 pub struct LoadedImage {
     uncompressed_image:     egui::ColorImage,
     texture:                egui::TextureHandle,
+}
+
+impl Clone for LoadedImage {
+  fn clone(&self) -> Self {
+    LoadedImage{ uncompressed_image: self.uncompressed_image.clone(), texture: self.texture.clone() }
+  }
 }
 
 impl LoadedImage {
@@ -26,6 +135,8 @@ impl LoadedImage {
     }
 }
 
+
+
 fn load_image_from_trusted_source( bytes : &[u8],  name: impl Into<String>, ctx: &egui::Context ) -> LoadedImage 
 {
     let uncompressed_image = egui_extras::image::load_image_bytes( bytes ).unwrap();
@@ -35,13 +146,13 @@ fn load_image_from_trusted_source( bytes : &[u8],  name: impl Into<String>, ctx:
 
 fn load_image_from_existing_image( 
   existing: &LoadedImage, 
-  mutator: fn( &egui::Color32 ) -> egui::Color32, 
+  mutator: fn( egui::Color32 ) -> egui::Color32, 
   name: impl Into<String>, ctx: &egui::Context ) -> LoadedImage 
 {
   let mut new_image : Vec<egui::Color32> = vec![];
 
   for color in existing.pixels().iter() {
-    new_image.push( mutator( color ));
+    new_image.push( mutator( *color ));
   } 
 
   let uncompressed_image = egui::ColorImage { size: existing.size_as_array().clone(), pixels: new_image };
@@ -54,8 +165,9 @@ pub struct TShirtCheckerApp<'a> {
     footer_debug_0:         String,
     footer_debug_1:         String,
     test_artwork_src:       egui::Image<'a>,
+    blue_t_shirt:           LoadedImage,
+    red_t_shirt:            LoadedImage,
     t_shirt:                LoadedImage,
-    _red_t_shirt:            LoadedImage,
     artwork:                std::option::Option<egui::load::SizedTexture>,
     zoom:                   f32,
     target:                 Vector3<f32>,
@@ -131,7 +243,7 @@ impl TShirtCheckerApp<'_> {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
         let blue_shirt : LoadedImage = load_image_from_trusted_source(include_bytes!("blue_tshirt.png"), "blue_shirt", &cc.egui_ctx  );
-        let red_shirt : LoadedImage = load_image_from_existing_image( &blue_shirt, | c : &egui::Color32 | -> egui::Color32 { *c }, "red_shirt", &cc.egui_ctx ); 
+        let red_shirt : LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_red, "red_shirt", &cc.egui_ctx ); 
  
         Self {
             footer_debug_0:         String::new(),
@@ -139,8 +251,9 @@ impl TShirtCheckerApp<'_> {
             //test_artwork_src:     egui::Image::new(egui::include_image!("hortest.png")) ,
             //test_artwork_src:     egui::Image::new(egui::include_image!("starfest-2024-attendee-v2.png")) ,
             test_artwork_src:       egui::Image::new(egui::include_image!("sf2024-attendee-v1.png")) ,
-            t_shirt:                blue_shirt,
-            _red_t_shirt:            red_shirt,           
+            blue_t_shirt:           blue_shirt,
+            red_t_shirt:            red_shirt.clone(),           
+            t_shirt:                red_shirt,           
             artwork:                None,
             zoom:                   1.0,
             target:                 vector![ 0.50, 0.50, 1.0 ],
