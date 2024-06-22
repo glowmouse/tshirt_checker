@@ -130,7 +130,12 @@ fn blue_to_burg( input : egui::Color32 ) -> egui::Color32 {
   // 1024 to adjust the primary color to red.
   let burg_adjust = HSLA{ h: ( hsla.h + 6 * 256 - 324 + 439 + 512 ) % ( 6 * 256 ), s: hsla.s, l : int_gamma(hsla.l, 1.7), a: hsla.a };
   burg_adjust.into()
-} 
+}
+
+fn correct_for_gamma( input : egui::Color32 ) -> egui::Color32 {
+    let new_a = if input.a() == 0 { 0 } else { 255 };
+    return egui::Color32::from_rgba_unmultiplied( input.r(), input.g(), input.b(), new_a );
+}
 
 /// My image abstraction
 pub struct LoadedImage {
@@ -192,10 +197,9 @@ fn load_image_from_existing_image(
 }
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
-pub struct TShirtCheckerApp<'a> {
+pub struct TShirtCheckerApp {
     footer_debug_0:         String,
     footer_debug_1:         String,
-    test_artwork_src:       egui::Image<'a>,
     blue_t_shirt:           LoadedImage,
     red_t_shirt:            LoadedImage,
     dgreen_t_shirt:         LoadedImage,
@@ -204,7 +208,7 @@ pub struct TShirtCheckerApp<'a> {
     warn:                   LoadedImage,
     fail:                   LoadedImage,
     t_shirt:                egui::TextureId,
-    artwork:                std::option::Option<egui::load::SizedTexture>,
+    artwork:                LoadedImage,
     zoom:                   f32,
     target:                 Vector3<f32>,
     last_drag_pos:          std::option::Option<Vector3<f32>>,
@@ -273,12 +277,13 @@ fn _app_execute<F: Future<Output = ()> + 'static>(f: F) {
         */
 
 
-impl TShirtCheckerApp<'_> {
+impl TShirtCheckerApp {
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
         let blue_shirt : LoadedImage = load_image_from_trusted_source(include_bytes!("blue_tshirt.png"), "blue_shirt", &cc.egui_ctx  );
+        let default_art: LoadedImage = load_image_from_trusted_source(include_bytes!("sf2024-attendee-v1.png"), "default_art", &cc.egui_ctx  );
         let red_shirt : LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_red, "red_shirt", &cc.egui_ctx ); 
         let dgreen_shirt: LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_dgreen, "dgreen_shirt", &cc.egui_ctx ); 
         let burg_shirt: LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_burg, "burg_shirt", &cc.egui_ctx ); 
@@ -292,7 +297,6 @@ impl TShirtCheckerApp<'_> {
             footer_debug_1:         String::new(),
             //test_artwork_src:     egui::Image::new(egui::include_image!("hortest.png")) ,
             //test_artwork_src:     egui::Image::new(egui::include_image!("starfest-2024-attendee-v2.png")) ,
-            test_artwork_src:       egui::Image::new(egui::include_image!("sf2024-attendee-v1.png")) ,
             blue_t_shirt:           blue_shirt,
             red_t_shirt:            red_shirt,
             dgreen_t_shirt:         dgreen_shirt,
@@ -301,27 +305,12 @@ impl TShirtCheckerApp<'_> {
             pass:                   pass,           
             warn:                   warn,
             fail:                   fail,
-            artwork:                None,
+            artwork:                default_art,
             zoom:                   1.0,
             target:                 vector![ 0.50, 0.50, 1.0 ],
             last_drag_pos:          None,
             drag_display_to_tshirt: None,
             drag_count:             0,
-        }
-    }
-
-    fn do_texture_loads(&mut self, ctx: &egui::Context ) {
-
-        if Option::is_none(&self.artwork) {
-            let load_result = self.test_artwork_src.load_for_size( ctx, egui::Vec2{ x: 1.0, y: 1.0 } );
-            if Result::is_ok(&load_result) {
-                let texture_poll = load_result.unwrap();
-                let osize = texture_poll.size();
-                let oid = texture_poll.texture_id();
-                if Option::is_some( &osize ) && Option::is_some( &oid ) {
-                    self.artwork = Some(egui::load::SizedTexture::new(oid.unwrap(), osize.unwrap()));
-                }
-            }
         }
     }
 
@@ -391,13 +380,11 @@ impl TShirtCheckerApp<'_> {
     }
 
     fn art_to_art_space( &self ) -> Matrix3<f32> {
-        std::assert!(Option::is_some(&self.artwork ));
         
         let artspace_size   = vector!( 11.0, 14.0 );
         let artspace_aspect = artspace_size.x / artspace_size.y;
 
-        let art_texture     = self.artwork.unwrap();
-        let art_size        = art_texture.size;
+        let art_size        = self.artwork.size();
         let art_aspect      = art_size.x / art_size.y;
 
         if artspace_aspect > art_aspect {
@@ -442,8 +429,6 @@ impl TShirtCheckerApp<'_> {
     fn do_central_panel(&mut self, ctx: &egui::Context ) {
         egui::CentralPanel::default().show(ctx, |ui| {
 
-            //if Option::is_some(&self.t_shirt_2 ) {
-            if true {
                 let tshirt_to_display = self.tshirt_to_display(ui);
 
                 let uv0 = egui::Pos2{ x: 0.0, y: 0.0 };
@@ -459,9 +444,6 @@ impl TShirtCheckerApp<'_> {
                     egui::Rect::from_min_max(uv0, uv1 ),
                     egui::Color32::WHITE );
 
-                if Option::is_some(&self.artwork) {
-
-                    let art_texture = self.artwork.unwrap();
                     let art_space_to_display = tshirt_to_display * self.art_space_to_tshirt() * self.art_to_art_space();
 
                     let a0 = v3_to_egui( art_space_to_display * dvector![0.0,  0.0,  1.0] ); 
@@ -499,12 +481,10 @@ impl TShirtCheckerApp<'_> {
                     }
 
                     painter.image( 
-                        art_texture.id,
+                        self.artwork.id(),
                         egui::Rect::from_min_max(a0, a1),
                         egui::Rect::from_min_max(uv0, uv1 ),
                         egui::Color32::WHITE );
-                }
-            }
         });
     }
 
@@ -517,22 +497,19 @@ impl TShirtCheckerApp<'_> {
     }
 
     fn report_dpi(&self, ui: &mut egui::Ui) {
-        if Option::is_some(&self.artwork) {
-            let art_texture   = self.artwork.unwrap();
-            let top_corner    = self.art_to_art_space() * dvector![ 0.0, 0.0, 1.0 ]; 
-            let bot_corner    = self.art_to_art_space() * dvector![ 1.0, 1.0, 1.0 ];
-            let dim_in_inches = bot_corner - top_corner;
-            let dpi = (art_texture.size.x / dim_in_inches.x) as i32;
-            let status = self.gen_status( match dpi {
-                0..=74 => 0,
-                75 ..=149 => 1,
-                _ => 2
+        let top_corner    = self.art_to_art_space() * dvector![ 0.0, 0.0, 1.0 ]; 
+        let bot_corner    = self.art_to_art_space() * dvector![ 1.0, 1.0, 1.0 ];
+        let dim_in_inches = bot_corner - top_corner;
+        let dpi = (self.artwork.size().x / dim_in_inches.x) as i32;
+        let status = self.gen_status( match dpi {
+            0..=74 => 0,
+            75 ..=149 => 1,
+            _ => 2
+        });
+        ui.horizontal(|ui| {
+            ui.add( status );
+            ui.label(mtexts(&format!("{} DPI", dpi )));
             });
-            ui.horizontal(|ui| {
-                ui.add( status );
-                ui.label(mtexts(&format!("{} DPI", dpi )));
-            });
-        }
     }
 
     fn do_right_panel(&mut self, ctx: &egui::Context ) {
@@ -580,12 +557,11 @@ fn mtexts(text: &String) -> egui::widget_text::RichText {
     egui::widget_text::RichText::from(text).size(25.0)
 }
 
-impl eframe::App for TShirtCheckerApp<'_> {
+impl eframe::App for TShirtCheckerApp {
 
 
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.do_texture_loads( ctx ); 
         self.do_bottom_panel( ctx );
         self.do_right_panel( ctx );
         self.do_central_panel( ctx );
