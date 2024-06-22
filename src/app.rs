@@ -72,19 +72,19 @@ impl Into<egui::Color32> for HSLA {
         else           { l + s - (( l * s ) >> 8 ) };
     let temp2 : i32 = 2 * l - temp1;
 
-    fn hue_to_rgb_2( p: i32, q: i32, harg : i32 ) -> i32 {
+    fn hue_to_rgb_2( t1: i32, t2: i32, harg : i32 ) -> i32 {
       let h = harg % ( 6 * 256 );
       let one   : i32 = 256;
       let three : i32 = 256*3;
       let four  : i32 = 256*4;
-      if        h < one       { p + (q - p ) * h / (256*6) }
-      else if   h < three     { q }
-      else if   h < four      { p + (q - p ) * ( four - h ) / (256*6) }
-      else                    { p } 
+      if        h < one       { t1 + (t2 - t1 ) * h / (256*6) }
+      else if   h < three     { t2 }
+      else if   h < four      { t1 + (t2 - t1 ) * ( four - h ) / (256*6) }
+      else                    { t1 } 
     }
 
-    fn hue_to_rgb( p : i32, q : i32, h: i32 ) -> u8 {
-      let tmp2 = hue_to_rgb_2( p, q, h );
+    fn hue_to_rgb( t1 : i32, t2 : i32, h: i32 ) -> u8 {
+      let tmp2 = hue_to_rgb_2( t1, t2, h );
       let tmp = if tmp2 == 256 { 255 } else { tmp2 };
       std::assert!( tmp >= 0 );
       std::assert!( tmp <= 256 );
