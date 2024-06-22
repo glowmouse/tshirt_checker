@@ -2,6 +2,8 @@
 extern crate nalgebra as na;
 use na::{Matrix3, matrix, dvector, vector, Vector3};
 
+const DEBUG: bool = false;
+
 pub struct HSLA {
   h:      u16,
   s:      u8,
@@ -198,7 +200,7 @@ pub struct TShirtCheckerApp<'a> {
     red_t_shirt:            LoadedImage,
     dgreen_t_shirt:         LoadedImage,
     burg_t_shirt:           LoadedImage,
-    t_shirt:                LoadedImage,
+    t_shirt:                egui::TextureId,
     artwork:                std::option::Option<egui::load::SizedTexture>,
     zoom:                   f32,
     target:                 Vector3<f32>,
@@ -277,7 +279,8 @@ impl TShirtCheckerApp<'_> {
         let red_shirt : LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_red, "red_shirt", &cc.egui_ctx ); 
         let dgreen_shirt: LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_dgreen, "dgreen_shirt", &cc.egui_ctx ); 
         let burg_shirt: LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_burg, "burg_shirt", &cc.egui_ctx ); 
- 
+        let default_shirt = red_shirt.id();
+
         Self {
             footer_debug_0:         String::new(),
             footer_debug_1:         String::new(),
@@ -285,10 +288,10 @@ impl TShirtCheckerApp<'_> {
             //test_artwork_src:     egui::Image::new(egui::include_image!("starfest-2024-attendee-v2.png")) ,
             test_artwork_src:       egui::Image::new(egui::include_image!("sf2024-attendee-v1.png")) ,
             blue_t_shirt:           blue_shirt,
-            red_t_shirt:            red_shirt.clone(),           
+            red_t_shirt:            red_shirt,
             dgreen_t_shirt:         dgreen_shirt,
             burg_t_shirt:           burg_shirt,
-            t_shirt:                red_shirt,           
+            t_shirt:                default_shirt,           
             artwork:                None,
             zoom:                   1.0,
             target:                 vector![ 0.50, 0.50, 1.0 ],
@@ -315,6 +318,7 @@ impl TShirtCheckerApp<'_> {
 
     fn do_bottom_panel(&self, ctx: &egui::Context ) {
         egui::TopBottomPanel::bottom("bot_panel").show(ctx, |ui| {
+            if DEBUG {
                 ui.horizontal(|ui| unsafe {
                     ui.label("Bytes in file: ");
                     let copy = HELLO.clone();
@@ -328,9 +332,9 @@ impl TShirtCheckerApp<'_> {
                     ui.label("footer_debug_1: ");
                     ui.label( &self.footer_debug_1 );
                 });
-
-                powered_by_egui_and_eframe(ui);
                 egui::warn_if_debug_build(ui);
+            }
+            powered_by_egui_and_eframe(ui);
         });
     }
 
@@ -343,7 +347,7 @@ impl TShirtCheckerApp<'_> {
         let panel_size   = ui.available_size_before_wrap();
         let panel_aspect = panel_size[0] / panel_size[1];
 
-        let tshirt_size = self.t_shirt.size();
+        let tshirt_size = self.blue_t_shirt.size();
         let tshirt_aspect = tshirt_size.x / tshirt_size.y;
 
         let move_from_center: Matrix3<f32> = 
@@ -411,7 +415,7 @@ impl TShirtCheckerApp<'_> {
     // 11.0 x 14.0 is the working area for the artwork in inches
     // 
     fn art_space_to_tshirt( &self ) -> Matrix3<f32> {
-        let tshirt_size        = self.t_shirt.size();
+        let tshirt_size        = self.blue_t_shirt.size();
         let tshirt_aspect      = tshirt_size.x / tshirt_size.y;
 
         let xcenter = 0.50;  // center artwork mid point for X
@@ -441,7 +445,7 @@ impl TShirtCheckerApp<'_> {
 
                 let (response, painter ) =ui.allocate_painter(ui.available_size_before_wrap(), egui::Sense::click_and_drag() );
                 painter.image( 
-                    self.t_shirt.id(),
+                    self.t_shirt,
                     egui::Rect::from_min_max(s0, s1 ),
                     egui::Rect::from_min_max(uv0, uv1 ),
                     egui::Color32::WHITE );
@@ -529,11 +533,23 @@ impl TShirtCheckerApp<'_> {
                 self.footer_debug_0 = format!("{} {}", panel_size[0], panel_size[1] );
                 ui.heading(mtext("T-Shirt Checker"));
                 ui.add_space(10.0);
-                ui.add(egui::widgets::ImageButton::new( egui::Image::from_texture( self.burg_t_shirt.texture_handle() )));
-                ui.add(egui::widgets::ImageButton::new( egui::Image::from_texture( self.dgreen_t_shirt.texture_handle() )));
-                ui.add(egui::widgets::ImageButton::new( egui::Image::from_texture( self.blue_t_shirt.texture_handle() ))); 
-                ui.add(egui::widgets::ImageButton::new( egui::Image::from_texture( self.red_t_shirt.texture_handle() )));
-                ui.end_row();
+                //let max_size = egui::Vec2{ x: 30.0, y: 30.0 };
+                ui.horizontal(|ui| {
+                    if (ui.add(egui::widgets::ImageButton::new( egui::Image::from_texture( self.burg_t_shirt.texture_handle()   ).max_width(90.0)))).clicked() {
+                        self.t_shirt = self.burg_t_shirt.id();
+                    }
+                    if ui.add(egui::widgets::ImageButton::new( egui::Image::from_texture( self.dgreen_t_shirt.texture_handle() ).max_width(90.0))).clicked() {
+                        self.t_shirt = self.dgreen_t_shirt.id();
+                    }
+                });
+                ui.horizontal(|ui| {
+                    if ui.add(egui::widgets::ImageButton::new( egui::Image::from_texture( self.blue_t_shirt.texture_handle()   ).max_width(90.0))).clicked() {
+                        self.t_shirt = self.blue_t_shirt.id();
+                    }
+                    if ui.add(egui::widgets::ImageButton::new( egui::Image::from_texture( self.red_t_shirt.texture_handle()    ).max_width(90.0))).clicked() {
+                        self.t_shirt = self.red_t_shirt.id();
+                    }
+                });
 
                 self.report_dpi(ui);
             })
