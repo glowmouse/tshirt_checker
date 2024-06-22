@@ -77,15 +77,16 @@ impl Into<egui::Color32> for HSLA {
       let one   : i32 = 256;
       let three : i32 = 256*3;
       let four  : i32 = 256*4;
-      if        h < one       { t1 + (t2 - t1 ) * h / (256*6) }
-      else if   h < three     { t2 }
-      else if   h < four      { t1 + (t2 - t1 ) * ( four - h ) / (256*6) }
-      else                    { t1 } 
+      if        h < one       { t2 + (t1 - t2 ) * h / 256 }
+      else if   h < three     { t1 }
+      else if   h < four      { t2 + (t1 - t2 ) * ( four - h ) / 256 }
+      else                    { t2 } 
     }
 
     fn hue_to_rgb( t1 : i32, t2 : i32, h: i32 ) -> u8 {
       let tmp2 = hue_to_rgb_2( t1, t2, h );
       let tmp = if tmp2 == 256 { 255 } else { tmp2 };
+      let tmp = if tmp2 < 0 { 0 } else { tmp2 };
       std::assert!( tmp >= 0 );
       std::assert!( tmp <= 256 );
       std::assert!( tmp <  256 );
@@ -101,8 +102,12 @@ impl Into<egui::Color32> for HSLA {
 }
 
 fn blue_to_red( input : egui::Color32 ) -> egui::Color32 {
-  let hsla = HSLA::from( input );
-  hsla.into()
+  let hsla = HSLA::from( input )
+  // -324 adjusts the original blue green shirt to a primary color
+  // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
+  // 1024 to adjust the primary color to red.
+  let red_adjust = HSLA{ h: ( hsla.h + 6 * 256 - 324 + 1024 ) % ( 6 * 256 ), s: hsla.s, l : hsla.l, a: hsla.a };
+  red_adjust.into()
 } 
 
 
