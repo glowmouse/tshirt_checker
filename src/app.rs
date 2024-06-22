@@ -4,6 +4,7 @@ extern crate nalgebra as na;
 use na::{Matrix3, matrix, dvector, vector, Vector3};
 
 const DEBUG: bool = false;
+const TRANSPARENCY_TOGGLE_RATE: u128 = 250;
 
 pub struct HSLA {
   h:      u16,
@@ -138,6 +139,13 @@ fn correct_alpha_for_tshirt( input : egui::Color32 ) -> egui::Color32 {
     return egui::Color32::from_rgba_unmultiplied( input.r(), input.g(), input.b(), new_a );
 }
 
+fn flag_alpha_for_shirt( input : egui::Color32 ) -> egui::Color32 {
+    let new_a = if input.a() == 0 { 0 } else { 255 };
+    let r = if input.a() == 0 { 255 } else { input.r() };
+    return egui::Color32::from_rgba_unmultiplied( r, input.g(), input.b(), new_a );
+}
+
+
 /// My image abstraction
 pub struct LoadedImage {
     uncompressed_image:     egui::ColorImage,
@@ -208,10 +216,13 @@ pub struct TShirtCheckerApp {
     pass:                   LoadedImage,
     warn:                   LoadedImage,
     fail:                   LoadedImage,
+    transparency:           LoadedImage,
     t_shirt:                egui::TextureId,
     artwork:                LoadedImage,
     fixed_artwork:          LoadedImage,
+    flagged_artwork:        LoadedImage,
     art_needs_fixing:       bool,
+    show_transparency_fix:  bool,
     zoom:                   f32,
     target:                 Vector3<f32>,
     last_drag_pos:          std::option::Option<Vector3<f32>>,
@@ -287,8 +298,10 @@ impl TShirtCheckerApp {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
         let blue_shirt : LoadedImage = load_image_from_trusted_source(include_bytes!("blue_tshirt.png"), "blue_shirt", &cc.egui_ctx  );
-        let default_art: LoadedImage = load_image_from_trusted_source(include_bytes!("sf2024-attendee-v1.png"), "default_art", &cc.egui_ctx  );
+        //let default_art: LoadedImage = load_image_from_trusted_source(include_bytes!("sf2024-attendee-v1.png"), "default_art", &cc.egui_ctx  );
+        let default_art: LoadedImage = load_image_from_trusted_source(include_bytes!("test_artwork.png"), "default_art", &cc.egui_ctx  );
         let default_fixed_art: LoadedImage = load_image_from_existing_image( &default_art, correct_alpha_for_tshirt, "fixed default art", &cc.egui_ctx ); 
+        let default_flagged_art: LoadedImage = load_image_from_existing_image( &default_art, flag_alpha_for_shirt, "fixed default art", &cc.egui_ctx ); 
         let red_shirt : LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_red, "red_shirt", &cc.egui_ctx ); 
         let dgreen_shirt: LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_dgreen, "dgreen_shirt", &cc.egui_ctx ); 
         let burg_shirt: LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_burg, "burg_shirt", &cc.egui_ctx ); 
@@ -296,12 +309,11 @@ impl TShirtCheckerApp {
         let pass: LoadedImage = load_image_from_trusted_source(include_bytes!("pass.png"), "pass", &cc.egui_ctx  );
         let warn: LoadedImage = load_image_from_trusted_source(include_bytes!("warn.png"), "warn", &cc.egui_ctx  );
         let fail: LoadedImage = load_image_from_trusted_source(include_bytes!("fail.png"), "fail", &cc.egui_ctx  );
+        let transparency: LoadedImage = load_image_from_trusted_source(include_bytes!("transparency.png"), "transparency", &cc.egui_ctx  );
 
         Self {
             footer_debug_0:         String::new(),
             footer_debug_1:         String::new(),
-            //test_artwork_src:     egui::Image::new(egui::include_image!("hortest.png")) ,
-            //test_artwork_src:     egui::Image::new(egui::include_image!("starfest-2024-attendee-v2.png")) ,
             blue_t_shirt:           blue_shirt,
             red_t_shirt:            red_shirt,
             dgreen_t_shirt:         dgreen_shirt,
@@ -310,9 +322,12 @@ impl TShirtCheckerApp {
             pass:                   pass,           
             warn:                   warn,
             fail:                   fail,
+            transparency:           transparency,
             art_needs_fixing:       default_art.pixels() != default_fixed_art.pixels(),
+            show_transparency_fix:  false,
             artwork:                default_art,
             fixed_artwork:          default_fixed_art,
+            flagged_artwork:        default_flagged_art,
             zoom:                   1.0,
             target:                 vector![ 0.50, 0.50, 1.0 ],
             last_drag_pos:          None,
@@ -489,11 +504,14 @@ impl TShirtCheckerApp {
                     }
 
                     let time_in_ms = self.start_time.elapsed().unwrap().as_millis();
-                    let state = ( time_in_ms / 500 ) & 2;
-                    let texture_to_display = match state {
-                        0 => self.artwork.id(),
-                        _ => self.fixed_artwork.id()
-                    };
+                    let state = ( time_in_ms / TRANSPARENCY_TOGGLE_RATE ) & 2;
+                    let texture_to_display = if self.show_transparency_fix {
+                        match state {
+                            0 => self.artwork.id(),
+                            _ => self.fixed_artwork.id()
+                        }
+                    }
+                    else { self.artwork.id() };
 
                     painter.image( 
                         texture_to_display,
@@ -573,7 +591,9 @@ impl TShirtCheckerApp {
                         self.t_shirt = self.red_t_shirt.id();
                     }
                 });
-
+                if ui.add(egui::widgets::ImageButton::new( egui::Image::from_texture( self.transparency.texture_handle()   ).max_width(195.0))).clicked() {
+                    self.show_transparency_fix = !self.show_transparency_fix;
+                }
             })
         });
     }
@@ -596,6 +616,9 @@ impl eframe::App for TShirtCheckerApp {
         self.do_bottom_panel( ctx );
         self.do_right_panel( ctx );
         self.do_central_panel( ctx );
+        if self.show_transparency_fix {
+            ctx.request_repaint_after( std::time::Duration::from_millis( TRANSPARENCY_TOGGLE_RATE.try_into().unwrap() ) );
+        }
     }
 }
 
