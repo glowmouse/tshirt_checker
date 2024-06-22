@@ -72,28 +72,29 @@ impl Into<egui::Color32> for HSLA {
         else           { l + s - (( l * s ) >> 8 ) };
     let temp2 : i32 = 2 * l - temp1;
 
-    fn hue_to_rgb_2( p: i32, q: i32, targ : i32 ) -> i32 {
-      let t = targ % ( 6 * 256 );
+    fn hue_to_rgb_2( p: i32, q: i32, harg : i32 ) -> i32 {
+      let h = harg % ( 6 * 256 );
       let one   : i32 = 256;
       let three : i32 = 256*3;
       let four  : i32 = 256*4;
-      if        t < one       { p + (q - p ) * t / 256 }
-      else if   t < three     { q }
-      else if   t < four      { p + (q - p ) * ( four - t ) / 256 }
+      if        h < one       { p + (q - p ) * h / (256*6) }
+      else if   h < three     { q }
+      else if   h < four      { p + (q - p ) * ( four - h ) / (256*6) }
       else                    { p } 
     }
 
-    fn hue_to_rgb( p : i32, q : i32, t: i32 ) -> u8 {
-      let tmp = hue_to_rgb_2( p, q, t );
+    fn hue_to_rgb( p : i32, q : i32, h: i32 ) -> u8 {
+      let tmp2 = hue_to_rgb_2( p, q, h );
+      let tmp = if tmp2 == 256 { 255 } else { tmp2 };
       std::assert!( tmp >= 0 );
       std::assert!( tmp <= 256 );
       std::assert!( tmp <  256 );
       u8::try_from( tmp ).unwrap()
     }
 
-    let r = hue_to_rgb( temp1, temp2, h + 256/3 );
+    let r = hue_to_rgb( temp1, temp2, h + 512 );
     let g = hue_to_rgb( temp1, temp2, h         );
-    let b = hue_to_rgb( temp1, temp2, h - 256/3 );
+    let b = hue_to_rgb( temp1, temp2, h - 512 );
 
     return egui::Color32::from_rgba_unmultiplied( r, g, b, self.a );
   }
