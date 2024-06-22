@@ -200,6 +200,9 @@ pub struct TShirtCheckerApp<'a> {
     red_t_shirt:            LoadedImage,
     dgreen_t_shirt:         LoadedImage,
     burg_t_shirt:           LoadedImage,
+    pass:                   LoadedImage,
+    warn:                   LoadedImage,
+    fail:                   LoadedImage,
     t_shirt:                egui::TextureId,
     artwork:                std::option::Option<egui::load::SizedTexture>,
     zoom:                   f32,
@@ -280,6 +283,9 @@ impl TShirtCheckerApp<'_> {
         let dgreen_shirt: LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_dgreen, "dgreen_shirt", &cc.egui_ctx ); 
         let burg_shirt: LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_burg, "burg_shirt", &cc.egui_ctx ); 
         let default_shirt = red_shirt.id();
+        let pass: LoadedImage = load_image_from_trusted_source(include_bytes!("pass.png"), "pass", &cc.egui_ctx  );
+        let warn: LoadedImage = load_image_from_trusted_source(include_bytes!("warn.png"), "warn", &cc.egui_ctx  );
+        let fail: LoadedImage = load_image_from_trusted_source(include_bytes!("fail.png"), "fail", &cc.egui_ctx  );
 
         Self {
             footer_debug_0:         String::new(),
@@ -292,6 +298,9 @@ impl TShirtCheckerApp<'_> {
             dgreen_t_shirt:         dgreen_shirt,
             burg_t_shirt:           burg_shirt,
             t_shirt:                default_shirt,           
+            pass:                   pass,           
+            warn:                   warn,
+            fail:                   fail,
             artwork:                None,
             zoom:                   1.0,
             target:                 vector![ 0.50, 0.50, 1.0 ],
@@ -499,11 +508,11 @@ impl TShirtCheckerApp<'_> {
         });
     }
 
-    fn gen_status(&self, state : i32 ) -> &str {
+    fn gen_status(&self, state : i32 ) -> egui::Image<'_> {
         match state {
-            0 => "Fail",
-            1 => "Warn",
-            _ => "Pass"
+            0 => egui::Image::from_texture( self.fail.texture_handle() ),
+            1 => egui::Image::from_texture( self.warn.texture_handle() ),
+            _ => egui::Image::from_texture( self.pass.texture_handle() )
         }
     }
 
@@ -514,12 +523,15 @@ impl TShirtCheckerApp<'_> {
             let bot_corner    = self.art_to_art_space() * dvector![ 1.0, 1.0, 1.0 ];
             let dim_in_inches = bot_corner - top_corner;
             let dpi = (art_texture.size.x / dim_in_inches.x) as i32;
-            let status : &str = self.gen_status( match dpi {
+            let status = self.gen_status( match dpi {
                 0..=74 => 0,
                 75 ..=149 => 1,
                 _ => 2
             });
-            ui.label(mtexts(&format!("{} DPI {}", status, dpi )));
+            ui.horizontal(|ui| {
+                ui.add( status );
+                ui.label(mtexts(&format!("{} DPI", dpi )));
+            });
         }
     }
 
@@ -531,7 +543,10 @@ impl TShirtCheckerApp<'_> {
              ui.vertical(|ui| {
                 let panel_size = ui.available_size_before_wrap();
                 self.footer_debug_0 = format!("{} {}", panel_size[0], panel_size[1] );
+                ui.add_space(10.0);
+                ui.vertical_centered(|ui| {
                 ui.heading(mtext("T-Shirt Checker"));
+                });
                 ui.add_space(10.0);
                 //let max_size = egui::Vec2{ x: 30.0, y: 30.0 };
                 ui.horizontal(|ui| {
