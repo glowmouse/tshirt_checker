@@ -4,7 +4,7 @@ extern crate nalgebra as na;
 use na::{Matrix3, matrix, dvector, vector, Vector3};
 
 const DEBUG: bool = false;
-const TRANSPARENCY_TOGGLE_RATE: u128 = 250;
+const TRANSPARENCY_TOGGLE_RATE: u128 = 500;
 
 pub struct HSLA {
   h:      u16,
@@ -140,9 +140,13 @@ fn correct_alpha_for_tshirt( input : egui::Color32 ) -> egui::Color32 {
 }
 
 fn flag_alpha_for_shirt( input : egui::Color32 ) -> egui::Color32 {
-    let new_a = if input.a() == 0 { 0 } else { 255 };
-    let r = if input.a() == 0 { 255 } else { input.r() };
-    return egui::Color32::from_rgba_unmultiplied( r, input.g(), input.b(), new_a );
+    let not_binary = input.a() != 0 && input.a() != 255;
+    if not_binary {
+      egui::Color32::from_rgba_unmultiplied( 255-input.r(), 255-input.g(), 255-input.b(), 255 )
+    }
+    else {
+      input
+    }
 }
 
 
@@ -301,7 +305,7 @@ impl TShirtCheckerApp {
         //let default_art: LoadedImage = load_image_from_trusted_source(include_bytes!("sf2024-attendee-v1.png"), "default_art", &cc.egui_ctx  );
         let default_art: LoadedImage = load_image_from_trusted_source(include_bytes!("test_artwork.png"), "default_art", &cc.egui_ctx  );
         let default_fixed_art: LoadedImage = load_image_from_existing_image( &default_art, correct_alpha_for_tshirt, "fixed default art", &cc.egui_ctx ); 
-        let default_flagged_art: LoadedImage = load_image_from_existing_image( &default_art, flag_alpha_for_shirt, "fixed default art", &cc.egui_ctx ); 
+        let default_flagged_art: LoadedImage = load_image_from_existing_image( &default_art, flag_alpha_for_shirt, "flagged default art", &cc.egui_ctx ); 
         let red_shirt : LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_red, "red_shirt", &cc.egui_ctx ); 
         let dgreen_shirt: LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_dgreen, "dgreen_shirt", &cc.egui_ctx ); 
         let burg_shirt: LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_burg, "burg_shirt", &cc.egui_ctx ); 
@@ -504,10 +508,10 @@ impl TShirtCheckerApp {
                     }
 
                     let time_in_ms = self.start_time.elapsed().unwrap().as_millis();
-                    let state = ( time_in_ms / TRANSPARENCY_TOGGLE_RATE ) & 2;
+                    let state = ( time_in_ms / TRANSPARENCY_TOGGLE_RATE ) % 2;
                     let texture_to_display = if self.show_transparency_fix {
                         match state {
-                            0 => self.artwork.id(),
+                            0 => self.flagged_artwork.id(),
                             _ => self.fixed_artwork.id()
                         }
                     }
@@ -523,9 +527,9 @@ impl TShirtCheckerApp {
 
     fn gen_status(&self, state : i32 ) -> egui::Image<'_> {
         match state {
-            0 => egui::Image::from_texture( self.fail.texture_handle() ),
-            1 => egui::Image::from_texture( self.warn.texture_handle() ),
-            _ => egui::Image::from_texture( self.pass.texture_handle() )
+            0 => egui::Image::from_texture( self.fail.texture_handle() ).max_width(25.0),
+            1 => egui::Image::from_texture( self.warn.texture_handle() ).max_width(25.0),
+            _ => egui::Image::from_texture( self.pass.texture_handle() ).max_width(25.0)
         }
     }
 
@@ -541,7 +545,7 @@ impl TShirtCheckerApp {
         });
         ui.horizontal(|ui| {
             ui.add( status );
-            ui.label(mtexts(&format!("{} DPI", dpi )));
+            ui.label(mtexts(&format!("DPI: {}", dpi )));
             });
     }
 
@@ -617,7 +621,11 @@ impl eframe::App for TShirtCheckerApp {
         self.do_right_panel( ctx );
         self.do_central_panel( ctx );
         if self.show_transparency_fix {
-            ctx.request_repaint_after( std::time::Duration::from_millis( TRANSPARENCY_TOGGLE_RATE.try_into().unwrap() ) );
+            let time_in_ms = self.start_time.elapsed().unwrap().as_millis();
+            let next_epoch = (time_in_ms / TRANSPARENCY_TOGGLE_RATE + 1 ) * TRANSPARENCY_TOGGLE_RATE + 1;
+            let time_to_wait = next_epoch - time_in_ms;
+
+            ctx.request_repaint_after( std::time::Duration::from_millis( time_to_wait.try_into().unwrap() ))
         }
     }
 }
