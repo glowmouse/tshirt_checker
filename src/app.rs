@@ -184,6 +184,33 @@ impl LoadedImage {
     }
 }
 
+fn compute_bad_tpixels( img : &Vec<egui::Color32> ) -> u32
+{
+  let mut num_bad_pixels = 0;
+  let num_pixels : u32 = img.len().try_into().unwrap();
+
+  for val in img.iter() {
+    if val.a() != 0 && val.a() != 255 {
+      num_bad_pixels += 1;
+    }
+  }
+  let raw_percent = 100 * num_bad_pixels / num_pixels;
+  return if raw_percent == 0 && num_bad_pixels !=0 { 1 } else { raw_percent }
+}
+
+fn compute_percent_opaque( img : &Vec<egui::Color32> ) -> u32
+{
+  let mut num_opaque_pixels = 0;
+  let num_pixels : u32 = img.len().try_into().unwrap();
+
+  for val in img.iter() {
+    if val.a() > 0 {
+      num_opaque_pixels += 1;
+    }
+  }
+  100 * num_opaque_pixels / num_pixels
+}
+
 
 
 fn load_image_from_trusted_source( bytes : &[u8],  name: impl Into<String>, ctx: &egui::Context ) -> LoadedImage 
@@ -225,7 +252,8 @@ pub struct TShirtCheckerApp {
     artwork:                LoadedImage,
     fixed_artwork:          LoadedImage,
     flagged_artwork:        LoadedImage,
-    art_needs_fixing:       bool,
+    bad_tpixel_percent:     u32,
+    opaque_percent:         u32,
     show_transparency_fix:  bool,
     zoom:                   f32,
     target:                 Vector3<f32>,
@@ -327,7 +355,8 @@ impl TShirtCheckerApp {
             warn:                   warn,
             fail:                   fail,
             transparency:           transparency,
-            art_needs_fixing:       default_art.pixels() != default_fixed_art.pixels(),
+            bad_tpixel_percent:     compute_bad_tpixels(default_art.pixels()),
+            opaque_percent:         compute_percent_opaque(default_art.pixels()),
             show_transparency_fix:  false,
             artwork:                default_art,
             fixed_artwork:          default_fixed_art,
@@ -549,16 +578,52 @@ impl TShirtCheckerApp {
             });
     }
 
-    fn report_transparency(&self, ui: &mut egui::Ui) {
-        let status = self.gen_status( match self.art_needs_fixing {
-            false => 2,
-            true  => 0
+    fn compute_area_used(&self ) -> u32 {
+        let top_corner    = self.art_to_art_space() * dvector![ 0.0, 0.0, 1.0 ]; 
+        let bot_corner    = self.art_to_art_space() * dvector![ 1.0, 1.0, 1.0 ];
+        let dim_in_inches = bot_corner - top_corner;
+        let area_used = 100.0 * dim_in_inches[0] * dim_in_inches[1] / (11.0 * 14.0);
+        return area_used as u32;
+    }
+
+    fn report_area_used(&self, ui: &mut egui::Ui ) {
+        let area_used = self.compute_area_used();
+        let status = self.gen_status( match area_used {
+            0..=50 => 2,
+            51..=90 => 1,
+            _ => 2,
         });
         ui.horizontal(|ui| {
             ui.add( status );
-            ui.label(mtexts(&format!("Transparency")));
+            ui.label(mtexts(&format!("Area Used: {}%", area_used)));
             });
     }
+
+    fn report_transparency(&self, ui: &mut egui::Ui) {
+        let status = self.gen_status( match self.bad_tpixel_percent {
+            0     => 2,
+            _     => 0
+        });
+        ui.horizontal(|ui| {
+            ui.add( status );
+            ui.label(mtexts(&format!("Bad TPixels: {}%", self.bad_tpixel_percent )));
+            });
+    }
+
+    fn report_opaque_percent(&self, ui: &mut egui::Ui) {
+        let area_used = self.compute_area_used();
+        let opaque_area = area_used * self.opaque_percent / 100;
+        let status = self.gen_status( match opaque_area {
+            0..=49      => 2,
+            50..=74     => 1,
+            _          => 0,
+        });
+        ui.horizontal(|ui| {
+            ui.add( status );
+            ui.label(mtexts(&format!("Bib Score: {}%", opaque_area )));
+            });
+    }
+
 
     fn do_right_panel(&mut self, ctx: &egui::Context ) {
         egui::SidePanel::right("stuff")
@@ -574,7 +639,9 @@ impl TShirtCheckerApp {
                 });
                 ui.add_space(10.0);
                 self.report_dpi(ui);
+                self.report_area_used(ui);
                 self.report_transparency(ui);
+                self.report_opaque_percent(ui);
                 ui.add_space(10.0);
                 ui.separator();
                 ui.add_space(10.0);
