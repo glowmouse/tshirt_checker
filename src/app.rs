@@ -245,7 +245,8 @@ enum ReportStatus {
     Fail
 }
 
-pub struct ReportTemplate {
+pub struct ReportTemplate<'a> {
+    label:                  &'a str,
     display_percent:        bool
 }
 
@@ -644,52 +645,52 @@ impl TShirtCheckerApp {
         }
     }
 
-    fn report_dpi(&self, strip: &mut egui_extras::Strip<'_, '_>, report: &ReportTemplate) {
+    fn report_dpi(&self, strip: &mut egui_extras::Strip<'_, '_>, report: &ReportTemplate<'_>) {
         let dpi = self.compute_dpi();
         let status = TShirtCheckerApp::dpi_to_status( dpi );
         let status_icon = self.gen_status_icon( status );
 
         strip.cell(|ui| { ui.add( status_icon ); });
-        strip.cell(|ui| { ui.label( mtexts(&format!("DPI"))); });
+        strip.cell(|ui| { ui.label( mtexts(&format!("{}", report.label))); });
         strip.cell(|ui| { ui.with_layout( egui::Layout::right_to_left(egui::Align::TOP), |ui| {ui.label( mtexts(&format!("{}", dpi ))); });});
         let cell_string = (if report.display_percent { "%" } else {""}).to_string();
         strip.cell(|ui| { ui.label( mtexts(&cell_string)); });
         strip.cell(|ui| { self.handle_tool(ui, status ); });
     }
 
-    fn report_area_used(&self, strip: &mut egui_extras::Strip<'_, '_>, report: &ReportTemplate) {
+    fn report_area_used(&self, strip: &mut egui_extras::Strip<'_, '_>, report: &ReportTemplate<'_>) {
         let area_used = self.compute_area_used();
         let status    = TShirtCheckerApp::area_used_to_status(area_used);
         let status_icon = self.gen_status_icon( status );
 
         strip.cell(|ui| { ui.add( status_icon ); });
-        strip.cell(|ui| { ui.label( mtexts(&format!("Area Used"))); });
+        strip.cell(|ui| { ui.label( mtexts(&format!("{}", report.label))); });
         strip.cell(|ui| { ui.with_layout( egui::Layout::right_to_left(egui::Align::TOP), |ui| {ui.label( mtexts(&format!("{}", area_used ))); });});
         let cell_string = (if report.display_percent { "%" } else {""}).to_string();
         strip.cell(|ui| { ui.label( mtexts(&cell_string)); });
         strip.cell(|ui| { self.handle_tool(ui, status ); });
     }
 
-    fn report_transparency(&self, strip: &mut egui_extras::Strip<'_, '_>, report: &ReportTemplate) {
+    fn report_transparency(&self, strip: &mut egui_extras::Strip<'_, '_>, report: &ReportTemplate<'_>) {
         let bad_transparency_pixels = self.compute_badtransparency_pixels();
         let status    = TShirtCheckerApp::bad_transparency_to_status(bad_transparency_pixels);
         let status_icon = self.gen_status_icon( status );
 
         strip.cell(|ui| { ui.add( status_icon ); });
-        strip.cell(|ui| { ui.label( mtexts(&format!("Bad TPixels"))); });
+        strip.cell(|ui| { ui.label( mtexts(&format!("{}", report.label))); });
         strip.cell(|ui| { ui.with_layout( egui::Layout::right_to_left(egui::Align::TOP), |ui| {ui.label( mtexts(&format!("{}", bad_transparency_pixels))); });});
         let cell_string = (if report.display_percent { "%" } else {""}).to_string();
         strip.cell(|ui| { ui.label( mtexts(&cell_string)); });
         strip.cell(|ui| { self.handle_tool(ui, status ); });
     }
 
-    fn report_opaque_percent(&self, strip: &mut egui_extras::Strip<'_, '_>, report: &ReportTemplate) {
+    fn report_opaque_percent(&self, strip: &mut egui_extras::Strip<'_, '_>, report: &ReportTemplate<'_>) {
         let opaque_area = self.compute_opaque_percentage();
         let status    = TShirtCheckerApp::opaque_to_status(opaque_area);
         let status_icon = self.gen_status_icon( status );
 
         strip.cell(|ui| { ui.add( status_icon ); });
-        strip.cell(|ui| { ui.label( mtexts(&format!("Bib Score"))); });
+        strip.cell(|ui| { ui.label( mtexts(&format!("{}", report.label))); });
         strip.cell(|ui| { ui.with_layout( egui::Layout::right_to_left(egui::Align::TOP), |ui| {ui.label( mtexts(&format!("{}", opaque_area ))); });});
         let cell_string = (if report.display_percent { "%" } else {""}).to_string();
         strip.cell(|ui| { ui.label( mtexts(&cell_string)); });
@@ -727,16 +728,20 @@ impl TShirtCheckerApp {
                 ui.add_space(10.0);
 
                 let dpi_report = ReportTemplate{
-                    display_percent :    false 
+                    label:              "DPI",
+                    display_percent :   false 
                 };
                 let area_used_report = ReportTemplate{
-                    display_percent :    true 
+                    label:              "Area Used",
+                    display_percent :   true 
                 };
                 let transparency_report = ReportTemplate {
-                    display_percent :    true 
+                    label:              "Bad TPixels",
+                    display_percent :   true 
                 };
                 let opaque_report = ReportTemplate {
-                    display_percent :    true 
+                    label:              "Bib Score",
+                    display_percent :   true 
                 };
 
                 self.report_row( ui, |strip| { self.report_dpi(strip, &dpi_report); } );
