@@ -157,6 +157,35 @@ fn blue_to_dgreen(input: egui::Color32) -> egui::Color32 {
     dgreen_adjust.into()
 }
 
+fn blue_to_ddgreen(input: egui::Color32) -> egui::Color32 {
+    let hsla = HSLA::from(input);
+    // -324 adjusts the original blue green shirt to a primary color
+    // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
+    // 1024 to adjust the primary color to red.
+    let ddgreen_adjust = HSLA {
+        h: (hsla.h + 6 * 256 - 324 + 38) % (6 * 256),
+        s: int_gamma(hsla.s, 3.0),
+        l: int_gamma(hsla.l, 2.5),
+        a: hsla.a,
+    };
+    ddgreen_adjust.into()
+}
+
+
+fn blue_to_dblue(input: egui::Color32) -> egui::Color32 {
+    let hsla = HSLA::from(input);
+    // -324 adjusts the original blue green shirt to a primary color
+    // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
+    // 1024 to adjust the primary color to red.
+    let dblue_adjust = HSLA {
+        h: (hsla.h + 6*256 - 324 + 350 ) % (6 * 256),
+        s: int_gamma(hsla.s, 3.0),
+        l: int_gamma(hsla.l, 1.7),
+        a: hsla.a,
+    };
+    dblue_adjust .into()
+}
+
 fn blue_to_burg(input: egui::Color32) -> egui::Color32 {
     let hsla = HSLA::from(input);
     // -324 adjusts the original blue green shirt to a primary color
@@ -323,6 +352,8 @@ pub struct TShirtCheckerApp<'a> {
     red_t_shirt: LoadedImage,
     dgreen_t_shirt: LoadedImage,
     burg_t_shirt: LoadedImage,
+    dblue_t_shirt: LoadedImage,
+    ddgreen_t_shirt: LoadedImage,
     pass: LoadedImage,
     warn: LoadedImage,
     fail: LoadedImage,
@@ -734,7 +765,7 @@ impl TShirtCheckerApp<'_> {
                     self.footer_debug_0 = format!("{} {}", panel_size[0], panel_size[1]);
                     ui.add_space(10.0);
                     ui.vertical_centered(|ui| {
-                        ui.heading(mtext("T Shirt Checker"));
+                        ui.heading(egui::widget_text::RichText::from("T-Shirt Checker").size(40.0))
                     });
                     ui.add_space(10.0);
 
@@ -757,41 +788,58 @@ impl TShirtCheckerApp<'_> {
                     //let max_size = egui::Vec2{ x: 30.0, y: 30.0 };
                     ui.horizontal(|ui| {
                         if (ui.add(egui::widgets::ImageButton::new(
-                            egui::Image::from_texture(self.burg_t_shirt.texture_handle())
-                                .max_width(90.0),
+                            egui::Image::from_texture(self.red_t_shirt.texture_handle())
+                                .max_width(80.0),
                         )))
                         .clicked()
                         {
-                            self.t_shirt = self.burg_t_shirt.id();
+                            self.t_shirt = self.red_t_shirt.id();
                         }
                         if ui
                             .add(egui::widgets::ImageButton::new(
                                 egui::Image::from_texture(self.dgreen_t_shirt.texture_handle())
-                                    .max_width(90.0),
+                                    .max_width(80.0),
                             ))
                             .clicked()
                         {
                             self.t_shirt = self.dgreen_t_shirt.id();
                         }
-                    });
-                    ui.horizontal(|ui| {
                         if ui
                             .add(egui::widgets::ImageButton::new(
                                 egui::Image::from_texture(self.blue_t_shirt.texture_handle())
-                                    .max_width(90.0),
+                                    .max_width(80.0),
                             ))
                             .clicked()
                         {
                             self.t_shirt = self.blue_t_shirt.id();
                         }
+                    });
+                    ui.horizontal(|ui| {
                         if ui
                             .add(egui::widgets::ImageButton::new(
-                                egui::Image::from_texture(self.red_t_shirt.texture_handle())
-                                    .max_width(90.0),
+                                egui::Image::from_texture(self.burg_t_shirt.texture_handle())
+                                    .max_width(80.0),
                             ))
                             .clicked()
                         {
-                            self.t_shirt = self.red_t_shirt.id();
+                            self.t_shirt = self.burg_t_shirt.id();
+                        }
+                        if ui
+                            .add(egui::widgets::ImageButton::new(
+                                egui::Image::from_texture(self.ddgreen_t_shirt.texture_handle())
+                                    .max_width(80.0),
+                            ))
+                            .clicked()
+                        {
+                            self.t_shirt = self.ddgreen_t_shirt.id();
+                        }
+                        if ui.add(egui::widgets::ImageButton::new(
+                                egui::Image::from_texture(self.dblue_t_shirt.texture_handle())
+                                    .max_width(80.0),
+                            ))
+                            .clicked()
+                        {
+                            self.t_shirt = self.dblue_t_shirt.id();
                         }
                     });
                 })
@@ -833,6 +881,19 @@ impl TShirtCheckerApp<'_> {
             "dgreen_shirt",
             &cc.egui_ctx,
         );
+        let ddgreen_shirt: LoadedImage = load_image_from_existing_image(
+            &blue_shirt,
+            blue_to_ddgreen,
+            "ddgreen_shirt",
+            &cc.egui_ctx,
+        );
+        let dblue_shirt: LoadedImage = load_image_from_existing_image(
+            &blue_shirt,
+            blue_to_dblue,
+            "dblue_shirt",
+            &cc.egui_ctx,
+        );
+
         let burg_shirt: LoadedImage =
             load_image_from_existing_image(&blue_shirt, blue_to_burg, "burg_shirt", &cc.egui_ctx);
         let default_shirt = red_shirt.id();
@@ -856,7 +917,7 @@ impl TShirtCheckerApp<'_> {
             metric_to_status: TShirtCheckerApp::area_used_to_status,
         };
         let transparency_report = ReportTemplate {
-            label: "Bad TPixels",
+            label: "Bad T.Pixels",
             display_percent: true,
             metric_to_status: TShirtCheckerApp::bad_transparency_to_status,
         };
@@ -873,6 +934,8 @@ impl TShirtCheckerApp<'_> {
             red_t_shirt: red_shirt,
             dgreen_t_shirt: dgreen_shirt,
             burg_t_shirt: burg_shirt,
+            dblue_t_shirt: dblue_shirt,
+            ddgreen_t_shirt: ddgreen_shirt,
             t_shirt: default_shirt,
             pass: pass,
             warn: warn,
@@ -896,10 +959,6 @@ impl TShirtCheckerApp<'_> {
             tool_selected_for: None,
         }
     }
-}
-
-fn mtext(text: &str) -> egui::widget_text::RichText {
-    egui::widget_text::RichText::from(text).size(25.0)
 }
 
 fn mtexts(text: &String) -> egui::widget_text::RichText {
