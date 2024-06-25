@@ -574,11 +574,34 @@ impl TShirtCheckerApp {
         }
     }
 
-    fn report_dpi(&self, strip: &mut egui_extras::Strip<'_, '_>) {
+    fn compute_dpi(&self) -> u32 {
         let top_corner    = self.art_to_art_space() * dvector![ 0.0, 0.0, 1.0 ]; 
         let bot_corner    = self.art_to_art_space() * dvector![ 1.0, 1.0, 1.0 ];
         let dim_in_inches = bot_corner - top_corner;
-        let dpi = (self.artwork.size().x / dim_in_inches.x) as i32;
+        let dpi = (self.artwork.size().x / dim_in_inches.x) as u32;
+        dpi
+    }
+
+    fn compute_badtransparency_pixels(&self) -> u32 {
+        return self.bad_tpixel_percent;
+    }
+
+    fn compute_area_used(&self) -> u32 {
+        let top_corner    = self.art_to_art_space() * dvector![ 0.0, 0.0, 1.0 ]; 
+        let bot_corner    = self.art_to_art_space() * dvector![ 1.0, 1.0, 1.0 ];
+        let dim_in_inches = bot_corner - top_corner;
+        let area_used = 100.0 * dim_in_inches[0] * dim_in_inches[1] / (11.0 * 14.0);
+        return area_used as u32;
+    }
+
+    fn compute_opaque_percentage(&self) -> u32 {
+        let area_used = self.compute_area_used();
+        let opaque_area = area_used * self.opaque_percent / 100;
+        opaque_area
+    }
+
+    fn report_dpi(&self, strip: &mut egui_extras::Strip<'_, '_>) {
+        let dpi = self.compute_dpi();
         let status = match dpi {
             0..=74 => 0,
             75 ..=149 => 1,
@@ -591,14 +614,6 @@ impl TShirtCheckerApp {
         strip.cell(|ui| { ui.with_layout( egui::Layout::right_to_left(egui::Align::TOP), |ui| {ui.label( mtexts(&format!("{}", dpi ))); });});
         strip.cell(|ui| { ui.label( mtexts(&format!(""))); });
         strip.cell(|ui| { self.handle_tool(ui, status ); });
-    }
-
-    fn compute_area_used(&self ) -> u32 {
-        let top_corner    = self.art_to_art_space() * dvector![ 0.0, 0.0, 1.0 ]; 
-        let bot_corner    = self.art_to_art_space() * dvector![ 1.0, 1.0, 1.0 ];
-        let dim_in_inches = bot_corner - top_corner;
-        let area_used = 100.0 * dim_in_inches[0] * dim_in_inches[1] / (11.0 * 14.0);
-        return area_used as u32;
     }
 
     fn report_area_used(&self, strip: &mut egui_extras::Strip<'_, '_>) {
@@ -618,7 +633,8 @@ impl TShirtCheckerApp {
     }
 
     fn report_transparency(&self, strip: &mut egui_extras::Strip<'_, '_>) {
-        let status = match self.bad_tpixel_percent {
+        let bad_transparency_pixels = self.compute_badtransparency_pixels();
+        let status = match bad_transparency_pixels {
             0     => 2,
             _     => 0
         };
@@ -626,14 +642,13 @@ impl TShirtCheckerApp {
 
         strip.cell(|ui| { ui.add( status_icon ); });
         strip.cell(|ui| { ui.label( mtexts(&format!("Bad TPixels"))); });
-        strip.cell(|ui| { ui.with_layout( egui::Layout::right_to_left(egui::Align::TOP), |ui| {ui.label( mtexts(&format!("{}", self.bad_tpixel_percent))); });});
+        strip.cell(|ui| { ui.with_layout( egui::Layout::right_to_left(egui::Align::TOP), |ui| {ui.label( mtexts(&format!("{}", bad_transparency_pixels))); });});
         strip.cell(|ui| { ui.label( mtexts(&format!("%"))); });
         strip.cell(|ui| { self.handle_tool(ui, status ); });
     }
 
     fn report_opaque_percent(&self, strip: &mut egui_extras::Strip<'_, '_>) {
-        let area_used = self.compute_area_used();
-        let opaque_area = area_used * self.opaque_percent / 100;
+        let opaque_area = self.compute_opaque_percentage();
         let status = match opaque_area {
             0..=49      => 2,
             50..=74     => 1,
