@@ -277,7 +277,6 @@ pub struct TShirtCheckerApp<'a> {
     flagged_artwork:        LoadedImage,
     bad_tpixel_percent:     u32,
     opaque_percent:         u32,
-    show_transparency_fix:  bool,
     zoom:                   f32,
     target:                 Vector3<f32>,
     last_drag_pos:          std::option::Option<Vector3<f32>>,
@@ -353,6 +352,11 @@ fn _app_execute<F: Future<Output = ()> + 'static>(f: F) {
 
 
 impl TShirtCheckerApp<'_> {
+
+    fn is_tool_active(&mut self, report_type: ReportTypes ) -> bool {
+        self.tool_selected_for.is_some() && self.tool_selected_for.unwrap() == report_type
+    }
+
     fn do_bottom_panel(&self, ctx: &egui::Context ) {
         egui::TopBottomPanel::bottom("bot_panel").show(ctx, |ui| {
             if DEBUG {
@@ -521,7 +525,7 @@ impl TShirtCheckerApp<'_> {
 
                     let time_in_ms = self.start_time.elapsed().unwrap().as_millis();
                     let state = ( time_in_ms / TRANSPARENCY_TOGGLE_RATE ) % 2;
-                    let texture_to_display = if self.show_transparency_fix {
+                    let texture_to_display = if self.is_tool_active( ReportTypes::BadTransparency) {
                         match state {
                             0 => self.flagged_artwork.id(),
                             _ => self.fixed_artwork.id()
@@ -661,11 +665,6 @@ impl TShirtCheckerApp<'_> {
                 self.report_metric(ui, ReportTypes::BadTransparency, self.compute_badtransparency_pixels());
                 self.report_metric(ui, ReportTypes::Opaqueness,      self.compute_opaque_percentage());
 
-                // Patch it in for now
-                if self.tool_selected_for.is_some() && self.tool_selected_for.unwrap() == ReportTypes::BadTransparency {
-                    self.show_transparency_fix = true
-                }
-
                 ui.add_space(10.0);
                 ui.separator();
                 ui.add_space(10.0);
@@ -743,7 +742,6 @@ impl TShirtCheckerApp<'_> {
             tool:                   tool,
             bad_tpixel_percent:     compute_bad_tpixels(default_art.pixels()),
             opaque_percent:         compute_percent_opaque(default_art.pixels()),
-            show_transparency_fix:  false,
             artwork:                default_art,
             fixed_artwork:          default_fixed_art,
             flagged_artwork:        default_flagged_art,
@@ -779,7 +777,7 @@ impl eframe::App for TShirtCheckerApp<'_> {
         self.do_bottom_panel( ctx );
         self.do_right_panel( ctx );
         self.do_central_panel( ctx );
-        if self.show_transparency_fix {
+        if self.is_tool_active( ReportTypes::BadTransparency ) {
             let time_in_ms = self.start_time.elapsed().unwrap().as_millis();
             let next_epoch = (time_in_ms / TRANSPARENCY_TOGGLE_RATE + 1 ) * TRANSPARENCY_TOGGLE_RATE + 1;
             let time_to_wait = next_epoch - time_in_ms;
