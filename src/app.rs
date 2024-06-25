@@ -590,8 +590,24 @@ impl TShirtCheckerApp {
         dpi
     }
 
+    fn dpi_to_status(dpi: u32 ) -> ReportStatus
+    {
+        return match dpi {
+            0..=74    => ReportStatus::Fail,
+            75 ..=149 => ReportStatus::Warn,
+            _         => ReportStatus::Pass
+        }
+    }
+
     fn compute_badtransparency_pixels(&self) -> u32 {
         return self.bad_tpixel_percent;
+    }
+
+    fn bad_transparency_to_status( bad_transparency_pixels: u32 ) -> ReportStatus {
+        match bad_transparency_pixels {
+            0     => ReportStatus::Pass,
+            _     => ReportStatus::Fail
+        }
     }
 
     fn compute_area_used(&self) -> u32 {
@@ -602,19 +618,31 @@ impl TShirtCheckerApp {
         return area_used as u32;
     }
 
+    fn area_used_to_status(area_used : u32) -> ReportStatus {
+        match area_used {
+            0..=50  => ReportStatus::Fail,
+            51..=90 => ReportStatus::Warn,
+            _       => ReportStatus::Pass
+        }
+    }
+
     fn compute_opaque_percentage(&self) -> u32 {
         let area_used = self.compute_area_used();
         let opaque_area = area_used * self.opaque_percent / 100;
         opaque_area
     }
 
+    fn opaque_to_status(opaque_area: u32) -> ReportStatus {
+        match opaque_area {
+            0..=49      => ReportStatus::Pass,
+            50..=74     => ReportStatus::Warn,
+            _          =>  ReportStatus::Fail
+        }
+    }
+
     fn report_dpi(&self, strip: &mut egui_extras::Strip<'_, '_>) {
         let dpi = self.compute_dpi();
-        let status = match dpi {
-            0..=74    => ReportStatus::Fail,
-            75 ..=149 => ReportStatus::Warn,
-            _         => ReportStatus::Pass
-        };
+        let status = TShirtCheckerApp::dpi_to_status( dpi );
         let status_icon = self.gen_status_icon( status );
 
         strip.cell(|ui| { ui.add( status_icon ); });
@@ -626,11 +654,7 @@ impl TShirtCheckerApp {
 
     fn report_area_used(&self, strip: &mut egui_extras::Strip<'_, '_>) {
         let area_used = self.compute_area_used();
-        let status = match area_used {
-            0..=50  => ReportStatus::Fail,
-            51..=90 => ReportStatus::Warn,
-            _       => ReportStatus::Pass
-        };
+        let status    = TShirtCheckerApp::area_used_to_status(area_used);
         let status_icon = self.gen_status_icon( status );
 
         strip.cell(|ui| { ui.add( status_icon ); });
@@ -642,10 +666,7 @@ impl TShirtCheckerApp {
 
     fn report_transparency(&self, strip: &mut egui_extras::Strip<'_, '_>) {
         let bad_transparency_pixels = self.compute_badtransparency_pixels();
-        let status = match bad_transparency_pixels {
-            0     => ReportStatus::Pass,
-            _     => ReportStatus::Fail
-        };
+        let status    = TShirtCheckerApp::bad_transparency_to_status(bad_transparency_pixels);
         let status_icon = self.gen_status_icon( status );
 
         strip.cell(|ui| { ui.add( status_icon ); });
@@ -657,11 +678,7 @@ impl TShirtCheckerApp {
 
     fn report_opaque_percent(&self, strip: &mut egui_extras::Strip<'_, '_>) {
         let opaque_area = self.compute_opaque_percentage();
-        let status = match opaque_area {
-            0..=49      => ReportStatus::Pass,
-            50..=74     => ReportStatus::Warn,
-            _          =>  ReportStatus::Fail
-        };
+        let status    = TShirtCheckerApp::opaque_to_status(opaque_area);
         let status_icon = self.gen_status_icon( status );
 
         strip.cell(|ui| { ui.add( status_icon ); });
