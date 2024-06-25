@@ -646,53 +646,49 @@ impl TShirtCheckerApp {
         }
     }
 
-    fn report_dpi(&self, strip: &mut egui_extras::Strip<'_, '_>, report: &ReportTemplate<'_>) {
-        let dpi         = self.compute_dpi();
-        let status      = (report.metric_to_status)(dpi);
+    fn report_dpi(&self, strip: &mut egui_extras::Strip<'_, '_>, report: &ReportTemplate<'_>, metric: u32) {
+        let status      = (report.metric_to_status)(metric);
         let status_icon = self.gen_status_icon( status );
 
         strip.cell(|ui| { ui.add( status_icon ); });
         strip.cell(|ui| { ui.label( mtexts(&format!("{}", report.label))); });
-        strip.cell(|ui| { ui.with_layout( egui::Layout::right_to_left(egui::Align::TOP), |ui| {ui.label( mtexts(&format!("{}", dpi ))); });});
+        strip.cell(|ui| { ui.with_layout( egui::Layout::right_to_left(egui::Align::TOP), |ui| {ui.label( mtexts(&format!("{}", metric ))); });});
         let cell_string = (if report.display_percent { "%" } else {""}).to_string();
         strip.cell(|ui| { ui.label( mtexts(&cell_string)); });
         strip.cell(|ui| { self.handle_tool(ui, status ); });
     }
 
-    fn report_area_used(&self, strip: &mut egui_extras::Strip<'_, '_>, report: &ReportTemplate<'_>) {
-        let area_used   = self.compute_area_used();
-        let status      = (report.metric_to_status)(area_used);
+    fn report_area_used(&self, strip: &mut egui_extras::Strip<'_, '_>, report: &ReportTemplate<'_>, metric: u32) {
+        let status      = (report.metric_to_status)(metric);
         let status_icon = self.gen_status_icon( status );
 
         strip.cell(|ui| { ui.add( status_icon ); });
         strip.cell(|ui| { ui.label( mtexts(&format!("{}", report.label))); });
-        strip.cell(|ui| { ui.with_layout( egui::Layout::right_to_left(egui::Align::TOP), |ui| {ui.label( mtexts(&format!("{}", area_used ))); });});
+        strip.cell(|ui| { ui.with_layout( egui::Layout::right_to_left(egui::Align::TOP), |ui| {ui.label( mtexts(&format!("{}", metric))); });});
         let cell_string = (if report.display_percent { "%" } else {""}).to_string();
         strip.cell(|ui| { ui.label( mtexts(&cell_string)); });
         strip.cell(|ui| { self.handle_tool(ui, status ); });
     }
 
-    fn report_transparency(&self, strip: &mut egui_extras::Strip<'_, '_>, report: &ReportTemplate<'_>) {
-        let bad_transparency_pixels = self.compute_badtransparency_pixels();
-        let status      = (report.metric_to_status)(bad_transparency_pixels);
+    fn report_transparency(&self, strip: &mut egui_extras::Strip<'_, '_>, report: &ReportTemplate<'_>, metric: u32) {
+        let status      = (report.metric_to_status)(metric);
         let status_icon = self.gen_status_icon( status );
 
         strip.cell(|ui| { ui.add( status_icon ); });
         strip.cell(|ui| { ui.label( mtexts(&format!("{}", report.label))); });
-        strip.cell(|ui| { ui.with_layout( egui::Layout::right_to_left(egui::Align::TOP), |ui| {ui.label( mtexts(&format!("{}", bad_transparency_pixels))); });});
+        strip.cell(|ui| { ui.with_layout( egui::Layout::right_to_left(egui::Align::TOP), |ui| {ui.label( mtexts(&format!("{}", metric))); });});
         let cell_string = (if report.display_percent { "%" } else {""}).to_string();
         strip.cell(|ui| { ui.label( mtexts(&cell_string)); });
         strip.cell(|ui| { self.handle_tool(ui, status ); });
     }
 
-    fn report_opaque_percent(&self, strip: &mut egui_extras::Strip<'_, '_>, report: &ReportTemplate<'_>) {
-        let opaque_area = self.compute_opaque_percentage();
-        let status      = (report.metric_to_status)(opaque_area);
+    fn report_opaque_percent(&self, strip: &mut egui_extras::Strip<'_, '_>, report: &ReportTemplate<'_>, metric: u32) {
+        let status      = (report.metric_to_status)(metric);
         let status_icon = self.gen_status_icon( status );
 
         strip.cell(|ui| { ui.add( status_icon ); });
         strip.cell(|ui| { ui.label( mtexts(&format!("{}", report.label))); });
-        strip.cell(|ui| { ui.with_layout( egui::Layout::right_to_left(egui::Align::TOP), |ui| {ui.label( mtexts(&format!("{}", opaque_area ))); });});
+        strip.cell(|ui| { ui.with_layout( egui::Layout::right_to_left(egui::Align::TOP), |ui| {ui.label( mtexts(&format!("{}", metric))); });});
         let cell_string = (if report.display_percent { "%" } else {""}).to_string();
         strip.cell(|ui| { ui.label( mtexts(&cell_string)); });
         strip.cell(|ui| { self.handle_tool(ui, status ); });
@@ -749,10 +745,10 @@ impl TShirtCheckerApp {
                     metric_to_status:   TShirtCheckerApp::opaque_to_status
                 };
 
-                self.report_row( ui, |strip| { self.report_dpi(strip, &dpi_report); } );
-                self.report_row( ui, |strip| { self.report_area_used(strip, &area_used_report); } );
-                self.report_row( ui, |strip| { self.report_transparency(strip, &transparency_report); } );
-                self.report_row( ui, |strip| { self.report_opaque_percent(strip, &opaque_report); } );
+                self.report_row( ui, |strip| { self.report_dpi(strip, &dpi_report, self.compute_dpi() ); } );
+                self.report_row( ui, |strip| { self.report_area_used(strip, &area_used_report, self.compute_area_used()); } );
+                self.report_row( ui, |strip| { self.report_transparency(strip, &transparency_report, self.compute_badtransparency_pixels()); } );
+                self.report_row( ui, |strip| { self.report_opaque_percent(strip, &opaque_report, self.compute_opaque_percentage()); } );
                 ui.add_space(10.0);
                 ui.separator();
                 ui.add_space(10.0);
