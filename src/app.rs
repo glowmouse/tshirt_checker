@@ -252,7 +252,7 @@ pub struct ReportTemplate<'a> {
 }
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
-pub struct TShirtCheckerApp {
+pub struct TShirtCheckerApp<'a> {
     footer_debug_0:         String,
     footer_debug_1:         String,
     blue_t_shirt:           LoadedImage,
@@ -276,7 +276,11 @@ pub struct TShirtCheckerApp {
     last_drag_pos:          std::option::Option<Vector3<f32>>,
     drag_display_to_tshirt: std::option::Option<Matrix3<f32>>,
     drag_count:             i32,
-    start_time:             SystemTime
+    start_time:             SystemTime,
+    area_used_report:       ReportTemplate<'a>,
+    transparency_report:    ReportTemplate<'a>,
+    opaque_report:          ReportTemplate<'a>,
+    dpi_report:             ReportTemplate<'a>,
 }
 
 // Sketchy global so I can test stuff out while I struggle with the
@@ -340,54 +344,7 @@ fn _app_execute<F: Future<Output = ()> + 'static>(f: F) {
         */
 
 
-impl TShirtCheckerApp {
-    /// Called once before the first frame.
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        // This is also where you can customize the look and feel of egui using
-        // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
-        let blue_shirt : LoadedImage = load_image_from_trusted_source(include_bytes!("blue_tshirt.png"), "blue_shirt", &cc.egui_ctx  );
-        //let default_art: LoadedImage = load_image_from_trusted_source(include_bytes!("sf2024-attendee-v1.png"), "default_art", &cc.egui_ctx  );
-        let default_art: LoadedImage = load_image_from_trusted_source(include_bytes!("test_artwork.png"), "default_art", &cc.egui_ctx  );
-        let default_fixed_art: LoadedImage = load_image_from_existing_image( &default_art, correct_alpha_for_tshirt, "fixed default art", &cc.egui_ctx ); 
-        let default_flagged_art: LoadedImage = load_image_from_existing_image( &default_art, flag_alpha_for_shirt, "flagged default art", &cc.egui_ctx ); 
-        let red_shirt : LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_red, "red_shirt", &cc.egui_ctx ); 
-        let dgreen_shirt: LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_dgreen, "dgreen_shirt", &cc.egui_ctx ); 
-        let burg_shirt: LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_burg, "burg_shirt", &cc.egui_ctx ); 
-        let default_shirt = red_shirt.id();
-        let pass: LoadedImage = load_image_from_trusted_source(include_bytes!("pass.png"), "pass", &cc.egui_ctx  );
-        let warn: LoadedImage = load_image_from_trusted_source(include_bytes!("warn.png"), "warn", &cc.egui_ctx  );
-        let fail: LoadedImage = load_image_from_trusted_source(include_bytes!("fail.png"), "fail", &cc.egui_ctx  );
-        let tool: LoadedImage = load_image_from_trusted_source(include_bytes!("tool.png"), "tool", &cc.egui_ctx  );
-        let transparency: LoadedImage = load_image_from_trusted_source(include_bytes!("transparency.png"), "transparency", &cc.egui_ctx  );
-
-        Self {
-            footer_debug_0:         String::new(),
-            footer_debug_1:         String::new(),
-            blue_t_shirt:           blue_shirt,
-            red_t_shirt:            red_shirt,
-            dgreen_t_shirt:         dgreen_shirt,
-            burg_t_shirt:           burg_shirt,
-            t_shirt:                default_shirt,           
-            pass:                   pass,           
-            warn:                   warn,
-            fail:                   fail,
-            tool:                   tool,
-            transparency:           transparency,
-            bad_tpixel_percent:     compute_bad_tpixels(default_art.pixels()),
-            opaque_percent:         compute_percent_opaque(default_art.pixels()),
-            show_transparency_fix:  false,
-            artwork:                default_art,
-            fixed_artwork:          default_fixed_art,
-            flagged_artwork:        default_flagged_art,
-            zoom:                   1.0,
-            target:                 vector![ 0.50, 0.50, 1.0 ],
-            last_drag_pos:          None,
-            drag_display_to_tshirt: None,
-            drag_count:             0,
-            start_time:             SystemTime::now()
-        }
-    }
-
+impl TShirtCheckerApp<'_> {
     fn do_bottom_panel(&self, ctx: &egui::Context ) {
         egui::TopBottomPanel::bottom("bot_panel").show(ctx, |ui| {
             if DEBUG {
@@ -688,31 +645,10 @@ impl TShirtCheckerApp {
                 });
                 ui.add_space(10.0);
 
-                let dpi_report = ReportTemplate{
-                    label:              "DPI",
-                    display_percent :   false,
-                    metric_to_status:   TShirtCheckerApp::dpi_to_status
-                };
-                let area_used_report = ReportTemplate{
-                    label:              "Area Used",
-                    display_percent :   true,
-                    metric_to_status:   TShirtCheckerApp::area_used_to_status
-                };
-                let transparency_report = ReportTemplate {
-                    label:              "Bad TPixels",
-                    display_percent :   true,
-                    metric_to_status:   TShirtCheckerApp::bad_transparency_to_status
-                };
-                let opaque_report = ReportTemplate {
-                    label:              "Bib Score",
-                    display_percent :   true,
-                    metric_to_status:   TShirtCheckerApp::opaque_to_status
-                };
-
-                self.report_row( ui, |strip| { self.report_metric(strip, &dpi_report,          self.compute_dpi() ); } );
-                self.report_row( ui, |strip| { self.report_metric(strip, &area_used_report,    self.compute_area_used()); } );
-                self.report_row( ui, |strip| { self.report_metric(strip, &transparency_report, self.compute_badtransparency_pixels()); } );
-                self.report_row( ui, |strip| { self.report_metric(strip, &opaque_report,       self.compute_opaque_percentage()); } );
+                self.report_row( ui, |strip| { self.report_metric(strip, &self.dpi_report,          self.compute_dpi() ); } );
+                self.report_row( ui, |strip| { self.report_metric(strip, &self.area_used_report,    self.compute_area_used()); } );
+                self.report_row( ui, |strip| { self.report_metric(strip, &self.transparency_report, self.compute_badtransparency_pixels()); } );
+                self.report_row( ui, |strip| { self.report_metric(strip, &self.opaque_report,       self.compute_opaque_percentage()); } );
                 ui.add_space(10.0);
                 ui.separator();
                 ui.add_space(10.0);
@@ -739,6 +675,78 @@ impl TShirtCheckerApp {
             })
         });
     }
+    /// Called once before the first frame.
+    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        // This is also where you can customize the look and feel of egui using
+        // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
+        let blue_shirt : LoadedImage = load_image_from_trusted_source(include_bytes!("blue_tshirt.png"), "blue_shirt", &cc.egui_ctx  );
+        //let default_art: LoadedImage = load_image_from_trusted_source(include_bytes!("sf2024-attendee-v1.png"), "default_art", &cc.egui_ctx  );
+        let default_art: LoadedImage = load_image_from_trusted_source(include_bytes!("test_artwork.png"), "default_art", &cc.egui_ctx  );
+        let default_fixed_art: LoadedImage = load_image_from_existing_image( &default_art, correct_alpha_for_tshirt, "fixed default art", &cc.egui_ctx ); 
+        let default_flagged_art: LoadedImage = load_image_from_existing_image( &default_art, flag_alpha_for_shirt, "flagged default art", &cc.egui_ctx ); 
+        let red_shirt : LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_red, "red_shirt", &cc.egui_ctx ); 
+        let dgreen_shirt: LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_dgreen, "dgreen_shirt", &cc.egui_ctx ); 
+        let burg_shirt: LoadedImage = load_image_from_existing_image( &blue_shirt, blue_to_burg, "burg_shirt", &cc.egui_ctx ); 
+        let default_shirt = red_shirt.id();
+        let pass: LoadedImage = load_image_from_trusted_source(include_bytes!("pass.png"), "pass", &cc.egui_ctx  );
+        let warn: LoadedImage = load_image_from_trusted_source(include_bytes!("warn.png"), "warn", &cc.egui_ctx  );
+        let fail: LoadedImage = load_image_from_trusted_source(include_bytes!("fail.png"), "fail", &cc.egui_ctx  );
+        let tool: LoadedImage = load_image_from_trusted_source(include_bytes!("tool.png"), "tool", &cc.egui_ctx  );
+        let transparency: LoadedImage = load_image_from_trusted_source(include_bytes!("transparency.png"), "transparency", &cc.egui_ctx  );
+
+        let dpi_report = ReportTemplate{
+            label:              "DPI",
+            display_percent :   false,
+            metric_to_status:   TShirtCheckerApp::dpi_to_status
+        };
+        let area_used_report = ReportTemplate{
+            label:              "Area Used",
+            display_percent :   true,
+            metric_to_status:   TShirtCheckerApp::area_used_to_status
+         };
+        let transparency_report = ReportTemplate {
+            label:              "Bad TPixels",
+            display_percent :   true,
+            metric_to_status:   TShirtCheckerApp::bad_transparency_to_status
+        };
+        let opaque_report = ReportTemplate {
+            label:              "Bib Score",
+            display_percent :   true,
+            metric_to_status:   TShirtCheckerApp::opaque_to_status
+        };
+
+        Self {
+            footer_debug_0:         String::new(),
+            footer_debug_1:         String::new(),
+            blue_t_shirt:           blue_shirt,
+            red_t_shirt:            red_shirt,
+            dgreen_t_shirt:         dgreen_shirt,
+            burg_t_shirt:           burg_shirt,
+            t_shirt:                default_shirt,           
+            pass:                   pass,           
+            warn:                   warn,
+            fail:                   fail,
+            tool:                   tool,
+            transparency:           transparency,
+            bad_tpixel_percent:     compute_bad_tpixels(default_art.pixels()),
+            opaque_percent:         compute_percent_opaque(default_art.pixels()),
+            show_transparency_fix:  false,
+            artwork:                default_art,
+            fixed_artwork:          default_fixed_art,
+            flagged_artwork:        default_flagged_art,
+            zoom:                   1.0,
+            target:                 vector![ 0.50, 0.50, 1.0 ],
+            last_drag_pos:          None,
+            drag_display_to_tshirt: None,
+            drag_count:             0,
+            start_time:             SystemTime::now(),
+            area_used_report:       area_used_report,
+            dpi_report:             dpi_report,
+            opaque_report:          opaque_report,
+            transparency_report:    transparency_report,
+        }
+    }
+
 }
 
 fn mtext(text: &str) -> egui::widget_text::RichText {
@@ -749,8 +757,7 @@ fn mtexts(text: &String) -> egui::widget_text::RichText {
     egui::widget_text::RichText::from(text).size(25.0)
 }
 
-impl eframe::App for TShirtCheckerApp {
-
+impl eframe::App for TShirtCheckerApp<'_> {
 
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
