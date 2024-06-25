@@ -6,6 +6,7 @@ use egui_extras::{Size, StripBuilder};
 
 const DEBUG: bool = false;
 const TRANSPARENCY_TOGGLE_RATE: u128 = 500;
+const TOOL_WIDTH: f32 = 25.0;
 
 pub struct HSLA {
   h:      u16,
@@ -248,6 +249,7 @@ pub struct TShirtCheckerApp {
     pass:                   LoadedImage,
     warn:                   LoadedImage,
     fail:                   LoadedImage,
+    tool:                   LoadedImage,
     transparency:           LoadedImage,
     t_shirt:                egui::TextureId,
     artwork:                LoadedImage,
@@ -342,6 +344,7 @@ impl TShirtCheckerApp {
         let pass: LoadedImage = load_image_from_trusted_source(include_bytes!("pass.png"), "pass", &cc.egui_ctx  );
         let warn: LoadedImage = load_image_from_trusted_source(include_bytes!("warn.png"), "warn", &cc.egui_ctx  );
         let fail: LoadedImage = load_image_from_trusted_source(include_bytes!("fail.png"), "fail", &cc.egui_ctx  );
+        let tool: LoadedImage = load_image_from_trusted_source(include_bytes!("tool.png"), "tool", &cc.egui_ctx  );
         let transparency: LoadedImage = load_image_from_trusted_source(include_bytes!("transparency.png"), "transparency", &cc.egui_ctx  );
 
         Self {
@@ -355,6 +358,7 @@ impl TShirtCheckerApp {
             pass:                   pass,           
             warn:                   warn,
             fail:                   fail,
+            tool:                   tool,
             transparency:           transparency,
             bad_tpixel_percent:     compute_bad_tpixels(default_art.pixels()),
             opaque_percent:         compute_percent_opaque(default_art.pixels()),
@@ -563,21 +567,30 @@ impl TShirtCheckerApp {
         }
     }
 
+    fn handle_tool(&self, ui: &mut egui::Ui, status: i32) {
+        if status != 2 {
+            if ui.add(egui::widgets::ImageButton::new( egui::Image::from_texture( self.tool.texture_handle()).max_width(TOOL_WIDTH))).clicked() {
+            }
+        }
+    }
+
     fn report_dpi(&self, strip: &mut egui_extras::Strip<'_, '_>) {
         let top_corner    = self.art_to_art_space() * dvector![ 0.0, 0.0, 1.0 ]; 
         let bot_corner    = self.art_to_art_space() * dvector![ 1.0, 1.0, 1.0 ];
         let dim_in_inches = bot_corner - top_corner;
         let dpi = (self.artwork.size().x / dim_in_inches.x) as i32;
-        let status = self.gen_status( match dpi {
+        let status = match dpi {
             0..=74 => 0,
             75 ..=149 => 1,
             _ => 2
-        });
+        };
+        let status_icon = self.gen_status( status );
 
-        strip.cell(|ui| { ui.add( status ); });
+        strip.cell(|ui| { ui.add( status_icon ); });
         strip.cell(|ui| { ui.label( mtexts(&format!("DPI"))); });
-        strip.cell(|ui| { ui.label( mtexts(&format!("{}", dpi ))); });
+        strip.cell(|ui| { ui.with_layout( egui::Layout::right_to_left(egui::Align::TOP), |ui| {ui.label( mtexts(&format!("{}", dpi ))); });});
         strip.cell(|ui| { ui.label( mtexts(&format!(""))); });
+        strip.cell(|ui| { self.handle_tool(ui, status ); });
     }
 
     fn compute_area_used(&self ) -> u32 {
@@ -590,40 +603,49 @@ impl TShirtCheckerApp {
 
     fn report_area_used(&self, strip: &mut egui_extras::Strip<'_, '_>) {
         let area_used = self.compute_area_used();
-        let status = self.gen_status( match area_used {
+        let status = match area_used {
             0..=50 => 2,
             51..=90 => 1,
             _ => 2,
-        });
-        strip.cell(|ui| { ui.add( status ); });
+        };
+        let status_icon = self.gen_status( status );
+
+        strip.cell(|ui| { ui.add( status_icon ); });
         strip.cell(|ui| { ui.label( mtexts(&format!("Area Used"))); });
-        strip.cell(|ui| { ui.label( mtexts(&format!("{}%", area_used ))); });
-        strip.cell(|ui| { ui.label( mtexts(&format!(""))); });
+        strip.cell(|ui| { ui.with_layout( egui::Layout::right_to_left(egui::Align::TOP), |ui| {ui.label( mtexts(&format!("{}", area_used ))); });});
+        strip.cell(|ui| { ui.label( mtexts(&format!("%"))); });
+        strip.cell(|ui| { self.handle_tool(ui, status ); });
     }
 
     fn report_transparency(&self, strip: &mut egui_extras::Strip<'_, '_>) {
-        let status = self.gen_status( match self.bad_tpixel_percent {
+        let status = match self.bad_tpixel_percent {
             0     => 2,
             _     => 0
-        });
-        strip.cell(|ui| { ui.add( status ); });
+        };
+        let status_icon = self.gen_status( status );
+
+        strip.cell(|ui| { ui.add( status_icon ); });
         strip.cell(|ui| { ui.label( mtexts(&format!("Bad TPixels"))); });
-        strip.cell(|ui| { ui.label( mtexts(&format!("{}%", self.bad_tpixel_percent))); });
-        strip.cell(|ui| { ui.label( mtexts(&format!(""))); });
+        strip.cell(|ui| { ui.with_layout( egui::Layout::right_to_left(egui::Align::TOP), |ui| {ui.label( mtexts(&format!("{}", self.bad_tpixel_percent))); });});
+        strip.cell(|ui| { ui.label( mtexts(&format!("%"))); });
+        strip.cell(|ui| { self.handle_tool(ui, status ); });
     }
 
     fn report_opaque_percent(&self, strip: &mut egui_extras::Strip<'_, '_>) {
         let area_used = self.compute_area_used();
         let opaque_area = area_used * self.opaque_percent / 100;
-        let status = self.gen_status( match opaque_area {
+        let status = match opaque_area {
             0..=49      => 2,
             50..=74     => 1,
             _          => 0,
-        });
-        strip.cell(|ui| { ui.add( status ); });
+        };
+        let status_icon = self.gen_status( status );
+
+        strip.cell(|ui| { ui.add( status_icon ); });
         strip.cell(|ui| { ui.label( mtexts(&format!("Bib Score"))); });
-        strip.cell(|ui| { ui.label( mtexts(&format!("{}%", opaque_area ))); });
-        strip.cell(|ui| { ui.label( mtexts(&format!(""))); });
+        strip.cell(|ui| { ui.with_layout( egui::Layout::right_to_left(egui::Align::TOP), |ui| {ui.label( mtexts(&format!("{}", opaque_area ))); });});
+        strip.cell(|ui| { ui.label( mtexts(&format!("%"))); });
+        strip.cell(|ui| { self.handle_tool(ui, status ); });
     }
 
     fn report_row<F>( &self, ui: &mut egui::Ui, report: F ) where 
@@ -632,9 +654,10 @@ impl TShirtCheckerApp {
         ui.horizontal(|ui| {
             StripBuilder::new(ui)
                 .size(Size::exact(25.0))
-                .size(Size::exact(130.0))
+                .size(Size::exact(140.0))
                 .size(Size::exact(40.0))
-                .size(Size::exact(25.0))
+                .size(Size::exact(15.0))
+                .size(Size::exact( TOOL_WIDTH ))
                 .horizontal(|mut strip| {
                     report(&mut strip);
                 });
@@ -651,7 +674,7 @@ impl TShirtCheckerApp {
                 self.footer_debug_0 = format!("{} {}", panel_size[0], panel_size[1] );
                 ui.add_space(10.0);
                 ui.vertical_centered(|ui| {
-                ui.heading(mtext("T Shirt Checker"));
+                    ui.heading(mtext("T Shirt Checker"));
                 });
                 ui.add_space(10.0);
                 self.report_row( ui, |strip| { self.report_dpi(strip); } );
