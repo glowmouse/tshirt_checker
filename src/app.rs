@@ -289,6 +289,7 @@ pub struct TShirtCheckerApp<'a> {
     transparency_report:    ReportTemplate<'a>,
     opaque_report:          ReportTemplate<'a>,
     dpi_report:             ReportTemplate<'a>,
+    tool_selected_for:      std::option::Option<ReportTypes>,
 }
 
 // Sketchy global so I can test stuff out while I struggle with the
@@ -546,13 +547,6 @@ impl TShirtCheckerApp<'_> {
             }).max_width(25.0)
     }
 
-    fn handle_tool(&self, ui: &mut egui::Ui, status: ReportStatus) {
-        if status != ReportStatus::Pass {
-            if ui.add(egui::widgets::ImageButton::new( egui::Image::from_texture( self.tool.texture_handle()).max_width(TOOL_WIDTH))).clicked() {
-            }
-        }
-    }
-
     fn compute_dpi(&self) -> u32 {
         let top_corner    = self.art_to_art_space() * dvector![ 0.0, 0.0, 1.0 ]; 
         let bot_corner    = self.art_to_art_space() * dvector![ 1.0, 1.0, 1.0 ];
@@ -620,7 +614,15 @@ impl TShirtCheckerApp<'_> {
         }
     }
 
-    fn report_metric(&self, strip: &mut egui_extras::Strip<'_, '_>, report_type: ReportTypes, metric: u32) {
+    fn report_metric(&mut self, ui: &mut egui::Ui, report_type: ReportTypes, metric: u32) {
+        ui.horizontal(|ui| {
+            StripBuilder::new(ui)
+                .size(Size::exact(25.0))
+                .size(Size::exact(140.0))
+                .size(Size::exact(40.0))
+                .size(Size::exact(15.0))
+                .size(Size::exact( TOOL_WIDTH ))
+                .horizontal(|mut strip| {
         let report      = self.report_type_to_template(report_type);
         let status      = (report.metric_to_status)(metric);
         let status_icon = self.gen_status_icon( status );
@@ -630,21 +632,13 @@ impl TShirtCheckerApp<'_> {
         strip.cell(|ui| { ui.with_layout( egui::Layout::right_to_left(egui::Align::TOP), |ui| {ui.label( mtexts(&format!("{}", metric ))); });});
         let cell_string = (if report.display_percent { "%" } else {""}).to_string();
         strip.cell(|ui| { ui.label( mtexts(&cell_string)); });
-        strip.cell(|ui| { self.handle_tool(ui, status ); });
-    }
-
-    fn report_row<F>( &self, ui: &mut egui::Ui, report: F ) where 
-        F: FnOnce(&mut egui_extras::Strip<'_, '_>) 
-    {
-        ui.horizontal(|ui| {
-            StripBuilder::new(ui)
-                .size(Size::exact(25.0))
-                .size(Size::exact(140.0))
-                .size(Size::exact(40.0))
-                .size(Size::exact(15.0))
-                .size(Size::exact( TOOL_WIDTH ))
-                .horizontal(|mut strip| {
-                    report(&mut strip);
+        strip.cell(|ui| {
+            if status != ReportStatus::Pass {
+                if ui.add(egui::widgets::ImageButton::new( egui::Image::from_texture( self.tool.texture_handle()).max_width(TOOL_WIDTH))).clicked() {
+                    self.tool_selected_for = Some( report_type );
+                }
+            }
+        });
                 });
         });
     }
@@ -663,10 +657,16 @@ impl TShirtCheckerApp<'_> {
                 });
                 ui.add_space(10.0);
 
-                self.report_row( ui, |strip| { self.report_metric(strip, ReportTypes::DPI,             self.compute_dpi() ); } );
-                self.report_row( ui, |strip| { self.report_metric(strip, ReportTypes::AreaUsed,        self.compute_area_used()); } );
-                self.report_row( ui, |strip| { self.report_metric(strip, ReportTypes::BadTransparency, self.compute_badtransparency_pixels()); } );
-                self.report_row( ui, |strip| { self.report_metric(strip, ReportTypes::Opaqueness,      self.compute_opaque_percentage()); } );
+                self.report_metric(ui, ReportTypes::DPI,             self.compute_dpi());
+                self.report_metric(ui, ReportTypes::AreaUsed,        self.compute_area_used());
+                self.report_metric(ui, ReportTypes::BadTransparency, self.compute_badtransparency_pixels());
+                self.report_metric(ui, ReportTypes::Opaqueness,      self.compute_opaque_percentage());
+
+                // Patch it in for now
+                if self.tool_selected_for.is_some() && self.tool_selected_for.unwrap() == ReportTypes::BadTransparency {
+                    self.show_transparency_fix = true
+                }
+
                 ui.add_space(10.0);
                 ui.separator();
                 ui.add_space(10.0);
@@ -693,6 +693,7 @@ impl TShirtCheckerApp<'_> {
             })
         });
     }
+
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // This is also where you can customize the look and feel of egui using
@@ -762,6 +763,7 @@ impl TShirtCheckerApp<'_> {
             dpi_report:             dpi_report,
             opaque_report:          opaque_report,
             transparency_report:    transparency_report,
+            tool_selected_for:      None
         }
     }
 
