@@ -708,14 +708,15 @@ impl TShirtCheckerApp<'_> {
                     });
                     strip.cell(|ui| {
                         if status != ReportStatus::Pass {
+                            let is_selected = self.is_tool_active(report_type);
                             if ui
                                 .add(egui::widgets::ImageButton::new(
                                     egui::Image::from_texture(self.tool.texture_handle())
                                         .max_width(TOOL_WIDTH),
-                                ))
+                                ).selected(is_selected))
                                 .clicked()
                             {
-                                self.tool_selected_for = Some(report_type);
+                                self.tool_selected_for = if is_selected {None} else {Some(report_type)};
                             }
                         }
                     });
