@@ -271,7 +271,6 @@ pub struct TShirtCheckerApp<'a> {
     warn:                   LoadedImage,
     fail:                   LoadedImage,
     tool:                   LoadedImage,
-    transparency:           LoadedImage,
     t_shirt:                egui::TextureId,
     artwork:                LoadedImage,
     fixed_artwork:          LoadedImage,
@@ -687,9 +686,6 @@ impl TShirtCheckerApp<'_> {
                         self.t_shirt = self.red_t_shirt.id();
                     }
                 });
-                if ui.add(egui::widgets::ImageButton::new( egui::Image::from_texture( self.transparency.texture_handle()   ).max_width(195.0))).clicked() {
-                    self.show_transparency_fix = !self.show_transparency_fix;
-                }
             })
         });
     }
@@ -711,7 +707,6 @@ impl TShirtCheckerApp<'_> {
         let warn: LoadedImage = load_image_from_trusted_source(include_bytes!("warn.png"), "warn", &cc.egui_ctx  );
         let fail: LoadedImage = load_image_from_trusted_source(include_bytes!("fail.png"), "fail", &cc.egui_ctx  );
         let tool: LoadedImage = load_image_from_trusted_source(include_bytes!("tool.png"), "tool", &cc.egui_ctx  );
-        let transparency: LoadedImage = load_image_from_trusted_source(include_bytes!("transparency.png"), "transparency", &cc.egui_ctx  );
 
         let dpi_report = ReportTemplate{
             label:              "DPI",
@@ -746,7 +741,6 @@ impl TShirtCheckerApp<'_> {
             warn:                   warn,
             fail:                   fail,
             tool:                   tool,
-            transparency:           transparency,
             bad_tpixel_percent:     compute_bad_tpixels(default_art.pixels()),
             opaque_percent:         compute_percent_opaque(default_art.pixels()),
             show_transparency_fix:  false,
