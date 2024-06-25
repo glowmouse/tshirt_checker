@@ -238,6 +238,13 @@ fn load_image_from_existing_image(
   LoadedImage{ uncompressed_image: uncompressed_image, texture: handle }
 }
 
+#[derive(PartialEq,Copy,Clone)]
+enum ReportStatus {
+    Pass,
+    Warn,
+    Fail
+}
+
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 pub struct TShirtCheckerApp {
     footer_debug_0:         String,
@@ -559,16 +566,17 @@ impl TShirtCheckerApp {
         });
     }
 
-    fn gen_status(&self, state : i32 ) -> egui::Image<'_> {
-        match state {
-            0 => egui::Image::from_texture( self.fail.texture_handle() ).max_width(25.0),
-            1 => egui::Image::from_texture( self.warn.texture_handle() ).max_width(25.0),
-            _ => egui::Image::from_texture( self.pass.texture_handle() ).max_width(25.0)
-        }
+    fn gen_status_icon(&self, status: ReportStatus ) -> egui::Image<'_> {
+        egui::Image::from_texture(
+            match status {
+                ReportStatus::Fail => self.fail.texture_handle(),
+                ReportStatus::Warn => self.warn.texture_handle(),
+                ReportStatus::Pass => self.pass.texture_handle()
+            }).max_width(25.0)
     }
 
-    fn handle_tool(&self, ui: &mut egui::Ui, status: i32) {
-        if status != 2 {
+    fn handle_tool(&self, ui: &mut egui::Ui, status: ReportStatus) {
+        if status != ReportStatus::Pass {
             if ui.add(egui::widgets::ImageButton::new( egui::Image::from_texture( self.tool.texture_handle()).max_width(TOOL_WIDTH))).clicked() {
             }
         }
@@ -603,11 +611,11 @@ impl TShirtCheckerApp {
     fn report_dpi(&self, strip: &mut egui_extras::Strip<'_, '_>) {
         let dpi = self.compute_dpi();
         let status = match dpi {
-            0..=74 => 0,
-            75 ..=149 => 1,
-            _ => 2
+            0..=74    => ReportStatus::Fail,
+            75 ..=149 => ReportStatus::Warn,
+            _         => ReportStatus::Pass
         };
-        let status_icon = self.gen_status( status );
+        let status_icon = self.gen_status_icon( status );
 
         strip.cell(|ui| { ui.add( status_icon ); });
         strip.cell(|ui| { ui.label( mtexts(&format!("DPI"))); });
@@ -619,11 +627,11 @@ impl TShirtCheckerApp {
     fn report_area_used(&self, strip: &mut egui_extras::Strip<'_, '_>) {
         let area_used = self.compute_area_used();
         let status = match area_used {
-            0..=50 => 2,
-            51..=90 => 1,
-            _ => 2,
+            0..=50  => ReportStatus::Fail,
+            51..=90 => ReportStatus::Warn,
+            _       => ReportStatus::Pass
         };
-        let status_icon = self.gen_status( status );
+        let status_icon = self.gen_status_icon( status );
 
         strip.cell(|ui| { ui.add( status_icon ); });
         strip.cell(|ui| { ui.label( mtexts(&format!("Area Used"))); });
@@ -635,10 +643,10 @@ impl TShirtCheckerApp {
     fn report_transparency(&self, strip: &mut egui_extras::Strip<'_, '_>) {
         let bad_transparency_pixels = self.compute_badtransparency_pixels();
         let status = match bad_transparency_pixels {
-            0     => 2,
-            _     => 0
+            0     => ReportStatus::Pass,
+            _     => ReportStatus::Fail
         };
-        let status_icon = self.gen_status( status );
+        let status_icon = self.gen_status_icon( status );
 
         strip.cell(|ui| { ui.add( status_icon ); });
         strip.cell(|ui| { ui.label( mtexts(&format!("Bad TPixels"))); });
@@ -650,11 +658,11 @@ impl TShirtCheckerApp {
     fn report_opaque_percent(&self, strip: &mut egui_extras::Strip<'_, '_>) {
         let opaque_area = self.compute_opaque_percentage();
         let status = match opaque_area {
-            0..=49      => 2,
-            50..=74     => 1,
-            _          => 0,
+            0..=49      => ReportStatus::Pass,
+            50..=74     => ReportStatus::Warn,
+            _          =>  ReportStatus::Fail
         };
-        let status_icon = self.gen_status( status );
+        let status_icon = self.gen_status_icon( status );
 
         strip.cell(|ui| { ui.add( status_icon ); });
         strip.cell(|ui| { ui.label( mtexts(&format!("Bib Score"))); });
