@@ -245,6 +245,14 @@ enum ReportStatus {
     Fail
 }
 
+#[derive(PartialEq,Copy,Clone)]
+enum ReportTypes {
+    DPI,
+    BadTransparency,
+    Opaqueness,
+    AreaUsed
+}
+
 pub struct ReportTemplate<'a> {
     label:                  &'a str,
     display_percent:        bool,
@@ -601,9 +609,19 @@ impl TShirtCheckerApp<'_> {
             50..=74     => ReportStatus::Warn,
             _          =>  ReportStatus::Fail
         }
+    }  
+
+    fn report_type_to_template(&self, report_type: ReportTypes ) -> &ReportTemplate<'_> {
+        match report_type {
+            ReportTypes::DPI                => &self.dpi_report,
+            ReportTypes::AreaUsed           => &self.area_used_report,
+            ReportTypes::BadTransparency    => &self.transparency_report,
+            ReportTypes::Opaqueness         => &self.opaque_report,
+        }
     }
 
-    fn report_metric(&self, strip: &mut egui_extras::Strip<'_, '_>, report: &ReportTemplate<'_>, metric: u32) {
+    fn report_metric(&self, strip: &mut egui_extras::Strip<'_, '_>, report_type: ReportTypes, metric: u32) {
+        let report      = self.report_type_to_template(report_type);
         let status      = (report.metric_to_status)(metric);
         let status_icon = self.gen_status_icon( status );
 
@@ -645,10 +663,10 @@ impl TShirtCheckerApp<'_> {
                 });
                 ui.add_space(10.0);
 
-                self.report_row( ui, |strip| { self.report_metric(strip, &self.dpi_report,          self.compute_dpi() ); } );
-                self.report_row( ui, |strip| { self.report_metric(strip, &self.area_used_report,    self.compute_area_used()); } );
-                self.report_row( ui, |strip| { self.report_metric(strip, &self.transparency_report, self.compute_badtransparency_pixels()); } );
-                self.report_row( ui, |strip| { self.report_metric(strip, &self.opaque_report,       self.compute_opaque_percentage()); } );
+                self.report_row( ui, |strip| { self.report_metric(strip, ReportTypes::DPI,             self.compute_dpi() ); } );
+                self.report_row( ui, |strip| { self.report_metric(strip, ReportTypes::AreaUsed,        self.compute_area_used()); } );
+                self.report_row( ui, |strip| { self.report_metric(strip, ReportTypes::BadTransparency, self.compute_badtransparency_pixels()); } );
+                self.report_row( ui, |strip| { self.report_metric(strip, ReportTypes::Opaqueness,      self.compute_opaque_percentage()); } );
                 ui.add_space(10.0);
                 ui.separator();
                 ui.add_space(10.0);
