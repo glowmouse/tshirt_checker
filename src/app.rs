@@ -247,7 +247,8 @@ enum ReportStatus {
 
 pub struct ReportTemplate<'a> {
     label:                  &'a str,
-    display_percent:        bool
+    display_percent:        bool,
+    metric_to_status:       fn( metric: u32) -> ReportStatus
 }
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
@@ -646,8 +647,8 @@ impl TShirtCheckerApp {
     }
 
     fn report_dpi(&self, strip: &mut egui_extras::Strip<'_, '_>, report: &ReportTemplate<'_>) {
-        let dpi = self.compute_dpi();
-        let status = TShirtCheckerApp::dpi_to_status( dpi );
+        let dpi         = self.compute_dpi();
+        let status      = (report.metric_to_status)(dpi);
         let status_icon = self.gen_status_icon( status );
 
         strip.cell(|ui| { ui.add( status_icon ); });
@@ -659,8 +660,8 @@ impl TShirtCheckerApp {
     }
 
     fn report_area_used(&self, strip: &mut egui_extras::Strip<'_, '_>, report: &ReportTemplate<'_>) {
-        let area_used = self.compute_area_used();
-        let status    = TShirtCheckerApp::area_used_to_status(area_used);
+        let area_used   = self.compute_area_used();
+        let status      = (report.metric_to_status)(area_used);
         let status_icon = self.gen_status_icon( status );
 
         strip.cell(|ui| { ui.add( status_icon ); });
@@ -673,7 +674,7 @@ impl TShirtCheckerApp {
 
     fn report_transparency(&self, strip: &mut egui_extras::Strip<'_, '_>, report: &ReportTemplate<'_>) {
         let bad_transparency_pixels = self.compute_badtransparency_pixels();
-        let status    = TShirtCheckerApp::bad_transparency_to_status(bad_transparency_pixels);
+        let status      = (report.metric_to_status)(bad_transparency_pixels);
         let status_icon = self.gen_status_icon( status );
 
         strip.cell(|ui| { ui.add( status_icon ); });
@@ -686,7 +687,7 @@ impl TShirtCheckerApp {
 
     fn report_opaque_percent(&self, strip: &mut egui_extras::Strip<'_, '_>, report: &ReportTemplate<'_>) {
         let opaque_area = self.compute_opaque_percentage();
-        let status    = TShirtCheckerApp::opaque_to_status(opaque_area);
+        let status      = (report.metric_to_status)(opaque_area);
         let status_icon = self.gen_status_icon( status );
 
         strip.cell(|ui| { ui.add( status_icon ); });
@@ -729,19 +730,23 @@ impl TShirtCheckerApp {
 
                 let dpi_report = ReportTemplate{
                     label:              "DPI",
-                    display_percent :   false 
+                    display_percent :   false,
+                    metric_to_status:   TShirtCheckerApp::dpi_to_status
                 };
                 let area_used_report = ReportTemplate{
                     label:              "Area Used",
-                    display_percent :   true 
+                    display_percent :   true,
+                    metric_to_status:   TShirtCheckerApp::area_used_to_status
                 };
                 let transparency_report = ReportTemplate {
                     label:              "Bad TPixels",
-                    display_percent :   true 
+                    display_percent :   true,
+                    metric_to_status:   TShirtCheckerApp::bad_transparency_to_status
                 };
                 let opaque_report = ReportTemplate {
                     label:              "Bib Score",
-                    display_percent :   true 
+                    display_percent :   true,
+                    metric_to_status:   TShirtCheckerApp::opaque_to_status
                 };
 
                 self.report_row( ui, |strip| { self.report_dpi(strip, &dpi_report); } );
