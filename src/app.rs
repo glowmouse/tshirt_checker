@@ -360,15 +360,35 @@ pub struct ArtworkDependentData {
     opaque_percent:         u32,
     selected_art:           Artwork,
     artwork:                LoadedImage,
+    fixed_artwork:          LoadedImage,
+    flagged_artwork:        LoadedImage,
 }
 
 impl ArtworkDependentData {
-    fn new(artwork: &LoadedImage, selected_art: Artwork) -> Self {
+    //fn new( cc: &eframe::CreationContext<'_>,
+    fn new( ctx: &egui::Context,
+            artwork: &LoadedImage, 
+            selected_art: Artwork) -> Self 
+    {
+        let default_fixed_art: LoadedImage = load_image_from_existing_image(
+            &artwork,
+            correct_alpha_for_tshirt,
+            "fixed default art",
+            ctx,
+        );
+        let default_flagged_art: LoadedImage = load_image_from_existing_image(
+            &artwork,
+            flag_alpha_for_shirt,
+            "flagged default art",
+            ctx,
+        );
         Self {
             bad_tpixel_percent: compute_bad_tpixels(artwork.pixels()),
             opaque_percent: compute_percent_opaque(artwork.pixels()),
             selected_art: selected_art,
             artwork: artwork.clone(),
+            fixed_artwork: default_fixed_art,
+            flagged_artwork: default_flagged_art,
         }
     }
 }
@@ -400,8 +420,6 @@ pub struct TShirtCheckerApp<'a> {
     fail: LoadedImage,
     tool: LoadedImage,
     t_shirt: egui::TextureId,
-    fixed_artwork: LoadedImage,
-    flagged_artwork: LoadedImage,
     zoom: f32,
     target: Vector3<f32>,
     last_drag_pos: std::option::Option<Vector3<f32>>,
@@ -657,8 +675,8 @@ impl TShirtCheckerApp<'_> {
             let state = (time_in_ms / TRANSPARENCY_TOGGLE_RATE) % 2;
             let texture_to_display = if self.is_tool_active(ReportTypes::BadTransparency) {
                 match state {
-                    0 => self.flagged_artwork.id(),
-                    _ => self.fixed_artwork.id(),
+                    0 => self.art_dependent_data.flagged_artwork.id(),
+                    _ => self.art_dependent_data.fixed_artwork.id(),
                 }
             } else {
                 self.art_dependent_data.artwork.id()
@@ -714,13 +732,13 @@ impl TShirtCheckerApp<'_> {
         }
     }
 
-    fn handle_art_button( &mut self, ui: &mut egui::Ui, artwork: Artwork)
+    fn handle_art_button( &mut self, ctx: &egui::Context, ui: &mut egui::Ui, artwork: Artwork)
     {
         let image: &LoadedImage = self.art_enum_to_image( artwork );
         let egui_image = egui::Image::from_texture(image.texture_handle() ).max_width(80.0);
         let is_selected = self.art_dependent_data.selected_art == artwork;
         if ui.add( egui::widgets::ImageButton::new( egui_image ).selected( is_selected )).clicked() {
-            self.art_dependent_data = ArtworkDependentData::new( image, artwork ) 
+            self.art_dependent_data = ArtworkDependentData::new( ctx, image, artwork ) 
         }
     }
 
@@ -880,9 +898,9 @@ impl TShirtCheckerApp<'_> {
                         self.handle_tshirt_button( ui, TShirtColors::DBlue);
                     });
                     ui.horizontal(|ui| {
-                        self.handle_art_button( ui, Artwork::Artwork0);
-                        self.handle_art_button( ui, Artwork::Artwork1);
-                        self.handle_art_button( ui, Artwork::Artwork2);
+                        self.handle_art_button( ctx, ui, Artwork::Artwork0);
+                        self.handle_art_button( ctx, ui, Artwork::Artwork1);
+                        self.handle_art_button( ctx, ui, Artwork::Artwork2);
                     });
                 })
             });
@@ -911,18 +929,6 @@ impl TShirtCheckerApp<'_> {
         let artwork_2: LoadedImage = load_image_from_trusted_source(
             include_bytes!("sf2024-attendee-v2.png"),
             "artwork_2",
-            &cc.egui_ctx,
-        );
-        let default_fixed_art: LoadedImage = load_image_from_existing_image(
-            &artwork_0,
-            correct_alpha_for_tshirt,
-            "fixed default art",
-            &cc.egui_ctx,
-        );
-        let default_flagged_art: LoadedImage = load_image_from_existing_image(
-            &artwork_0,
-            flag_alpha_for_shirt,
-            "flagged default art",
             &cc.egui_ctx,
         );
         let red_shirt: LoadedImage =
@@ -980,7 +986,7 @@ impl TShirtCheckerApp<'_> {
         };
 
         Self {
-            art_dependent_data: ArtworkDependentData::new( &artwork_0, Artwork::Artwork0 ),
+            art_dependent_data: ArtworkDependentData::new( &cc.egui_ctx, &artwork_0, Artwork::Artwork0 ),
             footer_debug_0: String::new(),
             footer_debug_1: String::new(),
             blue_t_shirt: blue_shirt,
@@ -994,8 +1000,6 @@ impl TShirtCheckerApp<'_> {
             warn: warn,
             fail: fail,
             tool: tool,
-            fixed_artwork: default_fixed_art,
-            flagged_artwork: default_flagged_art,
             zoom: 1.0,
             target: vector![0.50, 0.50, 1.0],
             last_drag_pos: None,
