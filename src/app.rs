@@ -348,6 +348,14 @@ enum TShirtColors {
     DBlue,
 }
 
+#[derive(PartialEq, Copy, Clone)]
+enum Artwork{
+    Artwork0,
+    Artwork1,
+    Artwork2,
+    Artwork3,
+}
+
 pub struct ReportTemplate<'a> {
     label: &'a str,
     display_percent: bool,
@@ -356,6 +364,11 @@ pub struct ReportTemplate<'a> {
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 pub struct TShirtCheckerApp<'a> {
+    artwork_0: LoadedImage,
+    artwork_1: LoadedImage,
+    artwork_2: LoadedImage,
+    artwork_3: LoadedImage,
+    selected_art: Artwork,
     footer_debug_0: String,
     footer_debug_1: String,
     blue_t_shirt: LoadedImage,
@@ -677,6 +690,27 @@ impl TShirtCheckerApp<'_> {
         }
     }
 
+    fn art_enum_to_image( &self, artwork: Artwork) -> &LoadedImage
+    {
+        match artwork {
+            Artwork::Artwork0 => &self.artwork_0,
+            Artwork::Artwork1 => &self.artwork_1,
+            Artwork::Artwork2 => &self.artwork_2,
+            Artwork::Artwork3 => &self.artwork_3
+        }
+    }
+
+    fn handle_art_button( &mut self, ui: &mut egui::Ui, artwork: Artwork)
+    {
+        let image: &LoadedImage = self.art_enum_to_image( artwork );
+        let egui_image = egui::Image::from_texture(image.texture_handle() ).max_width(80.0);
+        let is_selected = self.selected_art == artwork;
+        if ui.add( egui::widgets::ImageButton::new( egui_image ).selected( is_selected )).clicked() {
+            self.selected_art = artwork;
+        }
+    }
+
+
     fn compute_dpi(&self) -> u32 {
         let top_corner = self.art_to_art_space() * dvector![0.0, 0.0, 1.0];
         let bot_corner = self.art_to_art_space() * dvector![1.0, 1.0, 1.0];
@@ -830,6 +864,11 @@ impl TShirtCheckerApp<'_> {
                         self.handle_tshirt_button( ui, TShirtColors::DGreen);
                         self.handle_tshirt_button( ui, TShirtColors::DBlue);
                     });
+                    ui.horizontal(|ui| {
+                        self.handle_art_button( ui, Artwork::Artwork0);
+                        self.handle_art_button( ui, Artwork::Artwork1);
+                        self.handle_art_button( ui, Artwork::Artwork2);
+                    });
                 })
             });
     }
@@ -844,19 +883,34 @@ impl TShirtCheckerApp<'_> {
             &cc.egui_ctx,
         );
         //let default_art: LoadedImage = load_image_from_trusted_source(include_bytes!("sf2024-attendee-v1.png"), "default_art", &cc.egui_ctx  );
-        let default_art: LoadedImage = load_image_from_trusted_source(
+        let artwork_0: LoadedImage = load_image_from_trusted_source(
             include_bytes!("test_artwork.png"),
-            "default_art",
+            "artwork_0",
+            &cc.egui_ctx,
+        );
+        let artwork_1: LoadedImage = load_image_from_trusted_source(
+            include_bytes!("sf2024-attendee-v1.png"),
+            "artwork_1",
+            &cc.egui_ctx,
+        );
+        let artwork_2: LoadedImage = load_image_from_trusted_source(
+            include_bytes!("sf2024-attendee-v2.png"),
+            "artwork_2",
+            &cc.egui_ctx,
+        );
+        let artwork_3: LoadedImage = load_image_from_trusted_source(
+            include_bytes!("test_artwork.png"),
+            "artwork_3",
             &cc.egui_ctx,
         );
         let default_fixed_art: LoadedImage = load_image_from_existing_image(
-            &default_art,
+            &artwork_0,
             correct_alpha_for_tshirt,
             "fixed default art",
             &cc.egui_ctx,
         );
         let default_flagged_art: LoadedImage = load_image_from_existing_image(
-            &default_art,
+            &artwork_0,
             flag_alpha_for_shirt,
             "flagged default art",
             &cc.egui_ctx,
@@ -916,6 +970,7 @@ impl TShirtCheckerApp<'_> {
         };
 
         Self {
+            selected_art: Artwork::Artwork0,
             footer_debug_0: String::new(),
             footer_debug_1: String::new(),
             blue_t_shirt: blue_shirt,
@@ -929,9 +984,9 @@ impl TShirtCheckerApp<'_> {
             warn: warn,
             fail: fail,
             tool: tool,
-            bad_tpixel_percent: compute_bad_tpixels(default_art.pixels()),
-            opaque_percent: compute_percent_opaque(default_art.pixels()),
-            artwork: default_art,
+            bad_tpixel_percent: compute_bad_tpixels(artwork_0.pixels()),
+            opaque_percent: compute_percent_opaque(artwork_0.pixels()),
+            artwork: artwork_0.clone(),
             fixed_artwork: default_fixed_art,
             flagged_artwork: default_flagged_art,
             zoom: 1.0,
@@ -946,6 +1001,10 @@ impl TShirtCheckerApp<'_> {
             transparency_report: transparency_report,
             tool_selected_for: None,
             tshirt_selected_for: TShirtColors::Red,
+            artwork_0: artwork_0,
+            artwork_1: artwork_1,
+            artwork_2: artwork_2,
+            artwork_3: artwork_3,
         }
     }
 }
