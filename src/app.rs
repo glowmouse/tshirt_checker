@@ -306,6 +306,7 @@ fn load_image_from_existing_image(
     ctx: &egui::Context,
 ) -> LoadedImage {
     let mut new_image: Vec<egui::Color32> = vec![];
+    new_image.reserve( existing.pixels().len() );
 
     for color in existing.pixels().iter() {
         new_image.push(mutator(*color));
