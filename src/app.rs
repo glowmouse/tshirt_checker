@@ -338,6 +338,16 @@ enum ReportTypes {
     AreaUsed,
 }
 
+#[derive(PartialEq, Copy, Clone)]
+enum TShirtColors {
+    Red,
+    DRed,
+    Green,
+    DGreen,
+    Blue,
+    DBlue,
+}
+
 pub struct ReportTemplate<'a> {
     label: &'a str,
     display_percent: bool,
@@ -375,6 +385,7 @@ pub struct TShirtCheckerApp<'a> {
     opaque_report: ReportTemplate<'a>,
     dpi_report: ReportTemplate<'a>,
     tool_selected_for: std::option::Option<ReportTypes>,
+    tshirt_selected_for: TShirtColors,
 }
 
 // Sketchy global so I can test stuff out while I struggle with the
@@ -643,6 +654,29 @@ impl TShirtCheckerApp<'_> {
         .max_width(25.0)
     }
 
+    fn tshirt_enum_to_image( &self, color: TShirtColors) -> &LoadedImage
+    {
+        match color {
+            TShirtColors::Red     => &self.red_t_shirt,
+            TShirtColors::DRed    => &self.burg_t_shirt,
+            TShirtColors::Green   => &self.dgreen_t_shirt,
+            TShirtColors::DGreen  => &self.ddgreen_t_shirt,
+            TShirtColors::Blue    => &self.blue_t_shirt,
+            TShirtColors::DBlue   => &self.dblue_t_shirt
+        }
+    }
+
+    fn handle_tshirt_button( &mut self, ui: &mut egui::Ui, color: TShirtColors )
+    {
+        let image: &LoadedImage = self.tshirt_enum_to_image( color );
+        let egui_image = egui::Image::from_texture(image.texture_handle() ).max_width(80.0);
+        let is_selected = self.tshirt_selected_for == color;
+        if ui.add( egui::widgets::ImageButton::new( egui_image ).selected( is_selected )).clicked() {
+            self.t_shirt = image.id();
+            self.tshirt_selected_for = color;
+        }
+    }
+
     fn compute_dpi(&self) -> u32 {
         let top_corner = self.art_to_art_space() * dvector![0.0, 0.0, 1.0];
         let bot_corner = self.art_to_art_space() * dvector![1.0, 1.0, 1.0];
@@ -787,60 +821,14 @@ impl TShirtCheckerApp<'_> {
                     ui.add_space(10.0);
                     //let max_size = egui::Vec2{ x: 30.0, y: 30.0 };
                     ui.horizontal(|ui| {
-                        if (ui.add(egui::widgets::ImageButton::new(
-                            egui::Image::from_texture(self.red_t_shirt.texture_handle())
-                                .max_width(80.0),
-                        )))
-                        .clicked()
-                        {
-                            self.t_shirt = self.red_t_shirt.id();
-                        }
-                        if ui
-                            .add(egui::widgets::ImageButton::new(
-                                egui::Image::from_texture(self.dgreen_t_shirt.texture_handle())
-                                    .max_width(80.0),
-                            ))
-                            .clicked()
-                        {
-                            self.t_shirt = self.dgreen_t_shirt.id();
-                        }
-                        if ui
-                            .add(egui::widgets::ImageButton::new(
-                                egui::Image::from_texture(self.blue_t_shirt.texture_handle())
-                                    .max_width(80.0),
-                            ))
-                            .clicked()
-                        {
-                            self.t_shirt = self.blue_t_shirt.id();
-                        }
+                        self.handle_tshirt_button( ui, TShirtColors::Red );
+                        self.handle_tshirt_button( ui, TShirtColors::Green);
+                        self.handle_tshirt_button( ui, TShirtColors::Blue);
                     });
                     ui.horizontal(|ui| {
-                        if ui
-                            .add(egui::widgets::ImageButton::new(
-                                egui::Image::from_texture(self.burg_t_shirt.texture_handle())
-                                    .max_width(80.0),
-                            ))
-                            .clicked()
-                        {
-                            self.t_shirt = self.burg_t_shirt.id();
-                        }
-                        if ui
-                            .add(egui::widgets::ImageButton::new(
-                                egui::Image::from_texture(self.ddgreen_t_shirt.texture_handle())
-                                    .max_width(80.0),
-                            ))
-                            .clicked()
-                        {
-                            self.t_shirt = self.ddgreen_t_shirt.id();
-                        }
-                        if ui.add(egui::widgets::ImageButton::new(
-                                egui::Image::from_texture(self.dblue_t_shirt.texture_handle())
-                                    .max_width(80.0),
-                            ))
-                            .clicked()
-                        {
-                            self.t_shirt = self.dblue_t_shirt.id();
-                        }
+                        self.handle_tshirt_button( ui, TShirtColors::DRed );
+                        self.handle_tshirt_button( ui, TShirtColors::DGreen);
+                        self.handle_tshirt_button( ui, TShirtColors::DBlue);
                     });
                 })
             });
@@ -957,6 +945,7 @@ impl TShirtCheckerApp<'_> {
             opaque_report: opaque_report,
             transparency_report: transparency_report,
             tool_selected_for: None,
+            tshirt_selected_for: TShirtColors::Red,
         }
     }
 }
