@@ -353,8 +353,27 @@ enum Artwork{
     Artwork0,
     Artwork1,
     Artwork2,
-    Artwork3,
 }
+
+pub struct ArtworkDependentData {
+    bad_tpixel_percent:     u32,
+    opaque_percent:         u32,
+    selected_art:           Artwork,
+    artwork:                LoadedImage,
+}
+
+impl ArtworkDependentData {
+    fn new(artwork: &LoadedImage, selected_art: Artwork) -> Self {
+        Self {
+            bad_tpixel_percent: compute_bad_tpixels(artwork.pixels()),
+            opaque_percent: compute_percent_opaque(artwork.pixels()),
+            selected_art: selected_art,
+            artwork: artwork.clone(),
+        }
+    }
+}
+
+
 
 pub struct ReportTemplate<'a> {
     label: &'a str,
@@ -367,8 +386,7 @@ pub struct TShirtCheckerApp<'a> {
     artwork_0: LoadedImage,
     artwork_1: LoadedImage,
     artwork_2: LoadedImage,
-    artwork_3: LoadedImage,
-    selected_art: Artwork,
+    art_dependent_data: ArtworkDependentData,
     footer_debug_0: String,
     footer_debug_1: String,
     blue_t_shirt: LoadedImage,
@@ -382,11 +400,8 @@ pub struct TShirtCheckerApp<'a> {
     fail: LoadedImage,
     tool: LoadedImage,
     t_shirt: egui::TextureId,
-    artwork: LoadedImage,
     fixed_artwork: LoadedImage,
     flagged_artwork: LoadedImage,
-    bad_tpixel_percent: u32,
-    opaque_percent: u32,
     zoom: f32,
     target: Vector3<f32>,
     last_drag_pos: std::option::Option<Vector3<f32>>,
@@ -536,7 +551,7 @@ impl TShirtCheckerApp<'_> {
         let artspace_size = vector!(11.0, 14.0);
         let artspace_aspect = artspace_size.x / artspace_size.y;
 
-        let art_size = self.artwork.size();
+        let art_size = self.art_dependent_data.artwork.size();
         let art_aspect = art_size.x / art_size.y;
 
         if artspace_aspect > art_aspect {
@@ -646,7 +661,7 @@ impl TShirtCheckerApp<'_> {
                     _ => self.fixed_artwork.id(),
                 }
             } else {
-                self.artwork.id()
+                self.art_dependent_data.artwork.id()
             };
 
             painter.image(
@@ -696,7 +711,6 @@ impl TShirtCheckerApp<'_> {
             Artwork::Artwork0 => &self.artwork_0,
             Artwork::Artwork1 => &self.artwork_1,
             Artwork::Artwork2 => &self.artwork_2,
-            Artwork::Artwork3 => &self.artwork_3
         }
     }
 
@@ -704,9 +718,9 @@ impl TShirtCheckerApp<'_> {
     {
         let image: &LoadedImage = self.art_enum_to_image( artwork );
         let egui_image = egui::Image::from_texture(image.texture_handle() ).max_width(80.0);
-        let is_selected = self.selected_art == artwork;
+        let is_selected = self.art_dependent_data.selected_art == artwork;
         if ui.add( egui::widgets::ImageButton::new( egui_image ).selected( is_selected )).clicked() {
-            self.selected_art = artwork;
+            self.art_dependent_data = ArtworkDependentData::new( image, artwork ) 
         }
     }
 
@@ -715,7 +729,8 @@ impl TShirtCheckerApp<'_> {
         let top_corner = self.art_to_art_space() * dvector![0.0, 0.0, 1.0];
         let bot_corner = self.art_to_art_space() * dvector![1.0, 1.0, 1.0];
         let dim_in_inches = bot_corner - top_corner;
-        let dpi = (self.artwork.size().x / dim_in_inches.x) as u32;
+        let art = &self.art_dependent_data.artwork;
+        let dpi = (art.size().x / dim_in_inches.x) as u32;
         dpi
     }
 
@@ -728,7 +743,7 @@ impl TShirtCheckerApp<'_> {
     }
 
     fn compute_badtransparency_pixels(&self) -> u32 {
-        return self.bad_tpixel_percent;
+        return self.art_dependent_data.bad_tpixel_percent;
     }
 
     fn bad_transparency_to_status(bad_transparency_pixels: u32) -> ReportStatus {
@@ -756,7 +771,7 @@ impl TShirtCheckerApp<'_> {
 
     fn compute_opaque_percentage(&self) -> u32 {
         let area_used = self.compute_area_used();
-        let opaque_area = area_used * self.opaque_percent / 100;
+        let opaque_area = area_used * self.art_dependent_data.opaque_percent / 100;
         opaque_area
     }
 
@@ -898,11 +913,6 @@ impl TShirtCheckerApp<'_> {
             "artwork_2",
             &cc.egui_ctx,
         );
-        let artwork_3: LoadedImage = load_image_from_trusted_source(
-            include_bytes!("test_artwork.png"),
-            "artwork_3",
-            &cc.egui_ctx,
-        );
         let default_fixed_art: LoadedImage = load_image_from_existing_image(
             &artwork_0,
             correct_alpha_for_tshirt,
@@ -970,7 +980,7 @@ impl TShirtCheckerApp<'_> {
         };
 
         Self {
-            selected_art: Artwork::Artwork0,
+            art_dependent_data: ArtworkDependentData::new( &artwork_0, Artwork::Artwork0 ),
             footer_debug_0: String::new(),
             footer_debug_1: String::new(),
             blue_t_shirt: blue_shirt,
@@ -984,9 +994,6 @@ impl TShirtCheckerApp<'_> {
             warn: warn,
             fail: fail,
             tool: tool,
-            bad_tpixel_percent: compute_bad_tpixels(artwork_0.pixels()),
-            opaque_percent: compute_percent_opaque(artwork_0.pixels()),
-            artwork: artwork_0.clone(),
             fixed_artwork: default_fixed_art,
             flagged_artwork: default_flagged_art,
             zoom: 1.0,
@@ -1004,7 +1011,6 @@ impl TShirtCheckerApp<'_> {
             artwork_0: artwork_0,
             artwork_1: artwork_1,
             artwork_2: artwork_2,
-            artwork_3: artwork_3,
         }
     }
 }
