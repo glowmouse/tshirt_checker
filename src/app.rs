@@ -3,6 +3,7 @@ use web_time::SystemTime;
 extern crate nalgebra as na;
 use egui_extras::{Size, StripBuilder};
 use na::{dvector, matrix, vector, Matrix3, Vector3};
+use std::sync::Arc;
 
 const DEBUG: bool = false;
 const TRANSPARENCY_TOGGLE_RATE: u128 = 500;
@@ -15,8 +16,8 @@ pub struct HSLA {
     a: u8,
 }
 
-impl From<egui::Color32> for HSLA {
-    fn from(item: egui::Color32) -> Self {
+impl From<&egui::Color32> for HSLA {
+    fn from(item: &egui::Color32) -> Self {
         let r: i32 = i32::from(item.r());
         let g: i32 = i32::from(item.g());
         let b: i32 = i32::from(item.b());
@@ -123,7 +124,7 @@ impl Into<egui::Color32> for HSLA {
     }
 }
 
-fn blue_to_red(input: egui::Color32) -> egui::Color32 {
+fn blue_to_red(input: &egui::Color32) -> egui::Color32 {
     let hsla = HSLA::from(input);
     // -324 adjusts the original blue green shirt to a primary color
     // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
@@ -143,7 +144,7 @@ fn int_gamma(input: u8, gamma: f32) -> u8 {
     fout as u8
 }
 
-fn blue_to_dgreen(input: egui::Color32) -> egui::Color32 {
+fn blue_to_dgreen(input: &egui::Color32) -> egui::Color32 {
     let hsla = HSLA::from(input);
     // -324 adjusts the original blue green shirt to a primary color
     // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
@@ -157,7 +158,7 @@ fn blue_to_dgreen(input: egui::Color32) -> egui::Color32 {
     dgreen_adjust.into()
 }
 
-fn blue_to_ddgreen(input: egui::Color32) -> egui::Color32 {
+fn blue_to_ddgreen(input: &egui::Color32) -> egui::Color32 {
     let hsla = HSLA::from(input);
     // -324 adjusts the original blue green shirt to a primary color
     // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
@@ -172,7 +173,7 @@ fn blue_to_ddgreen(input: egui::Color32) -> egui::Color32 {
 }
 
 
-fn blue_to_dblue(input: egui::Color32) -> egui::Color32 {
+fn blue_to_dblue(input: &egui::Color32) -> egui::Color32 {
     let hsla = HSLA::from(input);
     // -324 adjusts the original blue green shirt to a primary color
     // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
@@ -186,7 +187,7 @@ fn blue_to_dblue(input: egui::Color32) -> egui::Color32 {
     dblue_adjust .into()
 }
 
-fn blue_to_burg(input: egui::Color32) -> egui::Color32 {
+fn blue_to_burg(input: &egui::Color32) -> egui::Color32 {
     let hsla = HSLA::from(input);
     // -324 adjusts the original blue green shirt to a primary color
     // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
@@ -200,12 +201,12 @@ fn blue_to_burg(input: egui::Color32) -> egui::Color32 {
     burg_adjust.into()
 }
 
-fn correct_alpha_for_tshirt(input: egui::Color32) -> egui::Color32 {
+fn correct_alpha_for_tshirt(input: &egui::Color32) -> egui::Color32 {
     let new_a = if input.a() == 0 { 0 } else { 255 };
     return egui::Color32::from_rgba_unmultiplied(input.r(), input.g(), input.b(), new_a);
 }
 
-fn flag_alpha_for_shirt(input: egui::Color32) -> egui::Color32 {
+fn flag_alpha_for_shirt(input: &egui::Color32) -> egui::Color32 {
     let not_binary = input.a() != 0 && input.a() != 255;
     if not_binary {
         egui::Color32::from_rgba_unmultiplied(
@@ -215,13 +216,13 @@ fn flag_alpha_for_shirt(input: egui::Color32) -> egui::Color32 {
             255,
         )
     } else {
-        input
+        *input
     }
 }
 
 /// My image abstraction
 pub struct LoadedImage {
-    uncompressed_image: egui::ColorImage,
+    uncompressed_image: Arc<egui::ColorImage>,
     texture: egui::TextureHandle,
 }
 
@@ -290,7 +291,7 @@ fn load_image_from_trusted_source(
     name: impl Into<String>,
     ctx: &egui::Context,
 ) -> LoadedImage {
-    let uncompressed_image = egui_extras::image::load_image_bytes(bytes).unwrap();
+    let uncompressed_image = Arc::new(egui_extras::image::load_image_bytes(bytes).unwrap());
     let handle: egui::TextureHandle =
         ctx.load_texture(name, uncompressed_image.clone(), Default::default());
     LoadedImage {
@@ -301,21 +302,22 @@ fn load_image_from_trusted_source(
 
 fn load_image_from_existing_image(
     existing: &LoadedImage,
-    mutator: fn(egui::Color32) -> egui::Color32,
+    mutator: fn(&egui::Color32) -> egui::Color32,
     name: impl Into<String>,
     ctx: &egui::Context,
 ) -> LoadedImage {
-    let mut new_image: Vec<egui::Color32> = vec![];
+    let mut new_image= Vec::new();
     new_image.reserve( existing.pixels().len() );
 
-    for color in existing.pixels().iter() {
-        new_image.push(mutator(*color));
-    }
+    let in_pixels = existing.pixels();
+    new_image.extend(in_pixels.iter().map(|color| {
+        mutator(color)
+    }));
 
-    let uncompressed_image = egui::ColorImage {
+    let uncompressed_image = Arc::new(egui::ColorImage {
         size: existing.size_as_array().clone(),
         pixels: new_image,
-    };
+    });
     let handle: egui::TextureHandle =
         ctx.load_texture(name, uncompressed_image.clone(), Default::default());
     LoadedImage {
@@ -360,7 +362,6 @@ pub struct ArtworkDependentData {
     bad_tpixel_percent:     u32,
     opaque_percent:         u32,
     selected_art:           Artwork,
-    artwork:                LoadedImage,
     fixed_artwork:          LoadedImage,
     flagged_artwork:        LoadedImage,
 }
@@ -387,7 +388,6 @@ impl ArtworkDependentData {
             bad_tpixel_percent: compute_bad_tpixels(artwork.pixels()),
             opaque_percent: compute_percent_opaque(artwork.pixels()),
             selected_art: selected_art,
-            artwork: artwork.clone(),
             fixed_artwork: default_fixed_art,
             flagged_artwork: default_flagged_art,
         }
@@ -566,11 +566,26 @@ impl TShirtCheckerApp<'_> {
             * scale_centered;
     }
 
+    fn art_enum_to_image( &self, artwork: Artwork) -> &LoadedImage
+    {
+        match artwork {
+            Artwork::Artwork0 => &self.artwork_0,
+            Artwork::Artwork1 => &self.artwork_1,
+            Artwork::Artwork2 => &self.artwork_2,
+        }
+    }
+
+    fn get_selected_art( &self ) -> &LoadedImage
+    {
+        self.art_enum_to_image( self.art_dependent_data.selected_art )
+    }
+
     fn art_to_art_space(&self) -> Matrix3<f32> {
         let artspace_size = vector!(11.0, 14.0);
         let artspace_aspect = artspace_size.x / artspace_size.y;
 
-        let art_size = self.art_dependent_data.artwork.size();
+        let art = self.get_selected_art();
+        let art_size = art.size();
         let art_aspect = art_size.x / art_size.y;
 
         if artspace_aspect > art_aspect {
@@ -680,7 +695,7 @@ impl TShirtCheckerApp<'_> {
                     _ => self.art_dependent_data.fixed_artwork.id(),
                 }
             } else {
-                self.art_dependent_data.artwork.id()
+                self.get_selected_art().id()
             };
 
             painter.image(
@@ -724,15 +739,6 @@ impl TShirtCheckerApp<'_> {
         }
     }
 
-    fn art_enum_to_image( &self, artwork: Artwork) -> &LoadedImage
-    {
-        match artwork {
-            Artwork::Artwork0 => &self.artwork_0,
-            Artwork::Artwork1 => &self.artwork_1,
-            Artwork::Artwork2 => &self.artwork_2,
-        }
-    }
-
     fn handle_art_button( &mut self, ctx: &egui::Context, ui: &mut egui::Ui, artwork: Artwork)
     {
         let image: &LoadedImage = self.art_enum_to_image( artwork );
@@ -748,7 +754,7 @@ impl TShirtCheckerApp<'_> {
         let top_corner = self.art_to_art_space() * dvector![0.0, 0.0, 1.0];
         let bot_corner = self.art_to_art_space() * dvector![1.0, 1.0, 1.0];
         let dim_in_inches = bot_corner - top_corner;
-        let art = &self.art_dependent_data.artwork;
+        let art = &self.get_selected_art();
         let dpi = (art.size().x / dim_in_inches.x) as u32;
         dpi
     }
