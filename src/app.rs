@@ -9,14 +9,14 @@ const DEBUG: bool = false;
 const TRANSPARENCY_TOGGLE_RATE: u128 = 500;
 const TOOL_WIDTH: f32 = 25.0;
 
-pub struct HSLA {
+pub struct Hsla {
     h: u16,
     s: u8,
     l: u8,
     a: u8,
 }
 
-impl From<&egui::Color32> for HSLA {
+impl From<&egui::Color32> for Hsla {
     fn from(item: &egui::Color32) -> Self {
         let r: i32 = i32::from(item.r());
         let g: i32 = i32::from(item.g());
@@ -28,7 +28,7 @@ impl From<&egui::Color32> for HSLA {
         let l: i32 = (min + max) / 2;
 
         if min == max {
-            return HSLA {
+            return Hsla {
                 h: 0,
                 s: 0,
                 l: u8::try_from(l).unwrap(),
@@ -58,14 +58,10 @@ impl From<&egui::Color32> for HSLA {
 
         let h = (ht + 256 * 6) % (256 * 6);
 
-        std::assert!(l >= 0 && l < 256);
-        std::assert!(s >= 0);
-        std::assert!(s <= 256);
-        std::assert!(s < 256);
         std::assert!(h >= 0);
         std::assert!(h <= 256 * 6);
 
-        HSLA {
+        Hsla {
             h: u16::try_from(h).unwrap(),
             s: u8::try_from(s).unwrap(),
             l: u8::try_from(l).unwrap(),
@@ -74,18 +70,18 @@ impl From<&egui::Color32> for HSLA {
     }
 }
 
-impl Into<egui::Color32> for HSLA {
+impl From<Hsla> for egui::Color32 {
     // https://www.niwa.nu/2013/05/math-behind-colorspace-conversions-rgb-hsl/
 
-    fn into(self) -> egui::Color32 {
-        if self.s == 0 {
-            return egui::Color32::from_rgba_premultiplied(self.l, self.l, self.l, self.a);
+    fn from(val: Hsla) -> Self {
+        if val.s == 0 {
+            return egui::Color32::from_rgba_premultiplied(val.l, val.l, val.l, val.a);
         }
         let half: i32 = 128;
         let one: i32 = 256;
-        let h: i32 = i32::from(self.h);
-        let s: i32 = i32::from(self.s);
-        let l: i32 = i32::from(self.l);
+        let h: i32 = i32::from(val.h);
+        let s: i32 = i32::from(val.s);
+        let l: i32 = i32::from(val.l);
 
         let temp1: i32 = if l < half {
             (l * (one + s)) >> 8
@@ -120,16 +116,16 @@ impl Into<egui::Color32> for HSLA {
         let g = hue_to_rgb(temp1, temp2, h);
         let b = hue_to_rgb(temp1, temp2, h - 512);
 
-        return egui::Color32::from_rgba_premultiplied(r, g, b, self.a);
+        egui::Color32::from_rgba_premultiplied(r, g, b, val.a)
     }
 }
 
 fn blue_to_red(input: &egui::Color32) -> egui::Color32 {
-    let hsla = HSLA::from(input);
+    let hsla = Hsla::from(input);
     // -324 adjusts the original blue green shirt to a primary color
     // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
     // 1024 to adjust the primary color to red.
-    let red_adjust = HSLA {
+    let red_adjust = Hsla {
         h: (hsla.h + 6 * 256 - 324 + 1024) % (6 * 256),
         s: hsla.s,
         l: hsla.l,
@@ -146,11 +142,11 @@ fn int_gamma(input: u8, gamma: f32) -> u8 {
 }
 
 fn blue_to_dgreen(input: &egui::Color32) -> egui::Color32 {
-    let hsla = HSLA::from(input);
+    let hsla = Hsla::from(input);
     // -324 adjusts the original blue green shirt to a primary color
     // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
     // 1024 to adjust the primary color to red.
-    let dgreen_adjust = HSLA {
+    let dgreen_adjust = Hsla {
         h: (hsla.h + 6 * 256 - 324 + 38) % (6 * 256),
         s: hsla.s,
         l: int_gamma(hsla.l, 1.7),
@@ -160,11 +156,11 @@ fn blue_to_dgreen(input: &egui::Color32) -> egui::Color32 {
 }
 
 fn blue_to_ddgreen(input: &egui::Color32) -> egui::Color32 {
-    let hsla = HSLA::from(input);
+    let hsla = Hsla::from(input);
     // -324 adjusts the original blue green shirt to a primary color
     // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
     // 1024 to adjust the primary color to red.
-    let ddgreen_adjust = HSLA {
+    let ddgreen_adjust = Hsla {
         h: (hsla.h + 6 * 256 - 324 + 38) % (6 * 256),
         s: int_gamma(hsla.s, 3.0),
         l: int_gamma(hsla.l, 2.5),
@@ -174,11 +170,11 @@ fn blue_to_ddgreen(input: &egui::Color32) -> egui::Color32 {
 }
 
 fn blue_to_dblue(input: &egui::Color32) -> egui::Color32 {
-    let hsla = HSLA::from(input);
+    let hsla = Hsla::from(input);
     // -324 adjusts the original blue green shirt to a primary color
     // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
     // 1024 to adjust the primary color to red.
-    let dblue_adjust = HSLA {
+    let dblue_adjust = Hsla {
         h: (hsla.h + 6 * 256 - 324 + 350) % (6 * 256),
         s: int_gamma(hsla.s, 3.0),
         l: int_gamma(hsla.l, 1.7),
@@ -188,11 +184,11 @@ fn blue_to_dblue(input: &egui::Color32) -> egui::Color32 {
 }
 
 fn blue_to_burg(input: &egui::Color32) -> egui::Color32 {
-    let hsla = HSLA::from(input);
+    let hsla = Hsla::from(input);
     // -324 adjusts the original blue green shirt to a primary color
     // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
     // 1024 to adjust the primary color to red.
-    let burg_adjust = HSLA {
+    let burg_adjust = Hsla {
         h: (hsla.h + 6 * 256 - 324 + 439 + 512) % (6 * 256),
         s: hsla.s,
         l: int_gamma(hsla.l, 1.7),
@@ -203,7 +199,7 @@ fn blue_to_burg(input: &egui::Color32) -> egui::Color32 {
 
 fn correct_alpha_for_tshirt(input: &egui::Color32) -> egui::Color32 {
     let new_a = if input.a() == 0 { 0 } else { 255 };
-    return egui::Color32::from_rgba_premultiplied(input.r(), input.g(), input.b(), new_a);
+    egui::Color32::from_rgba_premultiplied(input.r(), input.g(), input.b(), new_a)
 }
 
 fn flag_alpha_for_shirt(input: &egui::Color32) -> egui::Color32 {
@@ -257,7 +253,7 @@ impl LoadedImage {
     }
 }
 
-fn compute_bad_tpixels(img: &Vec<egui::Color32>) -> u32 {
+fn compute_bad_tpixels(img: &[egui::Color32]) -> u32 {
     let mut num_bad_pixels = 0;
     let num_pixels: u32 = img.len().try_into().unwrap();
 
@@ -267,14 +263,15 @@ fn compute_bad_tpixels(img: &Vec<egui::Color32>) -> u32 {
         }
     }
     let raw_percent = 100 * num_bad_pixels / num_pixels;
-    return if raw_percent == 0 && num_bad_pixels != 0 {
+    if raw_percent == 0 && num_bad_pixels != 0 {
         1
     } else {
         raw_percent
-    };
+    }
 }
 
-fn compute_percent_opaque(img: &Vec<egui::Color32>) -> u32 {
+//fn compute_percent_opaque(img: &Vec<egui::Color32>) -> u32 {
+fn compute_percent_opaque(img: &[egui::Color32]) -> u32 {
     let mut num_opaque_pixels = 0;
     let num_pixels: u32 = img.len().try_into().unwrap();
 
@@ -295,7 +292,7 @@ fn load_image_from_trusted_source(
     let handle: egui::TextureHandle =
         ctx.load_texture(name, uncompressed_image.clone(), Default::default());
     LoadedImage {
-        uncompressed_image: uncompressed_image,
+        uncompressed_image,
         texture: handle,
     }
 }
@@ -306,20 +303,19 @@ fn load_image_from_existing_image(
     name: impl Into<String>,
     ctx: &egui::Context,
 ) -> LoadedImage {
-    let mut new_image = Vec::new();
-    new_image.reserve(existing.pixels().len());
+    let mut new_image = Vec::with_capacity(existing.pixels().len());
 
     let in_pixels = existing.pixels();
-    new_image.extend(in_pixels.iter().map(|color| mutator(color)));
+    new_image.extend(in_pixels.iter().map(mutator));
 
     let uncompressed_image = Arc::new(egui::ColorImage {
-        size: existing.size_as_array().clone(),
+        size: *(existing.size_as_array()),
         pixels: new_image,
     });
     let handle: egui::TextureHandle =
         ctx.load_texture(name, uncompressed_image.clone(), Default::default());
     LoadedImage {
-        uncompressed_image: uncompressed_image,
+        uncompressed_image,
         texture: handle,
     }
 }
@@ -333,7 +329,7 @@ enum ReportStatus {
 
 #[derive(PartialEq, Copy, Clone)]
 enum ReportTypes {
-    DPI,
+    Dpi,
     BadTransparency,
     Opaqueness,
     AreaUsed,
@@ -367,13 +363,13 @@ impl ArtworkDependentData {
     //fn new( cc: &eframe::CreationContext<'_>,
     fn new(ctx: &egui::Context, artwork: &LoadedImage) -> Self {
         let default_fixed_art: LoadedImage = load_image_from_existing_image(
-            &artwork,
+            artwork,
             correct_alpha_for_tshirt,
             "fixed default art",
             ctx,
         );
         let default_flagged_art: LoadedImage = load_image_from_existing_image(
-            &artwork,
+            artwork,
             flag_alpha_for_shirt,
             "flagged default art",
             ctx,
@@ -554,10 +550,10 @@ impl TShirtCheckerApp<'_> {
         // panel is higher than the t-shirt
         let y_width = panel_size[1] / tshirt_aspect * panel_aspect;
         let y_margin = (panel_size[1] - y_width) / 2.0;
-        return matrix![  panel_size[0],    0.0,             0.0;
-                         0.0,              y_width,         y_margin;
-                         0.0,              0.0,             1.0  ]
-            * scale_centered;
+        matrix![  panel_size[0],    0.0,             0.0;
+                  0.0,              y_width,         y_margin;
+                  0.0,              0.0,             1.0  ]
+            * scale_centered
     }
 
     fn art_enum_to_image(&self, artwork: Artwork) -> &LoadedImage {
@@ -573,9 +569,9 @@ impl TShirtCheckerApp<'_> {
         // that the unwrap always succeeds.  Definately a comments are a code
         // smell moment.
         match artwork {
-            Artwork::Artwork0 => &self.art_dependent_data_0.as_ref().unwrap(),
-            Artwork::Artwork1 => &self.art_dependent_data_1.as_ref().unwrap(),
-            Artwork::Artwork2 => &self.art_dependent_data_2.as_ref().unwrap(),
+            Artwork::Artwork0 => self.art_dependent_data_0.as_ref().unwrap(),
+            Artwork::Artwork1 => self.art_dependent_data_1.as_ref().unwrap(),
+            Artwork::Artwork2 => self.art_dependent_data_2.as_ref().unwrap(),
         }
     }
 
@@ -624,9 +620,9 @@ impl TShirtCheckerApp<'_> {
         // panel is higher than the t-shirt
         let y_width = artspace_size.y / art_aspect * artspace_aspect;
         let y_margin = (artspace_size.y - y_width) / 2.0;
-        return matrix![  artspace_size.x,    0.0,             0.0;
+        matrix![         artspace_size.x,    0.0,             0.0;
                          0.0,                y_width,         y_margin;
-                         0.0,                0.0,             1.0  ];
+                         0.0,                0.0,             1.0  ]
     }
 
     //
@@ -647,9 +643,9 @@ impl TShirtCheckerApp<'_> {
                                  // Artwork as 11 x 14 inches, so use that to compute y area
         let yarea = xarea * tshirt_aspect;
 
-        return matrix![  xarea,          0.0,               xcenter - xarea * 11.0 / 2.0;
+        matrix![         xarea,          0.0,               xcenter - xarea * 11.0 / 2.0;
                          0.0,            yarea,             ycenter - yarea * 14.0 / 2.0;
-                         0.0,            0.0,               1.0 ];
+                         0.0,            0.0,               1.0 ]
     }
 
     fn do_central_panel(&mut self, ctx: &egui::Context) {
@@ -689,7 +685,7 @@ impl TShirtCheckerApp<'_> {
                     self.target = self.target + last - curr;
                 } else {
                     self.drag_display_to_tshirt = Some(tshirt_to_display.try_inverse().unwrap());
-                    self.drag_count = self.drag_count + 1
+                    self.drag_count += 1;
                 }
                 self.last_drag_pos = Some(current_drag_pos);
             } else {
@@ -706,7 +702,7 @@ impl TShirtCheckerApp<'_> {
                     zoom_delta_1
                 };
 
-                self.zoom = self.zoom * zoom_delta;
+                self.zoom *= zoom_delta;
                 if self.zoom < 1.0 {
                     self.zoom = 1.0;
                 }
@@ -784,21 +780,20 @@ impl TShirtCheckerApp<'_> {
         let bot_corner = self.art_to_art_space() * dvector![1.0, 1.0, 1.0];
         let dim_in_inches = bot_corner - top_corner;
         let art = &self.get_selected_art();
-        let dpi = (art.size().x / dim_in_inches.x) as u32;
-        dpi
+        (art.size().x / dim_in_inches.x) as u32
     }
 
     fn dpi_to_status(dpi: u32) -> ReportStatus {
-        return match dpi {
+        match dpi {
             0..=74 => ReportStatus::Fail,
             75..=149 => ReportStatus::Warn,
             _ => ReportStatus::Pass,
-        };
+        }
     }
 
     fn compute_badtransparency_pixels(&self) -> u32 {
         let dependent_data = self.art_enum_to_dependent_data(self.selected_art);
-        return dependent_data.bad_tpixel_percent;
+        dependent_data.bad_tpixel_percent
     }
 
     fn bad_transparency_to_status(bad_transparency_pixels: u32) -> ReportStatus {
@@ -813,7 +808,7 @@ impl TShirtCheckerApp<'_> {
         let bot_corner = self.art_to_art_space() * dvector![1.0, 1.0, 1.0];
         let dim_in_inches = bot_corner - top_corner;
         let area_used = 100.0 * dim_in_inches[0] * dim_in_inches[1] / (11.0 * 14.0);
-        return area_used as u32;
+        area_used as u32
     }
 
     fn area_used_to_status(area_used: u32) -> ReportStatus {
@@ -827,8 +822,7 @@ impl TShirtCheckerApp<'_> {
     fn compute_opaque_percentage(&self) -> u32 {
         let area_used = self.compute_area_used();
         let dependent_data = self.art_enum_to_dependent_data(self.selected_art);
-        let opaque_area = area_used * dependent_data.opaque_percent / 100;
-        opaque_area
+        area_used * dependent_data.opaque_percent / 100
     }
 
     fn opaque_to_status(opaque_area: u32) -> ReportStatus {
@@ -841,7 +835,7 @@ impl TShirtCheckerApp<'_> {
 
     fn report_type_to_template(&self, report_type: ReportTypes) -> &ReportTemplate<'_> {
         match report_type {
-            ReportTypes::DPI => &self.dpi_report,
+            ReportTypes::Dpi => &self.dpi_report,
             ReportTypes::AreaUsed => &self.area_used_report,
             ReportTypes::BadTransparency => &self.transparency_report,
             ReportTypes::Opaqueness => &self.opaque_report,
@@ -865,7 +859,7 @@ impl TShirtCheckerApp<'_> {
                         ui.add(status_icon);
                     });
                     strip.cell(|ui| {
-                        ui.label(mtexts(&format!("{}", report.label)));
+                        ui.label(mtexts(&report.label.to_string()));
                     });
                     strip.cell(|ui| {
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
@@ -912,7 +906,7 @@ impl TShirtCheckerApp<'_> {
                     });
                     ui.add_space(10.0);
 
-                    self.report_metric(ui, ReportTypes::DPI, self.compute_dpi());
+                    self.report_metric(ui, ReportTypes::Dpi, self.compute_dpi());
                     self.report_metric(ui, ReportTypes::AreaUsed, self.compute_area_used());
                     self.report_metric(
                         ui,
@@ -1037,25 +1031,25 @@ impl TShirtCheckerApp<'_> {
             dblue_t_shirt: dblue_shirt,
             ddgreen_t_shirt: ddgreen_shirt,
             t_shirt: default_shirt,
-            pass: pass,
-            warn: warn,
-            fail: fail,
-            tool: tool,
+            pass,
+            warn,
+            fail,
+            tool,
             zoom: 1.0,
             target: vector![0.50, 0.50, 1.0],
             last_drag_pos: None,
             drag_display_to_tshirt: None,
             drag_count: 0,
             start_time: SystemTime::now(),
-            area_used_report: area_used_report,
-            dpi_report: dpi_report,
-            opaque_report: opaque_report,
-            transparency_report: transparency_report,
+            area_used_report,
+            dpi_report,
+            opaque_report,
+            transparency_report,
             tool_selected_for: None,
             tshirt_selected_for: TShirtColors::Red,
-            artwork_0: artwork_0,
-            artwork_1: artwork_1,
-            artwork_2: artwork_2,
+            artwork_0,
+            artwork_1,
+            artwork_2,
         }
     }
 }
