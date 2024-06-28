@@ -79,7 +79,7 @@ impl Into<egui::Color32> for HSLA {
 
     fn into(self) -> egui::Color32 {
         if self.s == 0 {
-            return egui::Color32::from_rgba_unmultiplied(self.l, self.l, self.l, self.a);
+            return egui::Color32::from_rgba_premultiplied(self.l, self.l, self.l, self.a);
         }
         let half: i32 = 128;
         let one: i32 = 256;
@@ -120,7 +120,7 @@ impl Into<egui::Color32> for HSLA {
         let g = hue_to_rgb(temp1, temp2, h);
         let b = hue_to_rgb(temp1, temp2, h - 512);
 
-        return egui::Color32::from_rgba_unmultiplied(r, g, b, self.a);
+        return egui::Color32::from_rgba_premultiplied(r, g, b, self.a);
     }
 }
 
@@ -203,13 +203,13 @@ fn blue_to_burg(input: &egui::Color32) -> egui::Color32 {
 
 fn correct_alpha_for_tshirt(input: &egui::Color32) -> egui::Color32 {
     let new_a = if input.a() == 0 { 0 } else { 255 };
-    return egui::Color32::from_rgba_unmultiplied(input.r(), input.g(), input.b(), new_a);
+    return egui::Color32::from_rgba_premultiplied(input.r(), input.g(), input.b(), new_a);
 }
 
 fn flag_alpha_for_shirt(input: &egui::Color32) -> egui::Color32 {
     let not_binary = input.a() != 0 && input.a() != 255;
     if not_binary {
-        egui::Color32::from_rgba_unmultiplied(
+        egui::Color32::from_rgba_premultiplied(
             255 - input.r(),
             255 - input.g(),
             255 - input.b(),
