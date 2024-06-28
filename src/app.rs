@@ -138,6 +138,7 @@ fn blue_to_red(input: &egui::Color32) -> egui::Color32 {
     red_adjust.into()
 }
 
+#[inline]
 fn int_gamma(input: u8, gamma: f32) -> u8 {
     let finput = (input as f32) / 255.0;
     let fout = f32::powf(finput, gamma) * 255.0;
@@ -361,7 +362,6 @@ enum Artwork{
 pub struct ArtworkDependentData {
     bad_tpixel_percent:     u32,
     opaque_percent:         u32,
-    selected_art:           Artwork,
     fixed_artwork:          LoadedImage,
     flagged_artwork:        LoadedImage,
 }
@@ -369,8 +369,7 @@ pub struct ArtworkDependentData {
 impl ArtworkDependentData {
     //fn new( cc: &eframe::CreationContext<'_>,
     fn new( ctx: &egui::Context,
-            artwork: &LoadedImage, 
-            selected_art: Artwork) -> Self 
+            artwork: &LoadedImage) -> Self 
     {
         let default_fixed_art: LoadedImage = load_image_from_existing_image(
             &artwork,
@@ -387,7 +386,6 @@ impl ArtworkDependentData {
         Self {
             bad_tpixel_percent: compute_bad_tpixels(artwork.pixels()),
             opaque_percent: compute_percent_opaque(artwork.pixels()),
-            selected_art: selected_art,
             fixed_artwork: default_fixed_art,
             flagged_artwork: default_flagged_art,
         }
@@ -408,6 +406,7 @@ pub struct TShirtCheckerApp<'a> {
     artwork_1: LoadedImage,
     artwork_2: LoadedImage,
     art_dependent_data: ArtworkDependentData,
+    selected_art:           Artwork,
     footer_debug_0: String,
     footer_debug_1: String,
     blue_t_shirt: LoadedImage,
@@ -577,7 +576,7 @@ impl TShirtCheckerApp<'_> {
 
     fn get_selected_art( &self ) -> &LoadedImage
     {
-        self.art_enum_to_image( self.art_dependent_data.selected_art )
+        self.art_enum_to_image( self.selected_art )
     }
 
     fn art_to_art_space(&self) -> Matrix3<f32> {
@@ -743,9 +742,10 @@ impl TShirtCheckerApp<'_> {
     {
         let image: &LoadedImage = self.art_enum_to_image( artwork );
         let egui_image = egui::Image::from_texture(image.texture_handle() ).max_width(80.0);
-        let is_selected = self.art_dependent_data.selected_art == artwork;
+        let is_selected = self.selected_art == artwork;
         if ui.add( egui::widgets::ImageButton::new( egui_image ).selected( is_selected )).clicked() {
-            self.art_dependent_data = ArtworkDependentData::new( ctx, image, artwork ) 
+            self.art_dependent_data = ArtworkDependentData::new( ctx, image );
+            self.selected_art = artwork;
         }
     }
 
@@ -993,7 +993,8 @@ impl TShirtCheckerApp<'_> {
         };
 
         Self {
-            art_dependent_data: ArtworkDependentData::new( &cc.egui_ctx, &artwork_0, Artwork::Artwork0 ),
+            art_dependent_data: ArtworkDependentData::new( &cc.egui_ctx, &artwork_0 ),
+            selected_art:           Artwork::Artwork0,
             footer_debug_0: String::new(),
             footer_debug_1: String::new(),
             blue_t_shirt: blue_shirt,
