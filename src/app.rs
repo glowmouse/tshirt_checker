@@ -405,7 +405,9 @@ pub struct TShirtCheckerApp<'a> {
     artwork_0: LoadedImage,
     artwork_1: LoadedImage,
     artwork_2: LoadedImage,
-    art_dependent_data: ArtworkDependentData,
+    art_dependent_data_0: std::option::Option<ArtworkDependentData>,
+    art_dependent_data_1: std::option::Option<ArtworkDependentData>,
+    art_dependent_data_2: std::option::Option<ArtworkDependentData>,
     selected_art:           Artwork,
     footer_debug_0: String,
     footer_debug_1: String,
@@ -497,7 +499,7 @@ egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
 */
 
 impl TShirtCheckerApp<'_> {
-    fn is_tool_active(&mut self, report_type: ReportTypes) -> bool {
+    fn is_tool_active(&self, report_type: ReportTypes) -> bool {
         self.tool_selected_for.is_some() && self.tool_selected_for.unwrap() == report_type
     }
 
@@ -572,6 +574,38 @@ impl TShirtCheckerApp<'_> {
             Artwork::Artwork1 => &self.artwork_1,
             Artwork::Artwork2 => &self.artwork_2,
         }
+    }
+
+    fn art_enum_to_dependent_data( &self, artwork: Artwork ) -> &ArtworkDependentData
+    {
+      // For now I guess I guarantee, through logic that's hard to reason about
+      // that the unwrap always succeeds.  Definately a comments are a code
+      // smell moment.
+      match artwork {
+            Artwork::Artwork0 => &self.art_dependent_data_0.as_ref().unwrap(),
+            Artwork::Artwork1 => &self.art_dependent_data_1.as_ref().unwrap(),
+            Artwork::Artwork2 => &self.art_dependent_data_2.as_ref().unwrap(),
+      }
+    }
+
+    fn cache_in_art_dependent_data( &mut self, ctx: &egui::Context, artwork: Artwork )
+    {
+      let image: &LoadedImage = self.art_enum_to_image( artwork );
+
+      match artwork {
+            Artwork::Artwork0 => {
+              if self.art_dependent_data_0.is_none() {
+                self.art_dependent_data_0 = Some( ArtworkDependentData::new( ctx, image ));
+            }}
+            Artwork::Artwork1 => {
+              if self.art_dependent_data_1.is_none() {
+                self.art_dependent_data_1 = Some( ArtworkDependentData::new( ctx, image ));
+            }}
+            Artwork::Artwork2 => {
+              if self.art_dependent_data_2.is_none() {
+                self.art_dependent_data_2 = Some( ArtworkDependentData::new( ctx, image ));
+            }}
+      }
     }
 
     fn get_selected_art( &self ) -> &LoadedImage
@@ -688,10 +722,11 @@ impl TShirtCheckerApp<'_> {
 
             let time_in_ms = self.start_time.elapsed().unwrap().as_millis();
             let state = (time_in_ms / TRANSPARENCY_TOGGLE_RATE) % 2;
+            let dependent_data = self.art_enum_to_dependent_data( self.selected_art );
             let texture_to_display = if self.is_tool_active(ReportTypes::BadTransparency) {
                 match state {
-                    0 => self.art_dependent_data.flagged_artwork.id(),
-                    _ => self.art_dependent_data.fixed_artwork.id(),
+                    0 => dependent_data.flagged_artwork.id(),
+                    _ => dependent_data.fixed_artwork.id(),
                 }
             } else {
                 self.get_selected_art().id()
@@ -744,7 +779,7 @@ impl TShirtCheckerApp<'_> {
         let egui_image = egui::Image::from_texture(image.texture_handle() ).max_width(80.0);
         let is_selected = self.selected_art == artwork;
         if ui.add( egui::widgets::ImageButton::new( egui_image ).selected( is_selected )).clicked() {
-            self.art_dependent_data = ArtworkDependentData::new( ctx, image );
+            self.cache_in_art_dependent_data( ctx, artwork );
             self.selected_art = artwork;
         }
     }
@@ -768,7 +803,8 @@ impl TShirtCheckerApp<'_> {
     }
 
     fn compute_badtransparency_pixels(&self) -> u32 {
-        return self.art_dependent_data.bad_tpixel_percent;
+        let dependent_data = self.art_enum_to_dependent_data( self.selected_art );
+        return dependent_data.bad_tpixel_percent;
     }
 
     fn bad_transparency_to_status(bad_transparency_pixels: u32) -> ReportStatus {
@@ -796,7 +832,8 @@ impl TShirtCheckerApp<'_> {
 
     fn compute_opaque_percentage(&self) -> u32 {
         let area_used = self.compute_area_used();
-        let opaque_area = area_used * self.art_dependent_data.opaque_percent / 100;
+        let dependent_data = self.art_enum_to_dependent_data( self.selected_art );
+        let opaque_area = area_used * dependent_data.opaque_percent / 100;
         opaque_area
     }
 
@@ -993,7 +1030,9 @@ impl TShirtCheckerApp<'_> {
         };
 
         Self {
-            art_dependent_data: ArtworkDependentData::new( &cc.egui_ctx, &artwork_0 ),
+            art_dependent_data_0:   Some(ArtworkDependentData::new( &cc.egui_ctx, &artwork_0 )),
+            art_dependent_data_1:   None,
+            art_dependent_data_2:   None,
             selected_art:           Artwork::Artwork0,
             footer_debug_0: String::new(),
             footer_debug_1: String::new(),
