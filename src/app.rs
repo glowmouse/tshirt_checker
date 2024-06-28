@@ -173,19 +173,18 @@ fn blue_to_ddgreen(input: &egui::Color32) -> egui::Color32 {
     ddgreen_adjust.into()
 }
 
-
 fn blue_to_dblue(input: &egui::Color32) -> egui::Color32 {
     let hsla = HSLA::from(input);
     // -324 adjusts the original blue green shirt to a primary color
     // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
     // 1024 to adjust the primary color to red.
     let dblue_adjust = HSLA {
-        h: (hsla.h + 6*256 - 324 + 350 ) % (6 * 256),
+        h: (hsla.h + 6 * 256 - 324 + 350) % (6 * 256),
         s: int_gamma(hsla.s, 3.0),
         l: int_gamma(hsla.l, 1.7),
         a: hsla.a,
     };
-    dblue_adjust .into()
+    dblue_adjust.into()
 }
 
 fn blue_to_burg(input: &egui::Color32) -> egui::Color32 {
@@ -307,13 +306,11 @@ fn load_image_from_existing_image(
     name: impl Into<String>,
     ctx: &egui::Context,
 ) -> LoadedImage {
-    let mut new_image= Vec::new();
-    new_image.reserve( existing.pixels().len() );
+    let mut new_image = Vec::new();
+    new_image.reserve(existing.pixels().len());
 
     let in_pixels = existing.pixels();
-    new_image.extend(in_pixels.iter().map(|color| {
-        mutator(color)
-    }));
+    new_image.extend(in_pixels.iter().map(|color| mutator(color)));
 
     let uncompressed_image = Arc::new(egui::ColorImage {
         size: existing.size_as_array().clone(),
@@ -353,24 +350,22 @@ enum TShirtColors {
 }
 
 #[derive(PartialEq, Copy, Clone)]
-enum Artwork{
+enum Artwork {
     Artwork0,
     Artwork1,
     Artwork2,
 }
 
 pub struct ArtworkDependentData {
-    bad_tpixel_percent:     u32,
-    opaque_percent:         u32,
-    fixed_artwork:          LoadedImage,
-    flagged_artwork:        LoadedImage,
+    bad_tpixel_percent: u32,
+    opaque_percent: u32,
+    fixed_artwork: LoadedImage,
+    flagged_artwork: LoadedImage,
 }
 
 impl ArtworkDependentData {
     //fn new( cc: &eframe::CreationContext<'_>,
-    fn new( ctx: &egui::Context,
-            artwork: &LoadedImage) -> Self 
-    {
+    fn new(ctx: &egui::Context, artwork: &LoadedImage) -> Self {
         let default_fixed_art: LoadedImage = load_image_from_existing_image(
             &artwork,
             correct_alpha_for_tshirt,
@@ -392,8 +387,6 @@ impl ArtworkDependentData {
     }
 }
 
-
-
 pub struct ReportTemplate<'a> {
     label: &'a str,
     display_percent: bool,
@@ -408,7 +401,7 @@ pub struct TShirtCheckerApp<'a> {
     art_dependent_data_0: std::option::Option<ArtworkDependentData>,
     art_dependent_data_1: std::option::Option<ArtworkDependentData>,
     art_dependent_data_2: std::option::Option<ArtworkDependentData>,
-    selected_art:           Artwork,
+    selected_art: Artwork,
     footer_debug_0: String,
     footer_debug_1: String,
     blue_t_shirt: LoadedImage,
@@ -567,8 +560,7 @@ impl TShirtCheckerApp<'_> {
             * scale_centered;
     }
 
-    fn art_enum_to_image( &self, artwork: Artwork) -> &LoadedImage
-    {
+    fn art_enum_to_image(&self, artwork: Artwork) -> &LoadedImage {
         match artwork {
             Artwork::Artwork0 => &self.artwork_0,
             Artwork::Artwork1 => &self.artwork_1,
@@ -576,41 +568,41 @@ impl TShirtCheckerApp<'_> {
         }
     }
 
-    fn art_enum_to_dependent_data( &self, artwork: Artwork ) -> &ArtworkDependentData
-    {
-      // For now I guess I guarantee, through logic that's hard to reason about
-      // that the unwrap always succeeds.  Definately a comments are a code
-      // smell moment.
-      match artwork {
+    fn art_enum_to_dependent_data(&self, artwork: Artwork) -> &ArtworkDependentData {
+        // For now I guess I guarantee, through logic that's hard to reason about
+        // that the unwrap always succeeds.  Definately a comments are a code
+        // smell moment.
+        match artwork {
             Artwork::Artwork0 => &self.art_dependent_data_0.as_ref().unwrap(),
             Artwork::Artwork1 => &self.art_dependent_data_1.as_ref().unwrap(),
             Artwork::Artwork2 => &self.art_dependent_data_2.as_ref().unwrap(),
-      }
+        }
     }
 
-    fn cache_in_art_dependent_data( &mut self, ctx: &egui::Context, artwork: Artwork )
-    {
-      let image: &LoadedImage = self.art_enum_to_image( artwork );
+    fn cache_in_art_dependent_data(&mut self, ctx: &egui::Context, artwork: Artwork) {
+        let image: &LoadedImage = self.art_enum_to_image(artwork);
 
-      match artwork {
+        match artwork {
             Artwork::Artwork0 => {
-              if self.art_dependent_data_0.is_none() {
-                self.art_dependent_data_0 = Some( ArtworkDependentData::new( ctx, image ));
-            }}
+                if self.art_dependent_data_0.is_none() {
+                    self.art_dependent_data_0 = Some(ArtworkDependentData::new(ctx, image));
+                }
+            }
             Artwork::Artwork1 => {
-              if self.art_dependent_data_1.is_none() {
-                self.art_dependent_data_1 = Some( ArtworkDependentData::new( ctx, image ));
-            }}
+                if self.art_dependent_data_1.is_none() {
+                    self.art_dependent_data_1 = Some(ArtworkDependentData::new(ctx, image));
+                }
+            }
             Artwork::Artwork2 => {
-              if self.art_dependent_data_2.is_none() {
-                self.art_dependent_data_2 = Some( ArtworkDependentData::new( ctx, image ));
-            }}
-      }
+                if self.art_dependent_data_2.is_none() {
+                    self.art_dependent_data_2 = Some(ArtworkDependentData::new(ctx, image));
+                }
+            }
+        }
     }
 
-    fn get_selected_art( &self ) -> &LoadedImage
-    {
-        self.art_enum_to_image( self.selected_art )
+    fn get_selected_art(&self) -> &LoadedImage {
+        self.art_enum_to_image(self.selected_art)
     }
 
     fn art_to_art_space(&self) -> Matrix3<f32> {
@@ -722,7 +714,7 @@ impl TShirtCheckerApp<'_> {
 
             let time_in_ms = self.start_time.elapsed().unwrap().as_millis();
             let state = (time_in_ms / TRANSPARENCY_TOGGLE_RATE) % 2;
-            let dependent_data = self.art_enum_to_dependent_data( self.selected_art );
+            let dependent_data = self.art_enum_to_dependent_data(self.selected_art);
             let texture_to_display = if self.is_tool_active(ReportTypes::BadTransparency) {
                 match state {
                     0 => dependent_data.flagged_artwork.id(),
@@ -750,40 +742,42 @@ impl TShirtCheckerApp<'_> {
         .max_width(25.0)
     }
 
-    fn tshirt_enum_to_image( &self, color: TShirtColors) -> &LoadedImage
-    {
+    fn tshirt_enum_to_image(&self, color: TShirtColors) -> &LoadedImage {
         match color {
-            TShirtColors::Red     => &self.red_t_shirt,
-            TShirtColors::DRed    => &self.burg_t_shirt,
-            TShirtColors::Green   => &self.dgreen_t_shirt,
-            TShirtColors::DGreen  => &self.ddgreen_t_shirt,
-            TShirtColors::Blue    => &self.blue_t_shirt,
-            TShirtColors::DBlue   => &self.dblue_t_shirt
+            TShirtColors::Red => &self.red_t_shirt,
+            TShirtColors::DRed => &self.burg_t_shirt,
+            TShirtColors::Green => &self.dgreen_t_shirt,
+            TShirtColors::DGreen => &self.ddgreen_t_shirt,
+            TShirtColors::Blue => &self.blue_t_shirt,
+            TShirtColors::DBlue => &self.dblue_t_shirt,
         }
     }
 
-    fn handle_tshirt_button( &mut self, ui: &mut egui::Ui, color: TShirtColors )
-    {
-        let image: &LoadedImage = self.tshirt_enum_to_image( color );
-        let egui_image = egui::Image::from_texture(image.texture_handle() ).max_width(80.0);
+    fn handle_tshirt_button(&mut self, ui: &mut egui::Ui, color: TShirtColors) {
+        let image: &LoadedImage = self.tshirt_enum_to_image(color);
+        let egui_image = egui::Image::from_texture(image.texture_handle()).max_width(80.0);
         let is_selected = self.tshirt_selected_for == color;
-        if ui.add( egui::widgets::ImageButton::new( egui_image ).selected( is_selected )).clicked() {
+        if ui
+            .add(egui::widgets::ImageButton::new(egui_image).selected(is_selected))
+            .clicked()
+        {
             self.t_shirt = image.id();
             self.tshirt_selected_for = color;
         }
     }
 
-    fn handle_art_button( &mut self, ctx: &egui::Context, ui: &mut egui::Ui, artwork: Artwork)
-    {
-        let image: &LoadedImage = self.art_enum_to_image( artwork );
-        let egui_image = egui::Image::from_texture(image.texture_handle() ).max_width(80.0);
+    fn handle_art_button(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, artwork: Artwork) {
+        let image: &LoadedImage = self.art_enum_to_image(artwork);
+        let egui_image = egui::Image::from_texture(image.texture_handle()).max_width(80.0);
         let is_selected = self.selected_art == artwork;
-        if ui.add( egui::widgets::ImageButton::new( egui_image ).selected( is_selected )).clicked() {
-            self.cache_in_art_dependent_data( ctx, artwork );
+        if ui
+            .add(egui::widgets::ImageButton::new(egui_image).selected(is_selected))
+            .clicked()
+        {
+            self.cache_in_art_dependent_data(ctx, artwork);
             self.selected_art = artwork;
         }
     }
-
 
     fn compute_dpi(&self) -> u32 {
         let top_corner = self.art_to_art_space() * dvector![0.0, 0.0, 1.0];
@@ -803,7 +797,7 @@ impl TShirtCheckerApp<'_> {
     }
 
     fn compute_badtransparency_pixels(&self) -> u32 {
-        let dependent_data = self.art_enum_to_dependent_data( self.selected_art );
+        let dependent_data = self.art_enum_to_dependent_data(self.selected_art);
         return dependent_data.bad_tpixel_percent;
     }
 
@@ -832,7 +826,7 @@ impl TShirtCheckerApp<'_> {
 
     fn compute_opaque_percentage(&self) -> u32 {
         let area_used = self.compute_area_used();
-        let dependent_data = self.art_enum_to_dependent_data( self.selected_art );
+        let dependent_data = self.art_enum_to_dependent_data(self.selected_art);
         let opaque_area = area_used * dependent_data.opaque_percent / 100;
         opaque_area
     }
@@ -886,13 +880,17 @@ impl TShirtCheckerApp<'_> {
                         if status != ReportStatus::Pass {
                             let is_selected = self.is_tool_active(report_type);
                             if ui
-                                .add(egui::widgets::ImageButton::new(
-                                    egui::Image::from_texture(self.tool.texture_handle())
-                                        .max_width(TOOL_WIDTH),
-                                ).selected(is_selected))
+                                .add(
+                                    egui::widgets::ImageButton::new(
+                                        egui::Image::from_texture(self.tool.texture_handle())
+                                            .max_width(TOOL_WIDTH),
+                                    )
+                                    .selected(is_selected),
+                                )
                                 .clicked()
                             {
-                                self.tool_selected_for = if is_selected {None} else {Some(report_type)};
+                                self.tool_selected_for =
+                                    if is_selected { None } else { Some(report_type) };
                             }
                         }
                     });
@@ -932,19 +930,19 @@ impl TShirtCheckerApp<'_> {
                     ui.add_space(10.0);
                     //let max_size = egui::Vec2{ x: 30.0, y: 30.0 };
                     ui.horizontal(|ui| {
-                        self.handle_tshirt_button( ui, TShirtColors::Red );
-                        self.handle_tshirt_button( ui, TShirtColors::Green);
-                        self.handle_tshirt_button( ui, TShirtColors::Blue);
+                        self.handle_tshirt_button(ui, TShirtColors::Red);
+                        self.handle_tshirt_button(ui, TShirtColors::Green);
+                        self.handle_tshirt_button(ui, TShirtColors::Blue);
                     });
                     ui.horizontal(|ui| {
-                        self.handle_tshirt_button( ui, TShirtColors::DRed );
-                        self.handle_tshirt_button( ui, TShirtColors::DGreen);
-                        self.handle_tshirt_button( ui, TShirtColors::DBlue);
+                        self.handle_tshirt_button(ui, TShirtColors::DRed);
+                        self.handle_tshirt_button(ui, TShirtColors::DGreen);
+                        self.handle_tshirt_button(ui, TShirtColors::DBlue);
                     });
                     ui.horizontal(|ui| {
-                        self.handle_art_button( ctx, ui, Artwork::Artwork0);
-                        self.handle_art_button( ctx, ui, Artwork::Artwork1);
-                        self.handle_art_button( ctx, ui, Artwork::Artwork2);
+                        self.handle_art_button(ctx, ui, Artwork::Artwork0);
+                        self.handle_art_button(ctx, ui, Artwork::Artwork1);
+                        self.handle_art_button(ctx, ui, Artwork::Artwork2);
                     });
                 })
             });
@@ -989,12 +987,8 @@ impl TShirtCheckerApp<'_> {
             "ddgreen_shirt",
             &cc.egui_ctx,
         );
-        let dblue_shirt: LoadedImage = load_image_from_existing_image(
-            &blue_shirt,
-            blue_to_dblue,
-            "dblue_shirt",
-            &cc.egui_ctx,
-        );
+        let dblue_shirt: LoadedImage =
+            load_image_from_existing_image(&blue_shirt, blue_to_dblue, "dblue_shirt", &cc.egui_ctx);
 
         let burg_shirt: LoadedImage =
             load_image_from_existing_image(&blue_shirt, blue_to_burg, "burg_shirt", &cc.egui_ctx);
@@ -1030,10 +1024,10 @@ impl TShirtCheckerApp<'_> {
         };
 
         Self {
-            art_dependent_data_0:   Some(ArtworkDependentData::new( &cc.egui_ctx, &artwork_0 )),
-            art_dependent_data_1:   None,
-            art_dependent_data_2:   None,
-            selected_art:           Artwork::Artwork0,
+            art_dependent_data_0: Some(ArtworkDependentData::new(&cc.egui_ctx, &artwork_0)),
+            art_dependent_data_1: None,
+            art_dependent_data_2: None,
+            selected_art: Artwork::Artwork0,
             footer_debug_0: String::new(),
             footer_debug_1: String::new(),
             blue_t_shirt: blue_shirt,
