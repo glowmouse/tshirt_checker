@@ -108,7 +108,7 @@ impl From<Hsla> for egui::Color32 {
 
         fn hue_to_rgb(t1: i32, t2: i32, h: i32) -> u8 {
             // we sometimes get small negatives.  skill issue/ bug.
-            let tmp = std::cmp::min(255, std::cmp::max(0, hue_to_rgb_2(t1, t2, h)));
+            let tmp = hue_to_rgb_2(t1, t2, h).clamp(0, 255);
             u8::try_from(tmp).unwrap()
         }
 
@@ -163,7 +163,7 @@ fn blue_to_ddgreen(input: &egui::Color32) -> egui::Color32 {
     let ddgreen_adjust = Hsla {
         h: (hsla.h + 6 * 256 - 324 + 38) % (6 * 256),
         s: int_gamma(hsla.s, 3.0),
-        l: int_gamma(hsla.l, 2.5),
+        l: int_gamma(hsla.l, 2.2),
         a: hsla.a,
     };
     ddgreen_adjust.into()
