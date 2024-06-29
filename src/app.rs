@@ -141,6 +141,25 @@ fn int_gamma(input: u8, gamma: f32) -> u8 {
     fout as u8
 }
 
+/*
+
+// Experimental code with the thought that I could pre-compute gamma values
+// from 0 to 255.  Rust's constant function code doesn't do integers, so
+// yeah.
+
+pub struct GammaMap {
+  remap:  [u8; 256]
+}
+
+
+impl GammaMap {
+  fn new (gamma: f32 ) -> Self {
+    let mut i = 0u8;
+    Self{ remap : arr_macro::arr![{ i += 1; int_gamma(i-1, gamma ) }; 256 ] }
+  }
+}
+*/
+
 fn blue_to_dgreen(input: &egui::Color32) -> egui::Color32 {
     let hsla = Hsla::from(input);
     // -324 adjusts the original blue green shirt to a primary color
