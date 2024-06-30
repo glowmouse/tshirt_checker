@@ -341,20 +341,15 @@ fn load_image_from_existing_image(
     name: impl Into<String>,
     ctx: &egui::Context,
 ) -> LoadedImage {
-    let mut new_image = Vec::with_capacity(existing.pixels().len());
-
-    let in_pixels = existing.pixels();
-    new_image.extend(in_pixels.iter().map(mutator));
-
-    let uncompressed_image = Arc::new(egui::ColorImage {
-        size: *(existing.size_as_array()),
-        pixels: new_image,
-    });
-    let handle: egui::TextureHandle =
+    let pixels = existing.pixels().iter().map(mutator).collect();
+    let size = *existing.size_as_array();
+    let uncompressed_image = Arc::new(egui::ColorImage { size, pixels });
+    let texture: egui::TextureHandle =
         ctx.load_texture(name, uncompressed_image.clone(), Default::default());
+
     LoadedImage {
         uncompressed_image,
-        texture: handle,
+        texture,
     }
 }
 
