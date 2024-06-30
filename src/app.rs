@@ -708,10 +708,11 @@ impl TShirtCheckerApp<'_> {
             );
 
             let art_space_to_display =
-                tshirt_to_display * self.art_space_to_tshirt() * self.art_to_art_space();
+                tshirt_to_display * self.art_space_to_tshirt();
+            let art_to_display = art_space_to_display * self.art_to_art_space();
 
-            let a0 = v3_to_egui(art_space_to_display * dvector![0.0, 0.0, 1.0]);
-            let a1 = v3_to_egui(art_space_to_display * dvector![1.0, 1.0, 1.0]);
+            let a0 = v3_to_egui(art_to_display * dvector![0.0, 0.0, 1.0]);
+            let a1 = v3_to_egui(art_to_display * dvector![1.0, 1.0, 1.0]);
 
             if let Some(pointer_pos) = response.interact_pointer_pos() {
                 let current_drag_pos = vector!(pointer_pos[0], pointer_pos[1], 1.0);
@@ -764,6 +765,29 @@ impl TShirtCheckerApp<'_> {
                 egui::Rect::from_min_max(uv0, uv1),
                 egui::Color32::WHITE,
             );
+
+            if self.is_tool_active(ReportTypes::AreaUsed) {
+                let art_space_border = vec![
+                    v3_to_egui(art_space_to_display * dvector![0.0, 0.0, 1.0]),
+                    v3_to_egui(art_space_to_display * dvector![11.0, 0.0, 1.0]),
+                    v3_to_egui(art_space_to_display * dvector![11.0, 14.0, 1.0]),
+                    v3_to_egui(art_space_to_display * dvector![0.0, 14.0, 1.0]),
+                    v3_to_egui(art_space_to_display * dvector![0.0, 0.0, 1.0]),
+                ];
+
+                let dash_dim = (art_space_to_display * dvector![0.2, 0.05, 1.0]) - (art_space_to_display * dvector![0.0, 0.0, 1.0]);
+                let dash_length = dash_dim.x;
+                let dash_width  = dash_dim.y;
+                let gap_length  = dash_length;
+
+                // animate with 3 cycles
+                let cycle = (time_in_ms % (TRANSPARENCY_TOGGLE_RATE*3))/TRANSPARENCY_TOGGLE_RATE;
+                let offset : f32 = (cycle as f32) / 3.0 * (dash_length + gap_length);
+                let stroke_1 = egui::Stroke::new(dash_width, egui::Color32::from_rgb(200, 200, 200));
+
+                painter.add(egui::Shape::dashed_line_with_offset( 
+                    &art_space_border, stroke_1, &[dash_length], &[gap_length], offset));
+            }
         });
     }
 
@@ -810,6 +834,7 @@ impl TShirtCheckerApp<'_> {
         {
             self.cache_in_art_dependent_data(ctx, artwork);
             self.selected_art = artwork;
+            self.tool_selected_for = None; // Reset tool selection.
         }
     }
 
@@ -1102,7 +1127,7 @@ impl eframe::App for TShirtCheckerApp<'_> {
         self.do_bottom_panel(ctx);
         self.do_right_panel(ctx);
         self.do_central_panel(ctx);
-        if self.is_tool_active(ReportTypes::BadTransparency) {
+        if self.is_tool_active(ReportTypes::BadTransparency) || self.is_tool_active(ReportTypes::AreaUsed) {
             let time_in_ms = self.start_time.elapsed().unwrap().as_millis();
             let next_epoch =
                 (time_in_ms / TRANSPARENCY_TOGGLE_RATE + 1) * TRANSPARENCY_TOGGLE_RATE + 1;
