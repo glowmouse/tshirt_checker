@@ -353,6 +353,92 @@ fn load_image_from_existing_image(
     }
 }
 
+fn heat_map_from_image(
+    existing: &LoadedImage,
+    name: impl Into<String>,
+    ctx: &egui::Context,
+) -> LoadedImage {
+    let in_pixels = existing.pixels();
+    //let mut old_out_pixels = Vec::new();
+    let xsize = existing.size_as_array()[0];
+    let ysize = existing.size_as_array()[1];
+    let mut left = in_pixels[0];
+    let mut last_row = vec![egui::Color32::BLACK; xsize];
+    last_row.copy_from_slice(&in_pixels[0..xsize]);
+    let mut x: usize = 0;
+    let mut y: usize = 0;
+    let heat_x = xsize / 64 + 1;
+    let heat_y = ysize / 64 + 1;
+    let total_pixels = heat_x * heat_y;
+    let mut out_pixels_scalar = std::iter::repeat_with(|| 0)
+        .take(total_pixels)
+        .collect::<Vec<_>>();
+
+    for pixel in in_pixels {
+        let top = last_row[x];
+        let (r, g, b, a) = (
+            pixel.r() as i32,
+            pixel.g() as i32,
+            pixel.b() as i32,
+            pixel.a() as i32,
+        );
+        let (rt, gt, bt, at) = (
+            top.r() as i32,
+            top.g() as i32,
+            top.b() as i32,
+            top.a() as i32,
+        );
+        let (rl, gl, bl, al) = (
+            left.r() as i32,
+            left.g() as i32,
+            left.b() as i32,
+            left.a() as i32,
+        );
+        let ld = (rl - r).abs() + (gl - g).abs() + (bl - b).abs() + (al - a).abs();
+        let td = (rt - r).abs() + (gt - g).abs() + (bt - b).abs() + (at - a).abs();
+        let d = ld + td;
+
+        last_row[x] = *pixel;
+        left = *pixel;
+        x += 1;
+        if x == xsize {
+            y += 1;
+            x = 0;
+        }
+        let hx = x / 64;
+        let hy = y / 64;
+        out_pixels_scalar[hx + hy * heat_x] += d;
+        //out_pixels.push( egui::Color32::from_rgba_premultiplied( d, d, d, 255 ));
+    }
+
+    let mut max_out_pixel: i32 = 0;
+    for scalar in out_pixels_scalar.iter() {
+        max_out_pixel = std::cmp::max(max_out_pixel, *scalar);
+    }
+
+    let out_pixels = out_pixels_scalar
+        .iter()
+        .map(|g| {
+            let d = 255 * g / max_out_pixel;
+            let du8: u8 = d.try_into().unwrap();
+            egui::Color32::from_rgba_premultiplied(du8, du8, du8, 255)
+        })
+        .collect();
+
+    let size = [heat_x, heat_y];
+    let uncompressed_image = Arc::new(egui::ColorImage {
+        size,
+        pixels: out_pixels,
+    });
+    let texture: egui::TextureHandle =
+        ctx.load_texture(name, uncompressed_image.clone(), Default::default());
+
+    LoadedImage {
+        uncompressed_image,
+        texture,
+    }
+}
+
 #[derive(PartialEq, Copy, Clone)]
 enum ReportStatus {
     Pass,
@@ -385,11 +471,77 @@ enum Artwork {
     Artwork2,
 }
 
+#[derive(Eq, Clone)]
+pub struct HotSpot {
+    strength: u8,
+    location: egui::Vec2,
+}
+
+impl PartialEq for HotSpot {
+    fn eq(&self, other: &Self) -> bool {
+        self.strength == other.strength && self.location == other.location
+    }
+}
+
+use std::cmp::Ordering;
+
+impl PartialOrd for HotSpot {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        //Some(self.strength.cmp(&other.strength))
+        Some(other.strength.cmp(&self.strength))
+    }
+}
+
+impl Ord for HotSpot {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
+fn hot_spots_from_heat_map(heat_map: &LoadedImage) -> Vec<HotSpot> {
+    let mut all_hotspots = Vec::new();
+    let mut x: u16 = 0;
+    let mut y: u16 = 0;
+    let xsize = heat_map.size()[0] as u16;
+    let xsize_f = heat_map.size()[0];
+    let ysize_f = heat_map.size()[1];
+
+    for pixel in heat_map.pixels().iter() {
+        all_hotspots.push(HotSpot {
+            strength: pixel.r(),
+            location: egui::Vec2 {
+                x: ((x as f32) + 0.5) / xsize_f,
+                y: ((y as f32) + 0.5) / ysize_f,
+            },
+        });
+        x += 1;
+        if x == xsize {
+            y += 1;
+            x = 0;
+        }
+    }
+
+    all_hotspots.sort();
+    if all_hotspots.len() > 4 {
+        all_hotspots.resize(
+            4,
+            HotSpot {
+                strength: 0,
+                location: egui::Vec2 { x: 0.0, y: 0.0 },
+            },
+        )
+    }
+
+    all_hotspots
+}
+
 pub struct ArtworkDependentData {
     bad_tpixel_percent: u32,
     opaque_percent: u32,
     fixed_artwork: LoadedImage,
     flagged_artwork: LoadedImage,
+    _heat_map: LoadedImage,
+    top_hot_spots: Vec<HotSpot>,
 }
 
 impl ArtworkDependentData {
@@ -407,11 +559,15 @@ impl ArtworkDependentData {
             "flagged default art",
             ctx,
         );
+        let heat_map = heat_map_from_image(artwork, "heatmap", ctx);
+
         Self {
             bad_tpixel_percent: compute_bad_tpixels(artwork.pixels()),
             opaque_percent: compute_percent_opaque(artwork.pixels()),
             fixed_artwork: default_fixed_art,
             flagged_artwork: default_flagged_art,
+            top_hot_spots: hot_spots_from_heat_map(&heat_map),
+            _heat_map: heat_map_from_image(artwork, "heatmap", ctx),
         }
     }
 }
@@ -749,6 +905,8 @@ impl TShirtCheckerApp<'_> {
                     0 => dependent_data.flagged_artwork.id(),
                     _ => dependent_data.fixed_artwork.id(),
                 }
+            } else if self.is_tool_active(ReportTypes::Dpi) {
+                dependent_data.fixed_artwork.id()
             } else {
                 self.get_selected_art().id()
             };
@@ -759,6 +917,19 @@ impl TShirtCheckerApp<'_> {
                 egui::Rect::from_min_max(uv0, uv1),
                 egui::Color32::WHITE,
             );
+
+            if self.is_tool_active(ReportTypes::Dpi) {
+                let cycle = time_in_ms / TRANSPARENCY_TOGGLE_RATE / 10;
+                let slot = cycle % (dependent_data.top_hot_spots.len() as u128);
+                let hot_spot = &dependent_data.top_hot_spots[slot as usize];
+                let art_location = vector![hot_spot.location.x, hot_spot.location.y, 1.0];
+                let art_to_tshirt = self.art_space_to_tshirt() * self.art_to_art_space();
+                let display_location = art_to_tshirt * art_location;
+
+                //let location = vector![0.5, 0.5, 1.0];
+                self.zoom = 10.0;
+                self.target = display_location;
+            }
 
             if self.is_tool_active(ReportTypes::AreaUsed) {
                 let art_space_border = vec![
@@ -1131,6 +1302,7 @@ impl eframe::App for TShirtCheckerApp<'_> {
         self.do_central_panel(ctx);
         if self.is_tool_active(ReportTypes::BadTransparency)
             || self.is_tool_active(ReportTypes::AreaUsed)
+            || self.is_tool_active(ReportTypes::Dpi)
         {
             let time_in_ms = self.start_time.elapsed().unwrap().as_millis();
             let next_epoch =
