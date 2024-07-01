@@ -863,6 +863,7 @@ impl TShirtCheckerApp<'_> {
 
             let a0 = v3_to_egui(art_to_display * dvector![0.0, 0.0, 1.0]);
             let a1 = v3_to_egui(art_to_display * dvector![1.0, 1.0, 1.0]);
+            let mut movement_attempted = false;
 
             if let Some(pointer_pos) = response.interact_pointer_pos() {
                 let current_drag_pos = vector!(pointer_pos[0], pointer_pos[1], 1.0);
@@ -872,6 +873,7 @@ impl TShirtCheckerApp<'_> {
                     let last = display_to_artspace * last_drag_pos;
                     let curr = display_to_artspace * current_drag_pos;
                     self.target = self.target + last - curr;
+                    movement_attempted = true;
                 } else {
                     self.drag_display_to_tshirt = Some(tshirt_to_display.try_inverse().unwrap());
                     self.drag_count += 1;
@@ -890,6 +892,9 @@ impl TShirtCheckerApp<'_> {
                 } else {
                     zoom_delta_1
                 };
+                if zoom_delta != 1.0 {
+                    movement_attempted = true;
+                }
 
                 self.zoom *= zoom_delta;
                 if self.zoom < 1.0 {
@@ -926,9 +931,14 @@ impl TShirtCheckerApp<'_> {
                 let art_to_tshirt = self.art_space_to_tshirt() * self.art_to_art_space();
                 let display_location = art_to_tshirt * art_location;
 
-                //let location = vector![0.5, 0.5, 1.0];
-                self.zoom = 10.0;
-                self.target = display_location;
+                // need to make modifications to self after dependent_data borrow is done.
+                if !movement_attempted {
+                    self.zoom = 10.0;
+                    self.target = display_location;
+                } else {
+                    // deselect tool if the user is trying to move or zoom.
+                    self.tool_selected_for = None;
+                }
             }
 
             if self.is_tool_active(ReportTypes::AreaUsed) {
@@ -1121,6 +1131,7 @@ impl TShirtCheckerApp<'_> {
                             {
                                 self.tool_selected_for =
                                     if is_selected { None } else { Some(report_type) };
+                                self.start_time = SystemTime::now();
                             }
                         }
                     });
