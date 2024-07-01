@@ -522,17 +522,22 @@ fn hot_spots_from_heat_map(heat_map: &LoadedImage) -> Vec<HotSpot> {
     }
 
     all_hotspots.sort();
-    if all_hotspots.len() > 4 {
-        all_hotspots.resize(
-            4,
-            HotSpot {
-                strength: 0,
-                location: egui::Vec2 { x: 0.0, y: 0.0 },
-            },
-        )
-    }
+    let mut chosen_hotspots: Vec<HotSpot> = Vec::new();
 
-    all_hotspots
+    for hotspot in all_hotspots {
+        let mut closest_distance = f32::MAX;
+        for chosen_hotspot in &chosen_hotspots {
+            closest_distance =
+                closest_distance.min((chosen_hotspot.location - hotspot.location).length());
+        }
+        if closest_distance > 0.2 {
+            chosen_hotspots.push(hotspot);
+        }
+        if chosen_hotspots.len() >= 4 {
+            break;
+        }
+    }
+    chosen_hotspots
 }
 
 pub struct ArtworkDependentData {
