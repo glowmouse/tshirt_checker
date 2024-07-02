@@ -11,9 +11,9 @@
 
     <!-- config for our rust wasm binary. go to https://trunkrs.dev/assets/#rust for more customization -->
 
-<script type="module" nonce="rAB9PR56SWIsVy9sZyvXpg==">
-import init, * as bindings from '/tshirt_checker/tshirt_checker-4386358dd61e3e57.js';
-const wasm = await init('/tshirt_checker/tshirt_checker-4386358dd61e3e57_bg.wasm');
+<script type="module">
+import init, * as bindings from '/tshirt_checker/tshirt_checker-8d4ece0314ade63b.js';
+const wasm = await init('/tshirt_checker/tshirt_checker-8d4ece0314ade63b_bg.wasm');
 
 
 window.wasmBindings = bindings;
@@ -128,8 +128,8 @@ dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
 
     </style>
 
-<link rel="modulepreload" href="/tshirt_checker/tshirt_checker-4386358dd61e3e57.js" crossorigin=anonymous integrity="sha384-G6GNrsuePXuGcBlO9YXp6gL15S1R4Osr3Z3NGXB68wVAiqJf2v+fH2zKw8CXNIyq">
-<link rel="preload" href="/tshirt_checker/tshirt_checker-4386358dd61e3e57_bg.wasm" crossorigin=anonymous integrity="sha384-ES06q+a/zOR+D3rKqA8lEWbFLKMm5HthIr92xWZZMB/RewZ4nUNMGwLHDN8CF0tp" as="fetch" type="application/wasm"></head>
+<link rel="modulepreload" href="/tshirt_checker/tshirt_checker-8d4ece0314ade63b.js" crossorigin=anonymous integrity="sha384-6+yVVDcq3Zg1FR6V74ZgSbQQDt1oUrxBZ6QXacVPNsCzmDyHsfnXtQRUJMec5d3E">
+<link rel="preload" href="/tshirt_checker/tshirt_checker-8d4ece0314ade63b_bg.wasm" crossorigin=anonymous integrity="sha384-TqCnhoy+BGi3TTJnuUVleTW+ZokRb9jyxkiAxsmbjACnJTaGpLB+LZnO2GO8Dbkd" as="fetch" type="application/wasm"></head>
 
 <body>
     <!-- The WASM code will resize the canvas dynamically -->
