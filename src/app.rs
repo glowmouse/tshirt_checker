@@ -617,6 +617,7 @@ pub struct TShirtCheckerApp<'a> {
     warn: LoadedImage,
     fail: LoadedImage,
     tool: LoadedImage,
+    import: LoadedImage,
     t_shirt: egui::TextureId,
     zoom: f32,
     target: Vector3<f32>,
@@ -1138,7 +1139,8 @@ impl TShirtCheckerApp<'_> {
                                 .add(
                                     egui::widgets::ImageButton::new(
                                         egui::Image::from_texture(self.tool.texture_handle())
-                                            .max_width(TOOL_WIDTH),
+                                            .max_width(TOOL_WIDTH)
+                                            .bg_fill(egui::Color32::WHITE),
                                     )
                                     .selected(is_selected),
                                 )
@@ -1203,9 +1205,9 @@ impl TShirtCheckerApp<'_> {
                         self.compute_badtransparency_pixels(),
                     );
 
-                    ui.add_space(10.0);
+                    ui.add_space(5.0);
                     ui.separator();
-                    ui.add_space(10.0);
+                    ui.add_space(5.0);
                     //let max_size = egui::Vec2{ x: 30.0, y: 30.0 };
                     ui.horizontal(|ui| {
                         self.handle_tshirt_button(ui, TShirtColors::Red);
@@ -1217,13 +1219,31 @@ impl TShirtCheckerApp<'_> {
                         self.handle_tshirt_button(ui, TShirtColors::DGreen);
                         self.handle_tshirt_button(ui, TShirtColors::DBlue);
                     });
+                    ui.add_space(5.0);
+                    ui.separator();
+                    ui.add_space(5.0);
                     ui.horizontal(|ui| {
                         self.handle_art_button(ctx, ui, Artwork::Artwork0);
                         self.handle_art_button(ctx, ui, Artwork::Artwork1);
                         self.handle_art_button(ctx, ui, Artwork::Artwork2);
                     });
+                    ui.add_space(5.0);
+                    ui.separator();
+                    ui.add_space(5.0);
+                    //let image: &LoadedImage = self.art_enum_to_image(artwork);
+                    //let egui_image = egui::Image::from_texture(image.texture_handle()).max_width(80.0);
+                    //let is_selected = self.selected_art == artwork;
+                    //if ui
+                    //    .add(egui::widgets::ImageButton::new(egui_image).selected(is_selected))
+                    //    .clicked()
                     ui.horizontal(|ui| {
-                        if ui.add(egui::widgets::Button::new("Load")).clicked() {
+                        let import_icon = egui::Image::from_texture(self.import.texture_handle())
+                            .max_width(80.0)
+                            .bg_fill(egui::Color32::WHITE);
+                        if ui
+                            .add(egui::widgets::ImageButton::new(import_icon))
+                            .clicked()
+                        {
                             self.do_load(ctx);
                         }
                     });
@@ -1283,6 +1303,11 @@ impl TShirtCheckerApp<'_> {
             load_image_from_trusted_source(include_bytes!("fail.png"), "fail", &cc.egui_ctx);
         let tool: LoadedImage =
             load_image_from_trusted_source(include_bytes!("tool.png"), "tool", &cc.egui_ctx);
+        let import: LoadedImage = load_image_from_trusted_source(
+            include_bytes!("import_80x80.png"),
+            "import",
+            &cc.egui_ctx,
+        );
 
         let dpi_report = ReportTemplate {
             label: "DPI",
@@ -1323,6 +1348,7 @@ impl TShirtCheckerApp<'_> {
             warn,
             fail,
             tool,
+            import,
             zoom: 1.0,
             target: vector![0.50, 0.50, 1.0],
             last_drag_pos: None,
