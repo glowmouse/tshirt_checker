@@ -5,7 +5,7 @@ use egui_extras::{Size, StripBuilder};
 use na::{dvector, matrix, vector, Matrix3, Vector3};
 use std::sync::Arc;
 
-const DEBUG: bool = true;
+const DEBUG: bool = false;
 const TRANSPARENCY_TOGGLE_RATE: u128 = 500;
 const TOOL_WIDTH: f32 = 20.0;
 
@@ -592,6 +592,8 @@ impl ArtworkDependentData {
 
 pub struct ReportTemplate {
     label: String,
+    report_tip: String,
+    tool_tip: String,
     display_percent: bool,
     metric_to_status: fn(metric: u32) -> ReportStatus,
 }
@@ -1059,8 +1061,8 @@ impl TShirtCheckerApp {
 
     fn dpi_to_status(dpi: u32) -> ReportStatus {
         match dpi {
-            0..=74 => ReportStatus::Fail,
-            75..=149 => ReportStatus::Warn,
+            0..=199 => ReportStatus::Fail,
+            200..=299 => ReportStatus::Warn,
             _ => ReportStatus::Pass,
         }
     }
@@ -1128,16 +1130,20 @@ impl TShirtCheckerApp {
                     let report = self.report_type_to_template(report_type);
                     let status = (report.metric_to_status)(metric);
                     let status_icon = self.gen_status_icon(status);
+                    let tool_tip = report.tool_tip.clone();
+                    let report_tip = report.report_tip.clone();
 
                     strip.cell(|ui| {
-                        ui.add(status_icon);
+                        ui.add(status_icon).on_hover_text(&report_tip);
                     });
                     strip.cell(|ui| {
-                        ui.label(mtexts(&report.label.to_string()));
+                        ui.label(mtexts(&report.label.to_string()))
+                            .on_hover_text(&report_tip);
                     });
                     strip.cell(|ui| {
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
-                            ui.label(mtexts(&format!("{}", metric)));
+                            ui.label(mtexts(&format!("{}", metric)))
+                                .on_hover_text(&report_tip);
                         });
                     });
                     let cell_string = (if report.display_percent { "%" } else { "" }).to_string();
@@ -1156,6 +1162,7 @@ impl TShirtCheckerApp {
                                     )
                                     .selected(is_selected),
                                 )
+                                .on_hover_text(tool_tip)
                                 .clicked()
                             {
                                 self.tool_selected_for =
@@ -1196,13 +1203,17 @@ impl TShirtCheckerApp {
             .min_width(200.0)
             .show(ctx, |ui| {
                 ui.vertical(|ui| {
-                    ui.add_space(10.0);
+                    ui.add_space(5.0);
+                    ui.separator();
+                    ui.add_space(5.0);
                     ui.vertical_centered(|ui| {
                         ui.heading(
-                            egui::widget_text::RichText::from("T-Shirt\nArt Checker").size(40.0),
+                            egui::widget_text::RichText::from("T-Shirt Art Check").size(30.0),
                         )
                     });
-                    ui.add_space(10.0);
+                    ui.add_space(5.0);
+                    ui.separator();
+                    ui.add_space(5.0);
 
                     self.report_metric(ui, ReportTypes::Dpi, self.compute_dpi());
                     self.report_metric(ui, ReportTypes::AreaUsed, self.compute_area_used());
@@ -1254,6 +1265,7 @@ impl TShirtCheckerApp {
                             .bg_fill(egui::Color32::WHITE);
                         if ui
                             .add(egui::widgets::ImageButton::new(import_icon))
+                            .on_hover_text("Import an image to the selected artwork slot.")
                             .clicked()
                         {
                             self.do_load(ctx);
@@ -1265,6 +1277,7 @@ impl TShirtCheckerApp {
                         .bg_fill(egui::Color32::WHITE);
                         if ui
                             .add(egui::widgets::ImageButton::new(partialt_icon))
+                            .on_hover_text("Fix partial transparency problems by mapping all alpha values to 0 or 1.")
                             .clicked()
                         {
                             self.partialt_fix(ctx);
@@ -1339,21 +1352,29 @@ impl TShirtCheckerApp {
 
         let dpi_report = ReportTemplate {
             label: "DPI".to_string(),
+            report_tip: "Ideally, artwork for T-Shirts should be Print Quality - 300 DPI or more. Medium Quality (200 to 299 DPI) is probably okay. Below 200 DPI pixalation may be noticable.".to_string(),
+            tool_tip: "Show close ups of areas where artwork might look pixelly.\nTurn off the tool or move the T-Shirt to exit.".to_string(),
             display_percent: false,
             metric_to_status: TShirtCheckerApp::dpi_to_status,
         };
         let area_used_report = ReportTemplate {
             label: "Area Used".to_string(),
+            report_tip: "Artwork is usually printed on an 11 inch by 14 inch area of the T-Shirt.  The report shows how much of that printable area the art is currently filling.  There's no rule that says art has to use all of the available area, but it's nice to know how much available area there is.".to_string(),
+            tool_tip: "Show the maximum boundary of the printable area on the T-Shirt.".to_string(),
             display_percent: true,
             metric_to_status: TShirtCheckerApp::area_used_to_status,
         };
         let transparency_report = ReportTemplate {
             label: "Partial\nTransparency".to_string(),
+            report_tip: "The processed used to print T-Shirt artwork doesn't support partial transparency.  Either the artwork is being printed (100% transparecy) or the T-Shirt is showing through (0% transparency) - there's nothing in between.  For best results, fix partial transparency problems in your art package of choice.".to_string(),
+            tool_tip: "Show areas of the artwork where there's partial transparency of some kind.".to_string(),
             display_percent: true,
             metric_to_status: TShirtCheckerApp::bad_transparency_to_status,
         };
         let opaque_report = ReportTemplate {
             label: "Bib Score".to_string(),
+            report_tip: "T-Shirt artwork shouldn't cover all the printable area.  The more area the artwork covers, the more the T-Shirt will feel like a pastic bib you'd put on a baby for meal time.  For best results the artwork have transparent areas where the T-Shirt will show through, and work with the T-Shirt color.".to_string(),
+            tool_tip: "TODO: have tool do something.".to_string(),
             display_percent: true,
             metric_to_status: TShirtCheckerApp::opaque_to_status,
         };
