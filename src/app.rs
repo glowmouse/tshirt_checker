@@ -590,14 +590,14 @@ impl ArtworkDependentData {
     }
 }
 
-pub struct ReportTemplate<'a> {
-    label: &'a str,
+pub struct ReportTemplate {
+    label: String,
     display_percent: bool,
     metric_to_status: fn(metric: u32) -> ReportStatus,
 }
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
-pub struct TShirtCheckerApp<'a> {
+pub struct TShirtCheckerApp {
     artwork_0: LoadedImage,
     artwork_1: LoadedImage,
     artwork_2: LoadedImage,
@@ -626,10 +626,10 @@ pub struct TShirtCheckerApp<'a> {
     drag_display_to_tshirt: std::option::Option<Matrix3<f32>>,
     drag_count: i32,
     start_time: SystemTime,
-    area_used_report: ReportTemplate<'a>,
-    transparency_report: ReportTemplate<'a>,
-    opaque_report: ReportTemplate<'a>,
-    dpi_report: ReportTemplate<'a>,
+    area_used_report: ReportTemplate,
+    transparency_report: ReportTemplate,
+    opaque_report: ReportTemplate,
+    dpi_report: ReportTemplate,
     tool_selected_for: std::option::Option<ReportTypes>,
     tshirt_selected_for: TShirtColors,
     image_loader: Option<std::sync::mpsc::Receiver<Result<ImageLoad, String>>>,
@@ -669,7 +669,7 @@ fn app_execute<F: Future<Output = ()> + 'static>(f: F) {
     wasm_bindgen_futures::spawn_local(f);
 }
 
-impl TShirtCheckerApp<'_> {
+impl TShirtCheckerApp {
     fn is_tool_active(&self, report_type: ReportTypes) -> bool {
         self.tool_selected_for.is_some() && self.tool_selected_for.unwrap() == report_type
     }
@@ -1107,7 +1107,7 @@ impl TShirtCheckerApp<'_> {
         }
     }
 
-    fn report_type_to_template(&self, report_type: ReportTypes) -> &ReportTemplate<'_> {
+    fn report_type_to_template(&self, report_type: ReportTypes) -> &ReportTemplate {
         match report_type {
             ReportTypes::Dpi => &self.dpi_report,
             ReportTypes::AreaUsed => &self.area_used_report,
@@ -1338,22 +1338,22 @@ impl TShirtCheckerApp<'_> {
         );
 
         let dpi_report = ReportTemplate {
-            label: "DPI",
+            label: "DPI".to_string(),
             display_percent: false,
             metric_to_status: TShirtCheckerApp::dpi_to_status,
         };
         let area_used_report = ReportTemplate {
-            label: "Area Used",
+            label: "Area Used".to_string(),
             display_percent: true,
             metric_to_status: TShirtCheckerApp::area_used_to_status,
         };
         let transparency_report = ReportTemplate {
-            label: "Partial\nTransparency",
+            label: "Partial\nTransparency".to_string(),
             display_percent: true,
             metric_to_status: TShirtCheckerApp::bad_transparency_to_status,
         };
         let opaque_report = ReportTemplate {
-            label: "Bib Score",
+            label: "Bib Score".to_string(),
             display_percent: true,
             metric_to_status: TShirtCheckerApp::opaque_to_status,
         };
@@ -1402,7 +1402,7 @@ fn mtexts(text: &String) -> egui::widget_text::RichText {
     egui::widget_text::RichText::from(text).size(25.0)
 }
 
-impl eframe::App for TShirtCheckerApp<'_> {
+impl eframe::App for TShirtCheckerApp {
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.footer_debug_0 = format!("time {}", self.start_time.elapsed().unwrap().as_millis());
