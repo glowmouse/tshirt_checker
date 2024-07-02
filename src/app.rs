@@ -321,18 +321,26 @@ fn compute_percent_opaque(img: &[egui::Color32]) -> u32 {
     100 * num_opaque_pixels / num_pixels
 }
 
+fn load_image_from_untrusted_source(
+    bytes: &[u8],
+    name: impl Into<String>,
+    ctx: &egui::Context,
+) -> Result<LoadedImage, String> {
+    let uncompressed_image = Arc::new(egui_extras::image::load_image_bytes(bytes)?);
+    let handle: egui::TextureHandle =
+        ctx.load_texture(name, uncompressed_image.clone(), Default::default());
+    Ok(LoadedImage {
+        uncompressed_image,
+        texture: handle,
+    })
+}
+
 fn load_image_from_trusted_source(
     bytes: &[u8],
     name: impl Into<String>,
     ctx: &egui::Context,
 ) -> LoadedImage {
-    let uncompressed_image = Arc::new(egui_extras::image::load_image_bytes(bytes).unwrap());
-    let handle: egui::TextureHandle =
-        ctx.load_texture(name, uncompressed_image.clone(), Default::default());
-    LoadedImage {
-        uncompressed_image,
-        texture: handle,
-    }
+    load_image_from_untrusted_source(bytes, name, ctx).unwrap()
 }
 
 fn load_image_from_existing_image(
@@ -472,8 +480,9 @@ enum Artwork {
 }
 
 pub struct ImageLoad {
-    _artwork: Artwork,
-    data: Vec<u8>,
+    artwork: Artwork,
+    image: LoadedImage,
+    dependent_data: ArtworkDependentData,
 }
 
 #[derive(Eq, Clone)]
@@ -621,7 +630,7 @@ pub struct TShirtCheckerApp<'a> {
     dpi_report: ReportTemplate<'a>,
     tool_selected_for: std::option::Option<ReportTypes>,
     tshirt_selected_for: TShirtColors,
-    image_loader: Option<std::sync::mpsc::Receiver<ImageLoad>>,
+    image_loader: Option<std::sync::mpsc::Receiver<Result<ImageLoad, String>>>,
 }
 
 //
@@ -681,20 +690,28 @@ impl TShirtCheckerApp<'_> {
     }
 
     //fn do_load(&self) -> std::sync::mpsc::Receiver<Box<dyn Fn(&mut Self)>> {
-    fn do_load(&mut self) {
-        let (sender, receiver) = std::sync::mpsc::channel::<ImageLoad>();
+    fn do_load(&mut self, ctx: &egui::Context) {
+        let (sender, receiver) = std::sync::mpsc::channel::<Result<ImageLoad, String>>();
         let art_slot = self.selected_art;
         self.image_loader = Some(receiver);
+        let thread_ctx = ctx.clone();
         // Execute in another thread
         app_execute(async move {
             let file = rfd::AsyncFileDialog::new().pick_file().await;
             let data: Vec<u8> = file.unwrap().read().await;
-            sender
-                .send(ImageLoad {
-                    _artwork: art_slot,
-                    data,
+
+            let image = || -> Result<ImageLoad, String> {
+                let image = load_image_from_untrusted_source(&data, "loaded_data", &thread_ctx)?;
+                let dependent_data = ArtworkDependentData::new(&thread_ctx, &image);
+                Ok(ImageLoad {
+                    artwork: art_slot,
+                    image,
+                    dependent_data,
                 })
-                .unwrap();
+            };
+
+            sender.send(image()).unwrap();
+            thread_ctx.request_repaint();
             //sender.send(Box::new(move |app : &mut Self| {
             //    app.update_image(art_slot, &data )
             //})).unwrap();
@@ -1137,6 +1154,28 @@ impl TShirtCheckerApp<'_> {
         });
     }
 
+    fn set_artwork(
+        &mut self,
+        slot: Artwork,
+        image: LoadedImage,
+        dependent_data: ArtworkDependentData,
+    ) {
+        match slot {
+            Artwork::Artwork0 => {
+                self.artwork_0 = image;
+                self.art_dependent_data_0 = Some(dependent_data);
+            }
+            Artwork::Artwork1 => {
+                self.artwork_1 = image;
+                self.art_dependent_data_1 = Some(dependent_data);
+            }
+            Artwork::Artwork2 => {
+                self.artwork_2 = image;
+                self.art_dependent_data_2 = Some(dependent_data);
+            }
+        }
+    }
+
     fn do_right_panel(&mut self, ctx: &egui::Context) {
         egui::SidePanel::right("stuff")
             .resizable(true)
@@ -1185,7 +1224,7 @@ impl TShirtCheckerApp<'_> {
                     });
                     ui.horizontal(|ui| {
                         if ui.add(egui::widgets::Button::new("Load")).clicked() {
-                            self.do_load();
+                            self.do_load(ctx);
                         }
                     });
                 })
@@ -1316,7 +1355,15 @@ impl eframe::App for TShirtCheckerApp<'_> {
             let rcv = self.image_loader.as_ref().unwrap();
             let data_attempt = rcv.try_recv();
             if data_attempt.is_ok() {
-                self.footer_debug_1 = format!("woot {}", data_attempt.unwrap().data.len());
+                let loaded_result = data_attempt.unwrap();
+                match loaded_result {
+                    Err(e) => {
+                        self.footer_debug_1 = format!("Error: {}", e);
+                    }
+                    Ok(f) => {
+                        self.set_artwork(f.artwork, f.image, f.dependent_data);
+                    }
+                }
                 self.image_loader = None;
             }
         }
