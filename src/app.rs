@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 const DEBUG: bool = false;
 const TRANSPARENCY_TOGGLE_RATE: u128 = 500;
-const TOOL_WIDTH: f32 = 25.0;
+const TOOL_WIDTH: f32 = 20.0;
 
 pub struct Hsla {
     h: u16,
@@ -1149,7 +1149,9 @@ impl TShirtCheckerApp<'_> {
                     self.footer_debug_0 = format!("{} {}", panel_size[0], panel_size[1]);
                     ui.add_space(10.0);
                     ui.vertical_centered(|ui| {
-                        ui.heading(egui::widget_text::RichText::from("T-Shirt Checker").size(40.0))
+                        ui.heading(
+                            egui::widget_text::RichText::from("T-Shirt\nArt Checker").size(40.0),
+                        )
                     });
                     ui.add_space(10.0);
 
@@ -1157,13 +1159,13 @@ impl TShirtCheckerApp<'_> {
                     self.report_metric(ui, ReportTypes::AreaUsed, self.compute_area_used());
                     self.report_metric(
                         ui,
-                        ReportTypes::BadTransparency,
-                        self.compute_badtransparency_pixels(),
+                        ReportTypes::Opaqueness,
+                        self.compute_opaque_percentage(),
                     );
                     self.report_metric(
                         ui,
-                        ReportTypes::Opaqueness,
-                        self.compute_opaque_percentage(),
+                        ReportTypes::BadTransparency,
+                        self.compute_badtransparency_pixels(),
                     );
 
                     ui.add_space(10.0);
@@ -1253,7 +1255,7 @@ impl TShirtCheckerApp<'_> {
             metric_to_status: TShirtCheckerApp::area_used_to_status,
         };
         let transparency_report = ReportTemplate {
-            label: "Bad T.Pixels",
+            label: "Partial\nTransparency",
             display_percent: true,
             metric_to_status: TShirtCheckerApp::bad_transparency_to_status,
         };
