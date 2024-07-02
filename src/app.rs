@@ -618,6 +618,7 @@ pub struct TShirtCheckerApp<'a> {
     fail: LoadedImage,
     tool: LoadedImage,
     import: LoadedImage,
+    partial_transparency_fix: LoadedImage,
     t_shirt: egui::TextureId,
     zoom: f32,
     target: Vector3<f32>,
@@ -690,7 +691,6 @@ impl TShirtCheckerApp<'_> {
         });
     }
 
-    //fn do_load(&self) -> std::sync::mpsc::Receiver<Box<dyn Fn(&mut Self)>> {
     fn do_load(&mut self, ctx: &egui::Context) {
         let (sender, receiver) = std::sync::mpsc::channel::<Result<ImageLoad, String>>();
         let art_slot = self.selected_art;
@@ -713,10 +713,22 @@ impl TShirtCheckerApp<'_> {
 
             sender.send(image()).unwrap();
             thread_ctx.request_repaint();
-            //sender.send(Box::new(move |app : &mut Self| {
-            //    app.update_image(art_slot, &data )
-            //})).unwrap();
         });
+    }
+
+    fn partialt_fix(&mut self, ctx: &egui::Context) {
+        let art = self.get_selected_art();
+        let fixed_art = load_image_from_existing_image(
+            art,
+            |p| {
+                let new_alpha: u8 = if p.a() < 25 { 0 } else { 255 };
+                egui::Color32::from_rgba_premultiplied(p.r(), p.g(), p.b(), new_alpha)
+            },
+            "fixed_art", // todo, better name...
+            ctx,
+        );
+        let dependent_data = ArtworkDependentData::new(ctx, &fixed_art);
+        self.set_artwork(self.selected_art, fixed_art, dependent_data);
     }
 
     //
@@ -1246,6 +1258,17 @@ impl TShirtCheckerApp<'_> {
                         {
                             self.do_load(ctx);
                         }
+                        let partialt_icon = egui::Image::from_texture(
+                            self.partial_transparency_fix.texture_handle(),
+                        )
+                        .max_width(80.0)
+                        .bg_fill(egui::Color32::WHITE);
+                        if ui
+                            .add(egui::widgets::ImageButton::new(partialt_icon))
+                            .clicked()
+                        {
+                            self.partialt_fix(ctx);
+                        }
                     });
                 })
             });
@@ -1308,6 +1331,11 @@ impl TShirtCheckerApp<'_> {
             "import",
             &cc.egui_ctx,
         );
+        let partial_transparency_fix: LoadedImage = load_image_from_trusted_source(
+            include_bytes!("partialt_80x80.png"),
+            "partialt",
+            &cc.egui_ctx,
+        );
 
         let dpi_report = ReportTemplate {
             label: "DPI",
@@ -1349,6 +1377,7 @@ impl TShirtCheckerApp<'_> {
             fail,
             tool,
             import,
+            partial_transparency_fix,
             zoom: 1.0,
             target: vector![0.50, 0.50, 1.0],
             last_drag_pos: None,
