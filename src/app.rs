@@ -5,7 +5,7 @@ use egui_extras::{Size, StripBuilder};
 use na::{dvector, matrix, vector, Matrix3, Vector3};
 use std::sync::Arc;
 
-const DEBUG: bool = false;
+const DEBUG: bool = true;
 const TRANSPARENCY_TOGGLE_RATE: u128 = 500;
 const TOOL_WIDTH: f32 = 20.0;
 
@@ -471,6 +471,11 @@ enum Artwork {
     Artwork2,
 }
 
+pub struct ImageLoad {
+    _artwork: Artwork,
+    data: Vec<u8>,
+}
+
 #[derive(Eq, Clone)]
 pub struct HotSpot {
     strength: u8,
@@ -522,17 +527,22 @@ fn hot_spots_from_heat_map(heat_map: &LoadedImage) -> Vec<HotSpot> {
     }
 
     all_hotspots.sort();
-    if all_hotspots.len() > 4 {
-        all_hotspots.resize(
-            4,
-            HotSpot {
-                strength: 0,
-                location: egui::Vec2 { x: 0.0, y: 0.0 },
-            },
-        )
-    }
+    let mut chosen_hotspots: Vec<HotSpot> = Vec::new();
 
-    all_hotspots
+    for hotspot in all_hotspots {
+        let mut closest_distance = f32::MAX;
+        for chosen_hotspot in &chosen_hotspots {
+            closest_distance =
+                closest_distance.min((chosen_hotspot.location - hotspot.location).length());
+        }
+        if closest_distance > 0.2 {
+            chosen_hotspots.push(hotspot);
+        }
+        if chosen_hotspots.len() >= 4 {
+            break;
+        }
+    }
+    chosen_hotspots
 }
 
 pub struct ArtworkDependentData {
@@ -545,7 +555,6 @@ pub struct ArtworkDependentData {
 }
 
 impl ArtworkDependentData {
-    //fn new( cc: &eframe::CreationContext<'_>,
     fn new(ctx: &egui::Context, artwork: &LoadedImage) -> Self {
         let default_fixed_art: LoadedImage = load_image_from_existing_image(
             artwork,
@@ -612,11 +621,8 @@ pub struct TShirtCheckerApp<'a> {
     dpi_report: ReportTemplate<'a>,
     tool_selected_for: std::option::Option<ReportTypes>,
     tshirt_selected_for: TShirtColors,
+    image_loader: Option<std::sync::mpsc::Receiver<ImageLoad>>,
 }
-
-// Sketchy global so I can test stuff out while I struggle with the
-// file dialog box code.
-static mut HELLO: String = String::new();
 
 //
 // Copied from https://github.com/PolyMeilex/rfd/blob/master/examples/async.rs
@@ -643,38 +649,14 @@ fn _eguiv_to_v3(item: egui::Vec2) -> Vector3<f32> {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn _app_execute<F: Future<Output = ()> + Send + 'static>(f: F) {
+fn app_execute<F: Future<Output = ()> + Send + 'static>(f: F) {
     // this is stupid... use any executor of your choice instead
     std::thread::spawn(move || async_std::task::block_on(f));
 }
 #[cfg(target_arch = "wasm32")]
-fn _app_execute<F: Future<Output = ()> + 'static>(f: F) {
+fn app_execute<F: Future<Output = ()> + 'static>(f: F) {
     wasm_bindgen_futures::spawn_local(f);
 }
-
-/*
-egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-    let size = ui.available_size_before_wrap();
-    self.footer_debug = format!("{} {}", size[0], size[1] );
-
-    if ui.button(mtext("Load")).clicked() {
-        // Execute in another thread
-        app_execute(async {
-            unsafe {
-                HELLO = "here".to_string();
-            }
-            let file = rfd::AsyncFileDialog::new().pick_file().await;
-            unsafe {
-                HELLO = "there".to_string();
-            }
-            let data: Vec<u8> = file.unwrap().read().await;
-            unsafe {
-                HELLO = data.len().to_string();
-            }
-        });
-    }
-});
-*/
 
 impl TShirtCheckerApp<'_> {
     fn is_tool_active(&self, report_type: ReportTypes) -> bool {
@@ -684,11 +666,6 @@ impl TShirtCheckerApp<'_> {
     fn do_bottom_panel(&self, ctx: &egui::Context) {
         egui::TopBottomPanel::bottom("bot_panel").show(ctx, |ui| {
             if DEBUG {
-                ui.horizontal(|ui| unsafe {
-                    ui.label("Bytes in file: ");
-                    let copy = HELLO.clone();
-                    ui.label(&copy);
-                });
                 ui.horizontal(|ui| {
                     ui.label("footer_debug_0: ");
                     ui.label(&self.footer_debug_0);
@@ -700,6 +677,27 @@ impl TShirtCheckerApp<'_> {
                 egui::warn_if_debug_build(ui);
             }
             powered_by_egui_and_eframe(ui);
+        });
+    }
+
+    //fn do_load(&self) -> std::sync::mpsc::Receiver<Box<dyn Fn(&mut Self)>> {
+    fn do_load(&mut self) {
+        let (sender, receiver) = std::sync::mpsc::channel::<ImageLoad>();
+        let art_slot = self.selected_art;
+        self.image_loader = Some(receiver);
+        // Execute in another thread
+        app_execute(async move {
+            let file = rfd::AsyncFileDialog::new().pick_file().await;
+            let data: Vec<u8> = file.unwrap().read().await;
+            sender
+                .send(ImageLoad {
+                    _artwork: art_slot,
+                    data,
+                })
+                .unwrap();
+            //sender.send(Box::new(move |app : &mut Self| {
+            //    app.update_image(art_slot, &data )
+            //})).unwrap();
         });
     }
 
@@ -1145,8 +1143,6 @@ impl TShirtCheckerApp<'_> {
             .min_width(200.0)
             .show(ctx, |ui| {
                 ui.vertical(|ui| {
-                    let panel_size = ui.available_size_before_wrap();
-                    self.footer_debug_0 = format!("{} {}", panel_size[0], panel_size[1]);
                     ui.add_space(10.0);
                     ui.vertical_centered(|ui| {
                         ui.heading(
@@ -1186,6 +1182,11 @@ impl TShirtCheckerApp<'_> {
                         self.handle_art_button(ctx, ui, Artwork::Artwork0);
                         self.handle_art_button(ctx, ui, Artwork::Artwork1);
                         self.handle_art_button(ctx, ui, Artwork::Artwork2);
+                    });
+                    ui.horizontal(|ui| {
+                        if ui.add(egui::widgets::Button::new("Load")).clicked() {
+                            self.do_load();
+                        }
                     });
                 })
             });
@@ -1298,6 +1299,7 @@ impl TShirtCheckerApp<'_> {
             artwork_0,
             artwork_1,
             artwork_2,
+            image_loader: None,
         }
     }
 }
@@ -1309,7 +1311,15 @@ fn mtexts(text: &String) -> egui::widget_text::RichText {
 impl eframe::App for TShirtCheckerApp<'_> {
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.footer_debug_1 = format!("time {}", self.start_time.elapsed().unwrap().as_millis());
+        self.footer_debug_0 = format!("time {}", self.start_time.elapsed().unwrap().as_millis());
+        if self.image_loader.is_some() {
+            let rcv = self.image_loader.as_ref().unwrap();
+            let data_attempt = rcv.try_recv();
+            if data_attempt.is_ok() {
+                self.footer_debug_1 = format!("woot {}", data_attempt.unwrap().data.len());
+                self.image_loader = None;
+            }
+        }
         self.do_bottom_panel(ctx);
         self.do_right_panel(ctx);
         self.do_central_panel(ctx);
