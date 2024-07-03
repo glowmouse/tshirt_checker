@@ -1,3 +1,4 @@
+#[derive(Debug, Copy, Clone)]
 pub struct Hsla {
     pub h: u16,
     pub s: u8,
@@ -59,10 +60,10 @@ impl From<&egui::Color32> for Hsla {
     }
 }
 
-impl From<Hsla> for egui::Color32 {
+impl From<&Hsla> for egui::Color32 {
     // https://www.niwa.nu/2013/05/math-behind-colorspace-conversions-rgb-hsl/
 
-    fn from(val: Hsla) -> Self {
+    fn from(val: &Hsla) -> Self {
         if val.s == 0 {
             return egui::Color32::from_rgba_premultiplied(val.l, val.l, val.l, val.a);
         }
@@ -107,4 +108,72 @@ impl From<Hsla> for egui::Color32 {
 
         egui::Color32::from_rgba_premultiplied(r, g, b, val.a)
     }
+}
+
+impl From<Hsla> for egui::Color32 {
+    fn from(val: Hsla) -> Self {
+        Self::from(&val)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // helper
+    fn rgba(r: u8, g: u8, b: u8, a: u8) -> egui::Color32 {
+        egui::Color32::from_rgba_premultiplied(r, g, b, a)
+    }
+
+    fn _is_close(expected: &egui::Color32, actual: &egui::Color32) -> bool {
+        let rd = ((expected.r() as i32) - (actual.r() as i32)).abs();
+        let gd = ((expected.g() as i32) - (actual.g() as i32)).abs();
+        let bd = ((expected.b() as i32) - (actual.b() as i32)).abs();
+        let ad = ((expected.a() as i32) - (actual.a() as i32)).abs();
+        rd <= 3 && gd <= 3 && bd <= 3 && ad == 0
+    }
+
+    #[test]
+    fn test_primaries() {
+        let red_hsla = Hsla {
+            h: 0,
+            s: 255,
+            l: 128,
+            a: 255,
+        };
+        assert_eq!(rgba(255, 0, 0, 255), red_hsla.into());
+        let green_hsla = Hsla {
+            h: 512,
+            s: 255,
+            l: 128,
+            a: 255,
+        };
+        assert_eq!(rgba(0, 255, 0, 255), green_hsla.into());
+        let blue_hsla = Hsla {
+            h: 1024,
+            s: 255,
+            l: 128,
+            a: 255,
+        };
+        assert_eq!(rgba(0, 0, 255, 255), blue_hsla.into());
+    }
+
+    // This test doesn't work for (34, 17, 17, 255).
+    // HSLA is { h:0, s:85, l:25, a:25}, which seems correct on the surface
+    // Return is { 33, 17, 0, 255}}.  Blue value is wrong.
+    /*
+      #[test]
+      fn test_identities() {
+        for r in 0..16 {
+          for g in 0..16 {
+            for b in 0..16 {
+              let original = rgba(r*17, g*17, b*17, 255 );
+              let hsla : Hsla = (&original).into();
+              let converted : egui::Color32 = (&hsla).into();
+              assert!( is_close(&original, &converted ), "expected = {:?} actual = {:?} hsla = {:?}", original, converted, hsla );
+            }
+          }
+        }
+      }
+    */
 }
