@@ -292,33 +292,25 @@ impl LoadedImage {
 }
 
 fn compute_bad_tpixels(img: &[egui::Color32]) -> u32 {
-    let mut num_bad_pixels = 0;
     let num_pixels: u32 = img.len().try_into().unwrap();
-
-    for val in img.iter() {
-        if val.a() != 0 && val.a() != 255 {
-            num_bad_pixels += 1;
-        }
-    }
-    let raw_percent = 100 * num_bad_pixels / num_pixels;
-    if raw_percent == 0 && num_bad_pixels != 0 {
-        1
-    } else {
-        raw_percent
-    }
+    let num_bad_pixels: u32 = img
+        .iter()
+        .filter(|&p| p.a() != 0 && p.a() != 255)
+        .count()
+        .try_into()
+        .unwrap();
+    (100 * num_bad_pixels).div_ceil(num_pixels)
 }
 
-//fn compute_percent_opaque(img: &Vec<egui::Color32>) -> u32 {
 fn compute_percent_opaque(img: &[egui::Color32]) -> u32 {
-    let mut num_opaque_pixels = 0;
     let num_pixels: u32 = img.len().try_into().unwrap();
-
-    for val in img.iter() {
-        if val.a() > 0 {
-            num_opaque_pixels += 1;
-        }
-    }
-    100 * num_opaque_pixels / num_pixels
+    let num_opaque_pixels: u32 = img
+        .iter()
+        .filter(|&p| p.a() > 0)
+        .count()
+        .try_into()
+        .unwrap();
+    (100 * num_opaque_pixels).div_ceil(num_pixels)
 }
 
 fn load_image_from_untrusted_source(
@@ -637,15 +629,6 @@ pub struct TShirtCheckerApp {
     image_loader: Option<std::sync::mpsc::Receiver<Result<ImageLoad, String>>>,
 }
 
-//
-// Copied from https://github.com/PolyMeilex/rfd/blob/master/examples/async.rs
-//
-// My current understanding (new to this) is that nothing executed in web
-// assembly can block the main thread...  and the thread mechanism used by
-// web assembly won't return the thread's output.
-//
-use std::future::Future;
-
 fn v3_to_egui(item: Vector3<f32>) -> egui::Pos2 {
     egui::Pos2 {
         x: item.x,
@@ -653,13 +636,15 @@ fn v3_to_egui(item: Vector3<f32>) -> egui::Pos2 {
     }
 }
 
-fn _eguip_to_v3(item: egui::Pos2) -> Vector3<f32> {
-    vector![item.x, item.y, 1.0]
-}
+//
+// Copied from https://github.com/PolyMeilex/rfd/blob/master/examples/async.rs
+//
+// My current understanding (new to this) is that nothing executed in web
+// assembly can block the main thread...  and the thread mechanism used by
+// web assembly won't return the thread's output.
+//
 
-fn _eguiv_to_v3(item: egui::Vec2) -> Vector3<f32> {
-    vector![item[0], item[1], 1.0]
-}
+use std::future::Future;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn app_execute<F: Future<Output = ()> + Send + 'static>(f: F) {
