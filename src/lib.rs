@@ -2,3 +2,5 @@
 
 mod app;
 pub use app::TShirtCheckerApp;
+mod hsla;
+pub use hsla::Hsla;
