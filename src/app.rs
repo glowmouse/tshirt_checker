@@ -309,6 +309,71 @@ impl TShirtCheckerApp {
                          0.0,            0.0,               1.0 ]
     }
 
+    fn handle_central_movement_drag(
+        &mut self,
+        response: &egui::Response,
+        panel_size: egui::Vec2,
+    ) -> bool {
+        let mut movement_attempted = false;
+
+        if let Some(pointer_pos) = response.interact_pointer_pos() {
+            let current_drag_pos = vector!(pointer_pos[0], pointer_pos[1], 1.0);
+
+            if let Some(last_drag_pos) = self.last_drag_pos {
+                let display_to_artspace = self.drag_display_to_tshirt.unwrap();
+                let last = display_to_artspace * last_drag_pos;
+                let curr = display_to_artspace * current_drag_pos;
+                self.target = self.target + last - curr;
+                movement_attempted = true;
+            } else {
+                let tshirt_to_display = self.tshirt_to_display(panel_size);
+                self.drag_display_to_tshirt = Some(tshirt_to_display.try_inverse().unwrap());
+                self.drag_count += 1;
+            }
+            self.last_drag_pos = Some(current_drag_pos);
+        } else {
+            self.last_drag_pos = None;
+            self.drag_display_to_tshirt = None;
+        }
+        movement_attempted
+    }
+
+    fn handle_central_movement_zoom(&mut self, ui: &egui::Ui, response: &egui::Response) -> bool {
+        let mut movement_attempted = false;
+
+        if response.hovered() {
+            let zoom_delta_0 = 1.0 + ui.ctx().input(|i| i.smooth_scroll_delta)[1] / 200.0;
+            let zoom_delta_1 = ui.ctx().input(|i| i.zoom_delta());
+            let zoom_delta = if zoom_delta_0 != 1.0 {
+                zoom_delta_0
+            } else {
+                zoom_delta_1
+            };
+            if zoom_delta != 1.0 {
+                movement_attempted = true;
+            }
+
+            self.zoom *= zoom_delta;
+            if self.zoom < 1.0 {
+                self.zoom = 1.0;
+            }
+        }
+
+        movement_attempted
+    }
+
+    fn handle_central_movement(
+        &mut self,
+        ui: &egui::Ui,
+        response: egui::Response,
+        panel_size: egui::Vec2,
+    ) -> bool {
+        let dragged = self.handle_central_movement_drag(&response, panel_size);
+        let zoomed = self.handle_central_movement_zoom(ui, &response);
+
+        dragged || zoomed
+    }
+
     fn paint_tshirt(&self, painter: &egui::Painter, panel_size: egui::Vec2) {
         let tshirt_to_display = self.tshirt_to_display(panel_size);
 
@@ -330,52 +395,88 @@ impl TShirtCheckerApp {
         );
     }
 
-    fn handle_central_movement(
-        &mut self,
-        ui: &egui::Ui,
-        response: egui::Response,
-        panel_size: egui::Vec2,
-    ) -> bool {
+    fn paint_artwork(&self, painter: &egui::Painter, panel_size: egui::Vec2) {
         let tshirt_to_display = self.tshirt_to_display(panel_size);
-        let mut movement_attempted = false;
+        let art_space_to_display = tshirt_to_display * self.art_space_to_tshirt();
+        let art_to_display = art_space_to_display * self.art_to_art_space();
 
-        if let Some(pointer_pos) = response.interact_pointer_pos() {
-            let current_drag_pos = vector!(pointer_pos[0], pointer_pos[1], 1.0);
+        let a0 = v3_to_egui(art_to_display * dvector![0.0, 0.0, 1.0]);
+        let a1 = v3_to_egui(art_to_display * dvector![1.0, 1.0, 1.0]);
+        let uv0 = egui::Pos2 { x: 0.0, y: 0.0 };
+        let uv1 = egui::Pos2 { x: 1.0, y: 1.0 };
 
-            if let Some(last_drag_pos) = self.last_drag_pos {
-                let display_to_artspace = self.drag_display_to_tshirt.unwrap();
-                let last = display_to_artspace * last_drag_pos;
-                let curr = display_to_artspace * current_drag_pos;
-                self.target = self.target + last - curr;
-                movement_attempted = true;
-            } else {
-                self.drag_display_to_tshirt = Some(tshirt_to_display.try_inverse().unwrap());
-                self.drag_count += 1;
+        let time_in_ms = self.start_time.elapsed().unwrap().as_millis();
+        let state = (time_in_ms / TOOL_TOGGLE_RATE) % 2;
+        let dependent_data = self.art_enum_to_dependent_data(self.selected_art);
+        let texture_to_display = if self.is_tool_active(ReportTypes::PartialTransparency) {
+            match state {
+                0 => dependent_data.flagged_artwork.id(),
+                _ => dependent_data.fixed_artwork.id(),
             }
-            self.last_drag_pos = Some(current_drag_pos);
+        } else if self.is_tool_active(ReportTypes::Dpi) {
+            dependent_data.fixed_artwork.id()
         } else {
-            self.last_drag_pos = None;
-            self.drag_display_to_tshirt = None;
-        }
+            self.get_selected_art().id()
+        };
 
-        if response.hovered() {
-            let zoom_delta_0 = 1.0 + ui.ctx().input(|i| i.smooth_scroll_delta)[1] / 200.0;
-            let zoom_delta_1 = ui.ctx().input(|i| i.zoom_delta());
-            let zoom_delta = if zoom_delta_0 != 1.0 {
-                zoom_delta_0
-            } else {
-                zoom_delta_1
-            };
-            if zoom_delta != 1.0 {
-                movement_attempted = true;
-            }
+        painter.image(
+            texture_to_display,
+            egui::Rect::from_min_max(a0, a1),
+            egui::Rect::from_min_max(uv0, uv1),
+            egui::Color32::WHITE,
+        );
+    }
 
-            self.zoom *= zoom_delta;
-            if self.zoom < 1.0 {
-                self.zoom = 1.0;
-            }
+    fn do_dpi_tool(&mut self, movement_happened: bool) {
+        let time_in_ms = self.start_time.elapsed().unwrap().as_millis();
+        let dependent_data = self.art_enum_to_dependent_data(self.selected_art);
+        let cycle = time_in_ms / TOOL_TOGGLE_RATE / 10;
+        let slot = cycle % (dependent_data.top_hot_spots.len() as u128);
+        let hot_spot = &dependent_data.top_hot_spots[slot as usize];
+        let art_location = vector![hot_spot.location.x, hot_spot.location.y, 1.0];
+        let art_to_tshirt = self.art_space_to_tshirt() * self.art_to_art_space();
+        let display_location = art_to_tshirt * art_location;
+
+        // need to make modifications to self after dependent_data borrow is done.
+        if !movement_happened {
+            self.zoom = 10.0;
+            self.target = display_location;
+        } else {
+            // deselect tool if the user is trying to move or zoom.
+            self.tool_selected_for = None;
         }
-        movement_attempted
+    }
+
+    fn paint_area_used_tool(&self, painter: &egui::Painter, panel_size: egui::Vec2) {
+        let time_in_ms = self.start_time.elapsed().unwrap().as_millis();
+        let tshirt_to_display = self.tshirt_to_display(panel_size);
+        let art_space_to_display = tshirt_to_display * self.art_space_to_tshirt();
+        let art_space_border = vec![
+            v3_to_egui(art_space_to_display * dvector![0.0, 0.0, 1.0]),
+            v3_to_egui(art_space_to_display * dvector![11.0, 0.0, 1.0]),
+            v3_to_egui(art_space_to_display * dvector![11.0, 14.0, 1.0]),
+            v3_to_egui(art_space_to_display * dvector![0.0, 14.0, 1.0]),
+            v3_to_egui(art_space_to_display * dvector![0.0, 0.0, 1.0]),
+        ];
+
+        let dash_dim = (art_space_to_display * dvector![0.2, 0.05, 1.0])
+            - (art_space_to_display * dvector![0.0, 0.0, 1.0]);
+        let dash_length = dash_dim.x;
+        let dash_width = dash_dim.y;
+        let gap_length = dash_length;
+
+        // animate with 3 cycles
+        let cycle = (time_in_ms % (TOOL_TOGGLE_RATE * 3)) / TOOL_TOGGLE_RATE;
+        let offset: f32 = (cycle as f32) / 3.0 * (dash_length + gap_length);
+        let stroke_1 = egui::Stroke::new(dash_width, egui::Color32::from_rgb(200, 200, 200));
+
+        painter.add(egui::Shape::dashed_line_with_offset(
+            &art_space_border,
+            stroke_1,
+            &[dash_length],
+            &[gap_length],
+            offset,
+        ));
     }
 
     fn do_central_panel(&mut self, ctx: &egui::Context) {
@@ -386,83 +487,13 @@ impl TShirtCheckerApp {
 
             let movement_happened = self.handle_central_movement(ui, response, panel_size);
             self.paint_tshirt(&painter, panel_size);
-
-            let tshirt_to_display = self.tshirt_to_display(panel_size);
-            let art_space_to_display = tshirt_to_display * self.art_space_to_tshirt();
-            let art_to_display = art_space_to_display * self.art_to_art_space();
-
-            let a0 = v3_to_egui(art_to_display * dvector![0.0, 0.0, 1.0]);
-            let a1 = v3_to_egui(art_to_display * dvector![1.0, 1.0, 1.0]);
-            let uv0 = egui::Pos2 { x: 0.0, y: 0.0 };
-            let uv1 = egui::Pos2 { x: 1.0, y: 1.0 };
-
-            let time_in_ms = self.start_time.elapsed().unwrap().as_millis();
-            let state = (time_in_ms / TOOL_TOGGLE_RATE) % 2;
-            let dependent_data = self.art_enum_to_dependent_data(self.selected_art);
-            let texture_to_display = if self.is_tool_active(ReportTypes::PartialTransparency) {
-                match state {
-                    0 => dependent_data.flagged_artwork.id(),
-                    _ => dependent_data.fixed_artwork.id(),
-                }
-            } else if self.is_tool_active(ReportTypes::Dpi) {
-                dependent_data.fixed_artwork.id()
-            } else {
-                self.get_selected_art().id()
-            };
-
-            painter.image(
-                texture_to_display,
-                egui::Rect::from_min_max(a0, a1),
-                egui::Rect::from_min_max(uv0, uv1),
-                egui::Color32::WHITE,
-            );
+            self.paint_artwork(&painter, panel_size);
 
             if self.is_tool_active(ReportTypes::Dpi) {
-                let cycle = time_in_ms / TOOL_TOGGLE_RATE / 10;
-                let slot = cycle % (dependent_data.top_hot_spots.len() as u128);
-                let hot_spot = &dependent_data.top_hot_spots[slot as usize];
-                let art_location = vector![hot_spot.location.x, hot_spot.location.y, 1.0];
-                let art_to_tshirt = self.art_space_to_tshirt() * self.art_to_art_space();
-                let display_location = art_to_tshirt * art_location;
-
-                // need to make modifications to self after dependent_data borrow is done.
-                if !movement_happened {
-                    self.zoom = 10.0;
-                    self.target = display_location;
-                } else {
-                    // deselect tool if the user is trying to move or zoom.
-                    self.tool_selected_for = None;
-                }
+                self.do_dpi_tool(movement_happened);
             }
-
             if self.is_tool_active(ReportTypes::AreaUsed) {
-                let art_space_border = vec![
-                    v3_to_egui(art_space_to_display * dvector![0.0, 0.0, 1.0]),
-                    v3_to_egui(art_space_to_display * dvector![11.0, 0.0, 1.0]),
-                    v3_to_egui(art_space_to_display * dvector![11.0, 14.0, 1.0]),
-                    v3_to_egui(art_space_to_display * dvector![0.0, 14.0, 1.0]),
-                    v3_to_egui(art_space_to_display * dvector![0.0, 0.0, 1.0]),
-                ];
-
-                let dash_dim = (art_space_to_display * dvector![0.2, 0.05, 1.0])
-                    - (art_space_to_display * dvector![0.0, 0.0, 1.0]);
-                let dash_length = dash_dim.x;
-                let dash_width = dash_dim.y;
-                let gap_length = dash_length;
-
-                // animate with 3 cycles
-                let cycle = (time_in_ms % (TOOL_TOGGLE_RATE * 3)) / TOOL_TOGGLE_RATE;
-                let offset: f32 = (cycle as f32) / 3.0 * (dash_length + gap_length);
-                let stroke_1 =
-                    egui::Stroke::new(dash_width, egui::Color32::from_rgb(200, 200, 200));
-
-                painter.add(egui::Shape::dashed_line_with_offset(
-                    &art_space_border,
-                    stroke_1,
-                    &[dash_length],
-                    &[gap_length],
-                    offset,
-                ));
+                self.paint_area_used_tool(&painter, panel_size);
             }
         });
     }
