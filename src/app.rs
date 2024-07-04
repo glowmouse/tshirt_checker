@@ -175,11 +175,6 @@ impl TShirtCheckerApp {
         self.art_storage.get_art(self.selected_art)
     }
 
-    // Temp, while I refactor.
-    fn art_space_to_tshirt(&self) -> Matrix3<f32> {
-        art_space_to_tshirt(self.tshirt_storage.size())
-    }
-
     fn handle_central_movement_drag(
         &mut self,
         response: &egui::Response,
@@ -269,7 +264,8 @@ impl TShirtCheckerApp {
     fn paint_artwork(&self, painter: &egui::Painter, panel_size: egui::Vec2) {
         let tshirt_to_display = self.tshirt_to_display(panel_size);
         let art = self.get_selected_art();
-        let art_space_to_display = tshirt_to_display * self.art_space_to_tshirt();
+        let art_space_to_display =
+            tshirt_to_display * art_space_to_tshirt(self.tshirt_storage.size());
         let art_to_display = art_space_to_display * art_to_art_space(art);
 
         let a0 = v3_to_egui(art_to_display * dvector![0.0, 0.0, 1.0]);
@@ -308,7 +304,7 @@ impl TShirtCheckerApp {
         let hot_spot = &dependent_data.top_hot_spots[slot as usize];
         let art_location = vector![hot_spot.location.x, hot_spot.location.y, 1.0];
         let art = self.get_selected_art();
-        let art_to_tshirt = self.art_space_to_tshirt() * art_to_art_space(art);
+        let art_to_tshirt = art_space_to_tshirt(self.tshirt_storage.size()) * art_to_art_space(art);
         let display_location = art_to_tshirt * art_location;
 
         // need to make modifications to self after dependent_data borrow is done.
@@ -323,7 +319,9 @@ impl TShirtCheckerApp {
 
     fn paint_area_used_tool(&self, painter: &egui::Painter, panel_size: egui::Vec2) {
         let tshirt_to_display = self.tshirt_to_display(panel_size);
-        let art_space_to_display = tshirt_to_display * self.art_space_to_tshirt();
+        let art_space_to_display =
+            tshirt_to_display * art_space_to_tshirt(self.tshirt_storage.size());
+
         let art_space_border = vec![
             v3_to_egui(art_space_to_display * dvector![0.0, 0.0, 1.0]),
             v3_to_egui(art_space_to_display * dvector![11.0, 0.0, 1.0]),
