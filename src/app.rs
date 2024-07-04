@@ -1038,7 +1038,7 @@ impl TShirtCheckerApp {
                     ui.add_space(5.0);
                     ui.vertical_centered(|ui| {
                         ui.heading(
-                            egui::widget_text::RichText::from("T-Shirt Art Check").size(30.0),
+                            egui::widget_text::RichText::from("T-Shirt Art Checker").size(30.0),
                         )
                     });
                     ui.add_space(5.0);
