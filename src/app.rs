@@ -59,6 +59,26 @@ impl ToolSelection {
     }
 }
 
+struct MovementState {
+    zoom: f32,
+    target: Vector3<f32>,
+    last_drag_pos: std::option::Option<Vector3<f32>>,
+    drag_display_to_tshirt: std::option::Option<Matrix3<f32>>,
+    drag_count: i32,
+}
+
+impl MovementState {
+    fn new() -> Self {
+        Self {
+            zoom: 1.0,
+            target: vector![0.50, 0.50, 1.0],
+            last_drag_pos: None,
+            drag_display_to_tshirt: None,
+            drag_count: 0,
+        }
+    }
+}
+
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 pub struct TShirtCheckerApp {
     art_storage: ArtStorage,
@@ -66,12 +86,8 @@ pub struct TShirtCheckerApp {
     icons: IconStorage,
     footer_debug_0: String,
     footer_debug_1: String,
+    move_state: MovementState,
     tshirt_storage: TShirtStorage,
-    zoom: f32,
-    target: Vector3<f32>,
-    last_drag_pos: std::option::Option<Vector3<f32>>,
-    drag_display_to_tshirt: std::option::Option<Matrix3<f32>>,
-    drag_count: i32,
     tshirt_selected_for: TShirtColors,
     report_templates: ReportTemplates,
     image_loader: Option<std::sync::mpsc::Receiver<Result<ImageLoad, String>>>,
@@ -167,8 +183,8 @@ impl TShirtCheckerApp {
     // temp, while I do refactoring.
     fn tshirt_to_display(&self, panel_size: egui::Vec2) -> Matrix3<f32> {
         let tshirt_size = self.tshirt_storage.size();
-        let target = self.target;
-        tshirt_to_display(panel_size, tshirt_size, self.zoom, &target)
+        let target = self.move_state.target;
+        tshirt_to_display(panel_size, tshirt_size, self.move_state.zoom, &target)
     }
 
     fn get_selected_art(&self) -> &LoadedImage {
@@ -185,21 +201,22 @@ impl TShirtCheckerApp {
         if let Some(pointer_pos) = response.interact_pointer_pos() {
             let current_drag_pos = vector!(pointer_pos[0], pointer_pos[1], 1.0);
 
-            if let Some(last_drag_pos) = self.last_drag_pos {
-                let display_to_artspace = self.drag_display_to_tshirt.unwrap();
+            if let Some(last_drag_pos) = self.move_state.last_drag_pos {
+                let display_to_artspace = self.move_state.drag_display_to_tshirt.unwrap();
                 let last = display_to_artspace * last_drag_pos;
                 let curr = display_to_artspace * current_drag_pos;
-                self.target = self.target + last - curr;
+                self.move_state.target = self.move_state.target + last - curr;
                 movement_attempted = true;
             } else {
                 let tshirt_to_display = self.tshirt_to_display(panel_size);
-                self.drag_display_to_tshirt = Some(tshirt_to_display.try_inverse().unwrap());
-                self.drag_count += 1;
+                self.move_state.drag_display_to_tshirt =
+                    Some(tshirt_to_display.try_inverse().unwrap());
+                self.move_state.drag_count += 1;
             }
-            self.last_drag_pos = Some(current_drag_pos);
+            self.move_state.last_drag_pos = Some(current_drag_pos);
         } else {
-            self.last_drag_pos = None;
-            self.drag_display_to_tshirt = None;
+            self.move_state.last_drag_pos = None;
+            self.move_state.drag_display_to_tshirt = None;
         }
         movement_attempted
     }
@@ -219,9 +236,9 @@ impl TShirtCheckerApp {
                 movement_attempted = true;
             }
 
-            self.zoom *= zoom_delta;
-            if self.zoom < 1.0 {
-                self.zoom = 1.0;
+            self.move_state.zoom *= zoom_delta;
+            if self.move_state.zoom < 1.0 {
+                self.move_state.zoom = 1.0;
             }
         }
 
@@ -309,8 +326,8 @@ impl TShirtCheckerApp {
 
         // need to make modifications to self after dependent_data borrow is done.
         if !movement_happened {
-            self.zoom = 10.0;
-            self.target = display_location;
+            self.move_state.zoom = 10.0;
+            self.move_state.target = display_location;
         } else {
             // deselect tool if the user is trying to move or zoom.
             self.selected_tool.reset();
@@ -546,12 +563,8 @@ impl TShirtCheckerApp {
             footer_debug_0: String::new(),
             footer_debug_1: String::new(),
             tshirt_storage: TShirtStorage::new(&cc.egui_ctx),
+            move_state: MovementState::new(),
             icons: IconStorage::new(&cc.egui_ctx),
-            zoom: 1.0,
-            target: vector![0.50, 0.50, 1.0],
-            last_drag_pos: None,
-            drag_display_to_tshirt: None,
-            drag_count: 0,
             tshirt_selected_for: TShirtColors::Red,
             report_templates: ReportTemplates::new(),
             image_loader: None,
