@@ -20,8 +20,8 @@ enum ReportStatus {
 #[derive(PartialEq, Copy, Clone)]
 enum ReportTypes {
     Dpi,
-    BadTransparency,
-    Opaqueness,
+    PartialTransparency,
+    Bib,
     AreaUsed,
 }
 
@@ -49,7 +49,7 @@ pub struct ImageLoad {
 }
 
 pub struct ArtworkDependentData {
-    bad_tpixel_percent: u32,
+    partial_transparency_percent: u32,
     opaque_percent: u32,
     fixed_artwork: LoadedImage,
     flagged_artwork: LoadedImage,
@@ -74,7 +74,7 @@ impl ArtworkDependentData {
         let heat_map = heat_map_from_image(artwork, "heatmap", ctx);
 
         Self {
-            bad_tpixel_percent: compute_bad_tpixels(artwork.pixels()),
+            partial_transparency_percent: compute_bad_tpixels(artwork.pixels()),
             opaque_percent: compute_percent_opaque(artwork.pixels()),
             fixed_artwork: default_fixed_art,
             flagged_artwork: default_flagged_art,
@@ -422,7 +422,7 @@ impl TShirtCheckerApp {
             let time_in_ms = self.start_time.elapsed().unwrap().as_millis();
             let state = (time_in_ms / TOOL_TOGGLE_RATE) % 2;
             let dependent_data = self.art_enum_to_dependent_data(self.selected_art);
-            let texture_to_display = if self.is_tool_active(ReportTypes::BadTransparency) {
+            let texture_to_display = if self.is_tool_active(ReportTypes::PartialTransparency) {
                 match state {
                     0 => dependent_data.flagged_artwork.id(),
                     _ => dependent_data.fixed_artwork.id(),
@@ -555,7 +555,7 @@ impl TShirtCheckerApp {
 
     fn compute_badtransparency_pixels(&self) -> u32 {
         let dependent_data = self.art_enum_to_dependent_data(self.selected_art);
-        dependent_data.bad_tpixel_percent
+        dependent_data.partial_transparency_percent
     }
 
     fn bad_transparency_to_status(bad_transparency_pixels: u32) -> ReportStatus {
@@ -581,7 +581,7 @@ impl TShirtCheckerApp {
         }
     }
 
-    fn compute_opaque_percentage(&self) -> u32 {
+    fn compute_bib_score(&self) -> u32 {
         let area_used = self.compute_area_used();
         let dependent_data = self.art_enum_to_dependent_data(self.selected_art);
         area_used * dependent_data.opaque_percent / 100
@@ -599,8 +599,8 @@ impl TShirtCheckerApp {
         match report_type {
             ReportTypes::Dpi => &self.dpi_report,
             ReportTypes::AreaUsed => &self.area_used_report,
-            ReportTypes::BadTransparency => &self.transparency_report,
-            ReportTypes::Opaqueness => &self.opaque_report,
+            ReportTypes::PartialTransparency => &self.transparency_report,
+            ReportTypes::Bib => &self.opaque_report,
         }
     }
 
@@ -661,6 +661,84 @@ impl TShirtCheckerApp {
         });
     }
 
+    fn panel_separator(ui: &mut egui::Ui) {
+        ui.add_space(5.0);
+        ui.separator();
+        ui.add_space(5.0);
+    }
+
+    fn display_title(ui: &mut egui::Ui) {
+        Self::panel_separator(ui);
+        ui.vertical_centered(|ui| {
+            ui.heading(egui::widget_text::RichText::from("T-Shirt Art Checker").size(30.0))
+        });
+        Self::panel_separator(ui);
+    }
+
+    fn report_metrics(&mut self, ui: &mut egui::Ui) {
+        self.report_metric(ui, ReportTypes::Dpi, self.compute_dpi());
+        self.report_metric(ui, ReportTypes::AreaUsed, self.compute_area_used());
+        self.report_metric(ui, ReportTypes::Bib, self.compute_bib_score());
+        self.report_metric(
+            ui,
+            ReportTypes::PartialTransparency,
+            self.compute_badtransparency_pixels(),
+        );
+        Self::panel_separator(ui);
+    }
+
+    fn tshirt_selection_panel(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            self.handle_tshirt_button(ui, TShirtColors::Red);
+            self.handle_tshirt_button(ui, TShirtColors::Green);
+            self.handle_tshirt_button(ui, TShirtColors::Blue);
+        });
+        ui.horizontal(|ui| {
+            self.handle_tshirt_button(ui, TShirtColors::DRed);
+            self.handle_tshirt_button(ui, TShirtColors::DGreen);
+            self.handle_tshirt_button(ui, TShirtColors::DBlue);
+        });
+        Self::panel_separator(ui);
+    }
+
+    fn artwork_selection_panel(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        ui.horizontal(|ui| {
+            self.handle_art_button(ctx, ui, Artwork::Artwork0);
+            self.handle_art_button(ctx, ui, Artwork::Artwork1);
+            self.handle_art_button(ctx, ui, Artwork::Artwork2);
+        });
+        Self::panel_separator(ui);
+    }
+
+    fn import_button(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        let import_icon = egui::Image::from_texture(self.import.texture_handle())
+            .max_width(80.0)
+            .bg_fill(egui::Color32::WHITE);
+        if ui
+            .add(egui::widgets::ImageButton::new(import_icon))
+            .on_hover_text("Import an image to the selected artwork slot.")
+            .clicked()
+        {
+            self.do_load(ctx);
+        }
+    }
+
+    fn partial_transparency_fix_button(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        let partialt_icon =
+            egui::Image::from_texture(self.partial_transparency_fix.texture_handle())
+                .max_width(80.0)
+                .bg_fill(egui::Color32::WHITE);
+        if ui
+            .add(egui::widgets::ImageButton::new(partialt_icon))
+            .on_hover_text(
+                "Fix partial transparency problems by mapping all alpha values to 0 or 1.",
+            )
+            .clicked()
+        {
+            self.partialt_fix(ctx);
+        }
+    }
+
     fn set_artwork(
         &mut self,
         slot: Artwork,
@@ -689,85 +767,14 @@ impl TShirtCheckerApp {
             .min_width(200.0)
             .show(ctx, |ui| {
                 ui.vertical(|ui| {
-                    ui.add_space(5.0);
-                    ui.separator();
-                    ui.add_space(5.0);
-                    ui.vertical_centered(|ui| {
-                        ui.heading(
-                            egui::widget_text::RichText::from("T-Shirt Art Checker").size(30.0),
-                        )
-                    });
-                    ui.add_space(5.0);
-                    ui.separator();
-                    ui.add_space(5.0);
+                    Self::display_title(ui);
+                    self.report_metrics(ui);
+                    self.tshirt_selection_panel(ui);
+                    self.artwork_selection_panel(ui, ctx);
 
-                    self.report_metric(ui, ReportTypes::Dpi, self.compute_dpi());
-                    self.report_metric(ui, ReportTypes::AreaUsed, self.compute_area_used());
-                    self.report_metric(
-                        ui,
-                        ReportTypes::Opaqueness,
-                        self.compute_opaque_percentage(),
-                    );
-                    self.report_metric(
-                        ui,
-                        ReportTypes::BadTransparency,
-                        self.compute_badtransparency_pixels(),
-                    );
-
-                    ui.add_space(5.0);
-                    ui.separator();
-                    ui.add_space(5.0);
-                    //let max_size = egui::Vec2{ x: 30.0, y: 30.0 };
                     ui.horizontal(|ui| {
-                        self.handle_tshirt_button(ui, TShirtColors::Red);
-                        self.handle_tshirt_button(ui, TShirtColors::Green);
-                        self.handle_tshirt_button(ui, TShirtColors::Blue);
-                    });
-                    ui.horizontal(|ui| {
-                        self.handle_tshirt_button(ui, TShirtColors::DRed);
-                        self.handle_tshirt_button(ui, TShirtColors::DGreen);
-                        self.handle_tshirt_button(ui, TShirtColors::DBlue);
-                    });
-                    ui.add_space(5.0);
-                    ui.separator();
-                    ui.add_space(5.0);
-                    ui.horizontal(|ui| {
-                        self.handle_art_button(ctx, ui, Artwork::Artwork0);
-                        self.handle_art_button(ctx, ui, Artwork::Artwork1);
-                        self.handle_art_button(ctx, ui, Artwork::Artwork2);
-                    });
-                    ui.add_space(5.0);
-                    ui.separator();
-                    ui.add_space(5.0);
-                    //let image: &LoadedImage = self.art_enum_to_image(artwork);
-                    //let egui_image = egui::Image::from_texture(image.texture_handle()).max_width(80.0);
-                    //let is_selected = self.selected_art == artwork;
-                    //if ui
-                    //    .add(egui::widgets::ImageButton::new(egui_image).selected(is_selected))
-                    //    .clicked()
-                    ui.horizontal(|ui| {
-                        let import_icon = egui::Image::from_texture(self.import.texture_handle())
-                            .max_width(80.0)
-                            .bg_fill(egui::Color32::WHITE);
-                        if ui
-                            .add(egui::widgets::ImageButton::new(import_icon))
-                            .on_hover_text("Import an image to the selected artwork slot.")
-                            .clicked()
-                        {
-                            self.do_load(ctx);
-                        }
-                        let partialt_icon = egui::Image::from_texture(
-                            self.partial_transparency_fix.texture_handle(),
-                        )
-                        .max_width(80.0)
-                        .bg_fill(egui::Color32::WHITE);
-                        if ui
-                            .add(egui::widgets::ImageButton::new(partialt_icon))
-                            .on_hover_text("Fix partial transparency problems by mapping all alpha values to 0 or 1.")
-                            .clicked()
-                        {
-                            self.partialt_fix(ctx);
-                        }
+                        self.import_button(ui, ctx);
+                        self.partial_transparency_fix_button(ui, ctx);
                     });
                 })
             });
@@ -932,7 +939,7 @@ impl eframe::App for TShirtCheckerApp {
         self.do_bottom_panel(ctx);
         self.do_right_panel(ctx);
         self.do_central_panel(ctx);
-        if self.is_tool_active(ReportTypes::BadTransparency)
+        if self.is_tool_active(ReportTypes::PartialTransparency)
             || self.is_tool_active(ReportTypes::AreaUsed)
             || self.is_tool_active(ReportTypes::Dpi)
         {
