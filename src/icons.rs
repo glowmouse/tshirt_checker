@@ -67,4 +67,12 @@ impl IconStorage {
         })
         .max_width(25.0)
     }
+
+    fn image(&self, icon: Icon, width: f32) -> egui::Image<'_> {
+        egui::Image::from_texture(self.texture_handle(icon)).max_width(width)
+    }
+
+    pub fn button(&self, icon: Icon, width: f32) -> egui::widgets::ImageButton<'_> {
+        egui::widgets::ImageButton::new(self.image(icon, width).bg_fill(egui::Color32::WHITE))
+    }
 }

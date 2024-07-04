@@ -539,14 +539,9 @@ impl TShirtCheckerApp {
                             let is_selected = self.is_tool_active(report_type);
                             if ui
                                 .add(
-                                    egui::widgets::ImageButton::new(
-                                        egui::Image::from_texture(
-                                            self.icons.texture_handle(Icon::Tool),
-                                        )
-                                        .max_width(TOOL_WIDTH)
-                                        .bg_fill(egui::Color32::WHITE),
-                                    )
-                                    .selected(is_selected),
+                                    self.icons
+                                        .button(Icon::Tool, TOOL_WIDTH)
+                                        .selected(is_selected),
                                 )
                                 .on_hover_text(tool_tip)
                                 .clicked()
@@ -611,11 +606,8 @@ impl TShirtCheckerApp {
     }
 
     fn import_button(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        let import_icon = egui::Image::from_texture(self.icons.texture_handle(Icon::Import))
-            .max_width(80.0)
-            .bg_fill(egui::Color32::WHITE);
         if ui
-            .add(egui::widgets::ImageButton::new(import_icon))
+            .add(self.icons.button(Icon::Import, 80.0))
             .on_hover_text("Import an image to the selected artwork slot.")
             .clicked()
         {
@@ -624,11 +616,8 @@ impl TShirtCheckerApp {
     }
 
     fn partial_transparency_fix_button(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        let partialt_icon = egui::Image::from_texture(self.icons.texture_handle(Icon::FixPT))
-            .max_width(80.0)
-            .bg_fill(egui::Color32::WHITE);
         if ui
-            .add(egui::widgets::ImageButton::new(partialt_icon))
+            .add(self.icons.button(Icon::FixPT, 80.0))
             .on_hover_text(
                 "Fix partial transparency problems by mapping all alpha values to 0 or 1.",
             )
