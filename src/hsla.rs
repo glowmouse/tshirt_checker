@@ -36,7 +36,8 @@ impl From<&egui::Color32> for Hsla {
             ((max - min) << 8) / (two - max - min)
         };
 
-        let s = if s2 == 256 { 255 } else { s2 };
+        //let s = if s2 == 256 { 255 } else { s2 };
+        let s = s2 * 255 / 256;
 
         let ht: i32 = if r == max {
             ((g - b) << 8) / (max - min)
@@ -104,7 +105,7 @@ impl From<&Hsla> for egui::Color32 {
 
         let r = hue_to_rgb(temp1, temp2, h + 512);
         let g = hue_to_rgb(temp1, temp2, h);
-        let b = hue_to_rgb(temp1, temp2, h - 512);
+        let b = hue_to_rgb(temp1, temp2, h + 1024);
 
         egui::Color32::from_rgba_premultiplied(r, g, b, val.a)
     }
@@ -125,7 +126,7 @@ mod tests {
         egui::Color32::from_rgba_premultiplied(r, g, b, a)
     }
 
-    fn _is_close(expected: &egui::Color32, actual: &egui::Color32) -> bool {
+    fn is_close(expected: &egui::Color32, actual: &egui::Color32) -> bool {
         let rd = ((expected.r() as i32) - (actual.r() as i32)).abs();
         let gd = ((expected.g() as i32) - (actual.g() as i32)).abs();
         let bd = ((expected.b() as i32) - (actual.b() as i32)).abs();
@@ -161,19 +162,23 @@ mod tests {
     // This test doesn't work for (34, 17, 17, 255).
     // HSLA is { h:0, s:85, l:25, a:25}, which seems correct on the surface
     // Return is { 33, 17, 0, 255}}.  Blue value is wrong.
-    /*
-      #[test]
-      fn test_identities() {
+    #[test]
+    fn test_identities() {
         for r in 0..16 {
-          for g in 0..16 {
-            for b in 0..16 {
-              let original = rgba(r*17, g*17, b*17, 255 );
-              let hsla : Hsla = (&original).into();
-              let converted : egui::Color32 = (&hsla).into();
-              assert!( is_close(&original, &converted ), "expected = {:?} actual = {:?} hsla = {:?}", original, converted, hsla );
+            for g in 0..16 {
+                for b in 0..16 {
+                    let original = rgba(r * 17, g * 17, b * 17, 255);
+                    let hsla: Hsla = (&original).into();
+                    let converted: egui::Color32 = (&hsla).into();
+                    assert!(
+                        is_close(&original, &converted),
+                        "expected = {:?} actual = {:?} hsla = {:?}",
+                        original,
+                        converted,
+                        hsla
+                    );
+                }
             }
-          }
         }
-      }
-    */
+    }
 }
