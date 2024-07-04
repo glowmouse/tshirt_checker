@@ -3,27 +3,13 @@ use web_time::SystemTime;
 extern crate nalgebra as na;
 use crate::image_utils::*;
 use crate::loaded_image::*;
+use crate::report_templates::*;
 use egui_extras::{Size, StripBuilder};
 use na::{dvector, matrix, vector, Matrix3, Vector3};
 
 const DEBUG: bool = false;
 const TOOL_TOGGLE_RATE: u128 = 500; // in ms
 const TOOL_WIDTH: f32 = 20.0;
-
-#[derive(PartialEq, Copy, Clone)]
-enum ReportStatus {
-    Pass,
-    Warn,
-    Fail,
-}
-
-#[derive(PartialEq, Copy, Clone)]
-enum ReportTypes {
-    Dpi,
-    PartialTransparency,
-    Bib,
-    AreaUsed,
-}
 
 #[derive(PartialEq, Copy, Clone)]
 enum TShirtColors {
@@ -84,14 +70,6 @@ impl ArtworkDependentData {
     }
 }
 
-pub struct ReportTemplate {
-    label: String,
-    report_tip: String,
-    tool_tip: String,
-    display_percent: bool,
-    metric_to_status: fn(metric: u32) -> ReportStatus,
-}
-
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 pub struct TShirtCheckerApp {
     artwork_0: LoadedImage,
@@ -122,12 +100,9 @@ pub struct TShirtCheckerApp {
     drag_display_to_tshirt: std::option::Option<Matrix3<f32>>,
     drag_count: i32,
     start_time: SystemTime,
-    area_used_report: ReportTemplate,
-    transparency_report: ReportTemplate,
-    opaque_report: ReportTemplate,
-    dpi_report: ReportTemplate,
     tool_selected_for: std::option::Option<ReportTypes>,
     tshirt_selected_for: TShirtColors,
+    report_templates: ReportTemplates,
     image_loader: Option<std::sync::mpsc::Receiver<Result<ImageLoad, String>>>,
 }
 
@@ -545,24 +520,9 @@ impl TShirtCheckerApp {
         (art.size().x / dim_in_inches.x) as u32
     }
 
-    fn dpi_to_status(dpi: u32) -> ReportStatus {
-        match dpi {
-            0..=199 => ReportStatus::Fail,
-            200..=299 => ReportStatus::Warn,
-            _ => ReportStatus::Pass,
-        }
-    }
-
     fn compute_badtransparency_pixels(&self) -> u32 {
         let dependent_data = self.art_enum_to_dependent_data(self.selected_art);
         dependent_data.partial_transparency_percent
-    }
-
-    fn bad_transparency_to_status(bad_transparency_pixels: u32) -> ReportStatus {
-        match bad_transparency_pixels {
-            0 => ReportStatus::Pass,
-            _ => ReportStatus::Fail,
-        }
     }
 
     fn compute_area_used(&self) -> u32 {
@@ -573,35 +533,10 @@ impl TShirtCheckerApp {
         area_used as u32
     }
 
-    fn area_used_to_status(area_used: u32) -> ReportStatus {
-        match area_used {
-            0..=50 => ReportStatus::Fail,
-            51..=90 => ReportStatus::Warn,
-            _ => ReportStatus::Pass,
-        }
-    }
-
     fn compute_bib_score(&self) -> u32 {
         let area_used = self.compute_area_used();
         let dependent_data = self.art_enum_to_dependent_data(self.selected_art);
         area_used * dependent_data.opaque_percent / 100
-    }
-
-    fn opaque_to_status(opaque_area: u32) -> ReportStatus {
-        match opaque_area {
-            0..=49 => ReportStatus::Pass,
-            50..=74 => ReportStatus::Warn,
-            _ => ReportStatus::Fail,
-        }
-    }
-
-    fn report_type_to_template(&self, report_type: ReportTypes) -> &ReportTemplate {
-        match report_type {
-            ReportTypes::Dpi => &self.dpi_report,
-            ReportTypes::AreaUsed => &self.area_used_report,
-            ReportTypes::PartialTransparency => &self.transparency_report,
-            ReportTypes::Bib => &self.opaque_report,
-        }
     }
 
     fn report_metric(&mut self, ui: &mut egui::Ui, report_type: ReportTypes, metric: u32) {
@@ -613,7 +548,7 @@ impl TShirtCheckerApp {
                 .size(Size::exact(15.0))
                 .size(Size::exact(TOOL_WIDTH))
                 .horizontal(|mut strip| {
-                    let report = self.report_type_to_template(report_type);
+                    let report = self.report_templates.report_type_to_template(report_type);
                     let status = (report.metric_to_status)(metric);
                     let status_icon = self.gen_status_icon(status);
                     let tool_tip = report.tool_tip.clone();
@@ -843,35 +778,6 @@ impl TShirtCheckerApp {
             &cc.egui_ctx,
         );
 
-        let dpi_report = ReportTemplate {
-            label: "DPI".to_string(),
-            report_tip: "Ideally, artwork for T-Shirts should be Print Quality - 300 DPI or more. Medium Quality (200 to 299 DPI) is probably okay. Below 200 DPI pixalation may be noticable.".to_string(),
-            tool_tip: "Show close ups of areas where artwork might look pixelly.\nTurn off the tool or move the T-Shirt to exit.".to_string(),
-            display_percent: false,
-            metric_to_status: TShirtCheckerApp::dpi_to_status,
-        };
-        let area_used_report = ReportTemplate {
-            label: "Area Used".to_string(),
-            report_tip: "Artwork is usually printed on an 11 inch by 14 inch area of the T-Shirt.  The report shows how much of that printable area the art is currently filling.  There's no rule that says art has to use all of the available area, but it's nice to know how much available area there is.".to_string(),
-            tool_tip: "Show the maximum boundary of the printable area on the T-Shirt.".to_string(),
-            display_percent: true,
-            metric_to_status: TShirtCheckerApp::area_used_to_status,
-        };
-        let transparency_report = ReportTemplate {
-            label: "Partial\nTransparency".to_string(),
-            report_tip: "The processed used to print T-Shirt artwork doesn't support partial transparency.  Either the artwork is being printed (100% transparecy) or the T-Shirt is showing through (0% transparency) - there's nothing in between.  For best results, fix partial transparency problems in your art package of choice.".to_string(),
-            tool_tip: "Show areas of the artwork where there's partial transparency of some kind.".to_string(),
-            display_percent: true,
-            metric_to_status: TShirtCheckerApp::bad_transparency_to_status,
-        };
-        let opaque_report = ReportTemplate {
-            label: "Bib Score".to_string(),
-            report_tip: "T-Shirt artwork shouldn't cover all the printable area.  The more area the artwork covers, the more the T-Shirt will feel like a pastic bib you'd put on a baby for meal time.  For best results the artwork have transparent areas where the T-Shirt will show through, and work with the T-Shirt color.".to_string(),
-            tool_tip: "TODO: have tool do something.".to_string(),
-            display_percent: true,
-            metric_to_status: TShirtCheckerApp::opaque_to_status,
-        };
-
         Self {
             art_dependent_data_0: Some(ArtworkDependentData::new(&cc.egui_ctx, &artwork_0)),
             art_dependent_data_1: None,
@@ -898,15 +804,12 @@ impl TShirtCheckerApp {
             drag_display_to_tshirt: None,
             drag_count: 0,
             start_time: SystemTime::now(),
-            area_used_report,
-            dpi_report,
-            opaque_report,
-            transparency_report,
             tool_selected_for: None,
             tshirt_selected_for: TShirtColors::Red,
             artwork_0,
             artwork_1,
             artwork_2,
+            report_templates: ReportTemplates::new(),
             image_loader: None,
         }
     }
