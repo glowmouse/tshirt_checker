@@ -181,8 +181,7 @@ impl TShirtCheckerApp {
     // left corner of the t shirt image and (1,1) is the bottom
     // right corner of the t-shirt image, to the display.
     //
-    fn tshirt_to_display(&self, ui: &egui::Ui) -> Matrix3<f32> {
-        let panel_size = ui.available_size_before_wrap();
+    fn tshirt_to_display(&self, panel_size: egui::Vec2) -> Matrix3<f32> {
         let panel_aspect = panel_size[0] / panel_size[1];
 
         let tshirt_size = self.tshirt_storage.size();
@@ -310,35 +309,43 @@ impl TShirtCheckerApp {
                          0.0,            0.0,               1.0 ]
     }
 
+    fn paint_tshirt(&self, painter: &egui::Painter, panel_size: egui::Vec2) {
+        let tshirt_to_display = self.tshirt_to_display(panel_size);
+
+        let uv0 = egui::Pos2 { x: 0.0, y: 0.0 };
+        let uv1 = egui::Pos2 { x: 1.0, y: 1.0 };
+
+        let s0 = v3_to_egui(tshirt_to_display * dvector![0.0, 0.0, 1.0]);
+        let s1 = v3_to_egui(tshirt_to_display * dvector![1.0, 1.0, 1.0]);
+
+        let tshirt_art = self
+            .tshirt_storage
+            .tshirt_enum_to_image(self.tshirt_selected_for);
+
+        painter.image(
+            tshirt_art.id(),
+            egui::Rect::from_min_max(s0, s1),
+            egui::Rect::from_min_max(uv0, uv1),
+            egui::Color32::WHITE,
+        );
+    }
+
     fn do_central_panel(&mut self, ctx: &egui::Context) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            let tshirt_to_display = self.tshirt_to_display(ui);
+            let panel_size = ui.available_size_before_wrap();
+            let (response, painter) =
+                ui.allocate_painter(panel_size, egui::Sense::click_and_drag());
+            self.paint_tshirt(&painter, panel_size);
 
-            let uv0 = egui::Pos2 { x: 0.0, y: 0.0 };
-            let uv1 = egui::Pos2 { x: 1.0, y: 1.0 };
-
-            let s0 = v3_to_egui(tshirt_to_display * dvector![0.0, 0.0, 1.0]);
-            let s1 = v3_to_egui(tshirt_to_display * dvector![1.0, 1.0, 1.0]);
-
-            let (response, painter) = ui.allocate_painter(
-                ui.available_size_before_wrap(),
-                egui::Sense::click_and_drag(),
-            );
-            let tshirt_art = self
-                .tshirt_storage
-                .tshirt_enum_to_image(self.tshirt_selected_for);
-            painter.image(
-                tshirt_art.id(),
-                egui::Rect::from_min_max(s0, s1),
-                egui::Rect::from_min_max(uv0, uv1),
-                egui::Color32::WHITE,
-            );
-
+            let tshirt_to_display = self.tshirt_to_display(panel_size);
             let art_space_to_display = tshirt_to_display * self.art_space_to_tshirt();
             let art_to_display = art_space_to_display * self.art_to_art_space();
 
             let a0 = v3_to_egui(art_to_display * dvector![0.0, 0.0, 1.0]);
             let a1 = v3_to_egui(art_to_display * dvector![1.0, 1.0, 1.0]);
+            let uv0 = egui::Pos2 { x: 0.0, y: 0.0 };
+            let uv1 = egui::Pos2 { x: 1.0, y: 1.0 };
+
             let mut movement_attempted = false;
 
             if let Some(pointer_pos) = response.interact_pointer_pos() {
