@@ -397,34 +397,7 @@ impl TShirtCheckerApp {
         }
     }
 
-    fn compute_dpi(art: &LoadedImage, _art_dependent_data: &ArtworkDependentData) -> u32 {
-        let top_corner = art_to_art_space(art) * dvector![0.0, 0.0, 1.0];
-        let bot_corner = art_to_art_space(art) * dvector![1.0, 1.0, 1.0];
-        let dim_in_inches = bot_corner - top_corner;
-        (art.size().x / dim_in_inches.x) as u32
-    }
-
-    fn compute_badtransparency_pixels(
-        _art: &LoadedImage,
-        art_dependent_data: &ArtworkDependentData,
-    ) -> u32 {
-        art_dependent_data.partial_transparency_percent
-    }
-
-    fn compute_area_used(art: &LoadedImage, _art_dependent_data: &ArtworkDependentData) -> u32 {
-        let top_corner = art_to_art_space(art) * dvector![0.0, 0.0, 1.0];
-        let bot_corner = art_to_art_space(art) * dvector![1.0, 1.0, 1.0];
-        let dim_in_inches = bot_corner - top_corner;
-        let area_used = 100.0 * dim_in_inches[0] * dim_in_inches[1] / (11.0 * 14.0);
-        area_used as u32
-    }
-
-    fn compute_bib_score(art: &LoadedImage, art_dependent_data: &ArtworkDependentData) -> u32 {
-        let area_used = Self::compute_area_used(art, art_dependent_data);
-        area_used * art_dependent_data.opaque_percent / 100
-    }
-
-    fn report_metric(&mut self, ui: &mut egui::Ui, report_type: ReportTypes, metric: u32) {
+    fn report_metric(&mut self, ui: &mut egui::Ui, report_type: ReportTypes) {
         ui.horizontal(|ui| {
             StripBuilder::new(ui)
                 .size(Size::exact(25.0))
@@ -433,7 +406,11 @@ impl TShirtCheckerApp {
                 .size(Size::exact(15.0))
                 .size(Size::exact(TOOL_WIDTH))
                 .horizontal(|mut strip| {
+                    let art = self.get_selected_art();
+                    let art_dependent_data = self.art_storage.get_dependent_data(self.selected_art);
+
                     let report = self.report_templates.report_type_to_template(report_type);
+                    let metric = (report.generate_metric)(art, art_dependent_data);
                     let status = (report.metric_to_status)(metric);
                     let status_icon = self.icons.status_icon(status);
                     let tool_tip = report.tool_tip.clone();
@@ -491,18 +468,10 @@ impl TShirtCheckerApp {
     }
 
     fn report_metrics(&mut self, ui: &mut egui::Ui) {
-        let art = self.get_selected_art();
-        let art_dependent_data = self.art_storage.get_dependent_data(self.selected_art);
-
-        let dpi_metric = Self::compute_dpi(art, art_dependent_data);
-        let area_metric = Self::compute_area_used(art, art_dependent_data);
-        let bib_metric = Self::compute_bib_score(art, art_dependent_data);
-        let partialt_metric = Self::compute_badtransparency_pixels(art, art_dependent_data);
-
-        self.report_metric(ui, ReportTypes::Dpi, dpi_metric);
-        self.report_metric(ui, ReportTypes::AreaUsed, area_metric);
-        self.report_metric(ui, ReportTypes::Bib, bib_metric);
-        self.report_metric(ui, ReportTypes::PartialTransparency, partialt_metric);
+        self.report_metric(ui, ReportTypes::Dpi);
+        self.report_metric(ui, ReportTypes::AreaUsed);
+        self.report_metric(ui, ReportTypes::Bib);
+        self.report_metric(ui, ReportTypes::PartialTransparency);
 
         Self::panel_separator(ui);
     }

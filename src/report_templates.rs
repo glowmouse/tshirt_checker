@@ -1,3 +1,9 @@
+use crate::artwork::*;
+use crate::math::*;
+use crate::LoadedImage;
+extern crate nalgebra as na;
+use na::dvector;
+
 #[derive(PartialEq, Copy, Clone)]
 pub enum ReportStatus {
     Pass,
@@ -19,6 +25,7 @@ pub struct ReportTemplate {
     pub tool_tip: String,
     pub display_percent: bool,
     pub metric_to_status: fn(metric: u32) -> ReportStatus,
+    pub generate_metric: fn(art: &LoadedImage, art_dependent_data: &ArtworkDependentData) -> u32,
 }
 
 fn dpi_to_status(dpi: u32) -> ReportStatus {
@@ -27,6 +34,13 @@ fn dpi_to_status(dpi: u32) -> ReportStatus {
         200..=299 => ReportStatus::Warn,
         _ => ReportStatus::Pass,
     }
+}
+
+fn compute_dpi(art: &LoadedImage, _art_dependent_data: &ArtworkDependentData) -> u32 {
+    let top_corner = art_to_art_space(art) * dvector![0.0, 0.0, 1.0];
+    let bot_corner = art_to_art_space(art) * dvector![1.0, 1.0, 1.0];
+    let dim_in_inches = bot_corner - top_corner;
+    (art.size().x / dim_in_inches.x) as u32
 }
 
 fn bad_transparency_to_status(bad_transparency_pixels: u32) -> ReportStatus {
@@ -52,6 +66,26 @@ fn opaque_to_status(opaque_area: u32) -> ReportStatus {
     }
 }
 
+fn compute_area_used(art: &LoadedImage, _art_dependent_data: &ArtworkDependentData) -> u32 {
+    let top_corner = art_to_art_space(art) * dvector![0.0, 0.0, 1.0];
+    let bot_corner = art_to_art_space(art) * dvector![1.0, 1.0, 1.0];
+    let dim_in_inches = bot_corner - top_corner;
+    let area_used = 100.0 * dim_in_inches[0] * dim_in_inches[1] / (11.0 * 14.0);
+    area_used as u32
+}
+
+fn compute_bib_score(art: &LoadedImage, art_dependent_data: &ArtworkDependentData) -> u32 {
+    let area_used = compute_area_used(art, art_dependent_data);
+    area_used * art_dependent_data.opaque_percent / 100
+}
+
+fn compute_badtransparency_pixels(
+    _art: &LoadedImage,
+    art_dependent_data: &ArtworkDependentData,
+) -> u32 {
+    art_dependent_data.partial_transparency_percent
+}
+
 pub struct ReportTemplates {
     area_used_report: ReportTemplate,
     transparency_report: ReportTemplate,
@@ -67,6 +101,7 @@ impl ReportTemplates {
             tool_tip: "Show close ups of areas where artwork might look pixelly.\nTurn off the tool or move the T-Shirt to exit.".to_string(),
             display_percent: false,
             metric_to_status: dpi_to_status,
+            generate_metric: compute_dpi,
         };
         let area_used_report = ReportTemplate {
             label: "Area Used".to_string(),
@@ -74,6 +109,7 @@ impl ReportTemplates {
             tool_tip: "Show the maximum boundary of the printable area on the T-Shirt.".to_string(),
             display_percent: true,
             metric_to_status: area_used_to_status,
+            generate_metric: compute_area_used,
         };
         let transparency_report = ReportTemplate {
             label: "Partial\nTransparency".to_string(),
@@ -81,6 +117,7 @@ impl ReportTemplates {
             tool_tip: "Show areas of the artwork where there's partial transparency of some kind.".to_string(),
             display_percent: true,
             metric_to_status: bad_transparency_to_status,
+            generate_metric: compute_badtransparency_pixels,
         };
         let opaque_report = ReportTemplate {
             label: "Bib Score".to_string(),
@@ -88,6 +125,7 @@ impl ReportTemplates {
             tool_tip: "TODO: have tool do something.".to_string(),
             display_percent: true,
             metric_to_status: opaque_to_status,
+            generate_metric: compute_bib_score,
         };
         Self {
             area_used_report,
