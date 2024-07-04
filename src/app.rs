@@ -559,19 +559,21 @@ impl TShirtCheckerApp {
         }
     }
 
-    fn compute_dpi(art: &LoadedImage) -> u32 {
+    fn compute_dpi(art: &LoadedImage, _art_dependent_data: &ArtworkDependentData) -> u32 {
         let top_corner = Self::art_to_art_space(art) * dvector![0.0, 0.0, 1.0];
         let bot_corner = Self::art_to_art_space(art) * dvector![1.0, 1.0, 1.0];
         let dim_in_inches = bot_corner - top_corner;
         (art.size().x / dim_in_inches.x) as u32
     }
 
-    fn compute_badtransparency_pixels(&self) -> u32 {
-        let dependent_data = self.art_enum_to_dependent_data(self.selected_art);
-        dependent_data.partial_transparency_percent
+    fn compute_badtransparency_pixels(
+        _art: &LoadedImage,
+        art_dependent_data: &ArtworkDependentData,
+    ) -> u32 {
+        art_dependent_data.partial_transparency_percent
     }
 
-    fn compute_area_used(art: &LoadedImage) -> u32 {
+    fn compute_area_used(art: &LoadedImage, _art_dependent_data: &ArtworkDependentData) -> u32 {
         let top_corner = Self::art_to_art_space(art) * dvector![0.0, 0.0, 1.0];
         let bot_corner = Self::art_to_art_space(art) * dvector![1.0, 1.0, 1.0];
         let dim_in_inches = bot_corner - top_corner;
@@ -579,11 +581,9 @@ impl TShirtCheckerApp {
         area_used as u32
     }
 
-    fn compute_bib_score(&self) -> u32 {
-        let art = self.get_selected_art();
-        let area_used = Self::compute_area_used(art);
-        let dependent_data = self.art_enum_to_dependent_data(self.selected_art);
-        area_used * dependent_data.opaque_percent / 100
+    fn compute_bib_score(art: &LoadedImage, art_dependent_data: &ArtworkDependentData) -> u32 {
+        let area_used = Self::compute_area_used(art, art_dependent_data);
+        area_used * art_dependent_data.opaque_percent / 100
     }
 
     fn report_metric(&mut self, ui: &mut egui::Ui, report_type: ReportTypes, metric: u32) {
@@ -653,22 +653,19 @@ impl TShirtCheckerApp {
     }
 
     fn report_metrics(&mut self, ui: &mut egui::Ui) {
-        self.report_metric(
-            ui,
-            ReportTypes::Dpi,
-            Self::compute_dpi(self.get_selected_art()),
-        );
-        self.report_metric(
-            ui,
-            ReportTypes::AreaUsed,
-            Self::compute_area_used(self.get_selected_art()),
-        );
-        self.report_metric(ui, ReportTypes::Bib, self.compute_bib_score());
-        self.report_metric(
-            ui,
-            ReportTypes::PartialTransparency,
-            self.compute_badtransparency_pixels(),
-        );
+        let art = self.get_selected_art();
+        let art_dependent_data = self.art_enum_to_dependent_data(self.selected_art);
+
+        let dpi_metric = Self::compute_dpi(art, art_dependent_data);
+        let area_metric = Self::compute_area_used(art, art_dependent_data);
+        let bib_metric = Self::compute_bib_score(art, art_dependent_data);
+        let partialt_metric = Self::compute_badtransparency_pixels(art, art_dependent_data);
+
+        self.report_metric(ui, ReportTypes::Dpi, dpi_metric);
+        self.report_metric(ui, ReportTypes::AreaUsed, area_metric);
+        self.report_metric(ui, ReportTypes::Bib, bib_metric);
+        self.report_metric(ui, ReportTypes::PartialTransparency, partialt_metric);
+
         Self::panel_separator(ui);
     }
 
