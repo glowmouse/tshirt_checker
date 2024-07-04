@@ -4,22 +4,13 @@ extern crate nalgebra as na;
 use crate::image_utils::*;
 use crate::loaded_image::*;
 use crate::report_templates::*;
+use crate::tshirt_storage::*;
 use egui_extras::{Size, StripBuilder};
 use na::{dvector, matrix, vector, Matrix3, Vector3};
 
 const DEBUG: bool = false;
 const TOOL_TOGGLE_RATE: u128 = 500; // in ms
 const TOOL_WIDTH: f32 = 20.0;
-
-#[derive(PartialEq, Copy, Clone)]
-enum TShirtColors {
-    Red,
-    DRed,
-    Green,
-    DGreen,
-    Blue,
-    DBlue,
-}
 
 #[derive(PartialEq, Copy, Clone)]
 enum Artwork {
@@ -81,19 +72,13 @@ pub struct TShirtCheckerApp {
     selected_art: Artwork,
     footer_debug_0: String,
     footer_debug_1: String,
-    blue_t_shirt: LoadedImage,
-    red_t_shirt: LoadedImage,
-    dgreen_t_shirt: LoadedImage,
-    burg_t_shirt: LoadedImage,
-    dblue_t_shirt: LoadedImage,
-    ddgreen_t_shirt: LoadedImage,
+    tshirt_storage: TShirtStorage,
     pass: LoadedImage,
     warn: LoadedImage,
     fail: LoadedImage,
     tool: LoadedImage,
     import: LoadedImage,
     partial_transparency_fix: LoadedImage,
-    t_shirt: egui::TextureId,
     zoom: f32,
     target: Vector3<f32>,
     last_drag_pos: std::option::Option<Vector3<f32>>,
@@ -204,7 +189,7 @@ impl TShirtCheckerApp {
         let panel_size = ui.available_size_before_wrap();
         let panel_aspect = panel_size[0] / panel_size[1];
 
-        let tshirt_size = self.blue_t_shirt.size();
+        let tshirt_size = self.tshirt_storage.size();
         let tshirt_aspect = tshirt_size.x / tshirt_size.y;
 
         let move_from_center: Matrix3<f32> = matrix![ 1.0,  0.0,  -self.target.x;
@@ -314,7 +299,7 @@ impl TShirtCheckerApp {
     // 11.0 x 14.0 is the working area for the artwork in inches
     //
     fn art_space_to_tshirt(&self) -> Matrix3<f32> {
-        let tshirt_size = self.blue_t_shirt.size();
+        let tshirt_size = self.tshirt_storage.size();
         let tshirt_aspect = tshirt_size.x / tshirt_size.y;
 
         let xcenter = 0.50; // center artwork mid point for X
@@ -343,8 +328,11 @@ impl TShirtCheckerApp {
                 ui.available_size_before_wrap(),
                 egui::Sense::click_and_drag(),
             );
+            let tshirt_art = self
+                .tshirt_storage
+                .tshirt_enum_to_image(self.tshirt_selected_for);
             painter.image(
-                self.t_shirt,
+                tshirt_art.id(),
                 egui::Rect::from_min_max(s0, s1),
                 egui::Rect::from_min_max(uv0, uv1),
                 egui::Color32::WHITE,
@@ -474,26 +462,14 @@ impl TShirtCheckerApp {
         .max_width(25.0)
     }
 
-    fn tshirt_enum_to_image(&self, color: TShirtColors) -> &LoadedImage {
-        match color {
-            TShirtColors::Red => &self.red_t_shirt,
-            TShirtColors::DRed => &self.burg_t_shirt,
-            TShirtColors::Green => &self.dgreen_t_shirt,
-            TShirtColors::DGreen => &self.ddgreen_t_shirt,
-            TShirtColors::Blue => &self.blue_t_shirt,
-            TShirtColors::DBlue => &self.dblue_t_shirt,
-        }
-    }
-
     fn handle_tshirt_button(&mut self, ui: &mut egui::Ui, color: TShirtColors) {
-        let image: &LoadedImage = self.tshirt_enum_to_image(color);
+        let image: &LoadedImage = self.tshirt_storage.tshirt_enum_to_image(color);
         let egui_image = egui::Image::from_texture(image.texture_handle()).max_width(80.0);
         let is_selected = self.tshirt_selected_for == color;
         if ui
             .add(egui::widgets::ImageButton::new(egui_image).selected(is_selected))
             .clicked()
         {
-            self.t_shirt = image.id();
             self.tshirt_selected_for = color;
         }
     }
@@ -717,13 +693,6 @@ impl TShirtCheckerApp {
 
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        // This is also where you can customize the look and feel of egui using
-        // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
-        let blue_shirt: LoadedImage = load_image_from_trusted_source(
-            include_bytes!("blue_tshirt.png"),
-            "blue_shirt",
-            &cc.egui_ctx,
-        );
         let artwork_0: LoadedImage = load_image_from_trusted_source(
             include_bytes!("test_artwork.png"),
             "artwork_0",
@@ -739,26 +708,6 @@ impl TShirtCheckerApp {
             "artwork_2",
             &cc.egui_ctx,
         );
-        let red_shirt: LoadedImage =
-            load_image_from_existing_image(&blue_shirt, blue_to_red, "red_shirt", &cc.egui_ctx);
-        let dgreen_shirt: LoadedImage = load_image_from_existing_image(
-            &blue_shirt,
-            blue_to_dgreen,
-            "dgreen_shirt",
-            &cc.egui_ctx,
-        );
-        let ddgreen_shirt: LoadedImage = load_image_from_existing_image(
-            &blue_shirt,
-            blue_to_ddgreen,
-            "ddgreen_shirt",
-            &cc.egui_ctx,
-        );
-        let dblue_shirt: LoadedImage =
-            load_image_from_existing_image(&blue_shirt, blue_to_dblue, "dblue_shirt", &cc.egui_ctx);
-
-        let burg_shirt: LoadedImage =
-            load_image_from_existing_image(&blue_shirt, blue_to_burg, "burg_shirt", &cc.egui_ctx);
-        let default_shirt = red_shirt.id();
         let pass: LoadedImage =
             load_image_from_trusted_source(include_bytes!("pass.png"), "pass", &cc.egui_ctx);
         let warn: LoadedImage =
@@ -785,13 +734,7 @@ impl TShirtCheckerApp {
             selected_art: Artwork::Artwork0,
             footer_debug_0: String::new(),
             footer_debug_1: String::new(),
-            blue_t_shirt: blue_shirt,
-            red_t_shirt: red_shirt,
-            dgreen_t_shirt: dgreen_shirt,
-            burg_t_shirt: burg_shirt,
-            dblue_t_shirt: dblue_shirt,
-            ddgreen_t_shirt: ddgreen_shirt,
-            t_shirt: default_shirt,
+            tshirt_storage: TShirtStorage::new(&cc.egui_ctx),
             pass,
             warn,
             fail,
