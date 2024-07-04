@@ -1,6 +1,7 @@
 use web_time::SystemTime;
 
 extern crate nalgebra as na;
+use crate::icons::*;
 use crate::image_utils::*;
 use crate::loaded_image::*;
 use crate::report_templates::*;
@@ -69,16 +70,11 @@ pub struct TShirtCheckerApp {
     art_dependent_data_0: std::option::Option<ArtworkDependentData>,
     art_dependent_data_1: std::option::Option<ArtworkDependentData>,
     art_dependent_data_2: std::option::Option<ArtworkDependentData>,
+    icons: IconStorage,
     selected_art: Artwork,
     footer_debug_0: String,
     footer_debug_1: String,
     tshirt_storage: TShirtStorage,
-    pass: LoadedImage,
-    warn: LoadedImage,
-    fail: LoadedImage,
-    tool: LoadedImage,
-    import: LoadedImage,
-    partial_transparency_fix: LoadedImage,
     zoom: f32,
     target: Vector3<f32>,
     last_drag_pos: std::option::Option<Vector3<f32>>,
@@ -453,15 +449,6 @@ impl TShirtCheckerApp {
         });
     }
 
-    fn gen_status_icon(&self, status: ReportStatus) -> egui::Image<'_> {
-        egui::Image::from_texture(match status {
-            ReportStatus::Fail => self.fail.texture_handle(),
-            ReportStatus::Warn => self.warn.texture_handle(),
-            ReportStatus::Pass => self.pass.texture_handle(),
-        })
-        .max_width(25.0)
-    }
-
     fn handle_tshirt_button(&mut self, ui: &mut egui::Ui, color: TShirtColors) {
         let image: &LoadedImage = self.tshirt_storage.tshirt_enum_to_image(color);
         let egui_image = egui::Image::from_texture(image.texture_handle()).max_width(80.0);
@@ -526,7 +513,7 @@ impl TShirtCheckerApp {
                 .horizontal(|mut strip| {
                     let report = self.report_templates.report_type_to_template(report_type);
                     let status = (report.metric_to_status)(metric);
-                    let status_icon = self.gen_status_icon(status);
+                    let status_icon = self.icons.status_icon(status);
                     let tool_tip = report.tool_tip.clone();
                     let report_tip = report.report_tip.clone();
 
@@ -553,9 +540,11 @@ impl TShirtCheckerApp {
                             if ui
                                 .add(
                                     egui::widgets::ImageButton::new(
-                                        egui::Image::from_texture(self.tool.texture_handle())
-                                            .max_width(TOOL_WIDTH)
-                                            .bg_fill(egui::Color32::WHITE),
+                                        egui::Image::from_texture(
+                                            self.icons.texture_handle(Icon::Tool),
+                                        )
+                                        .max_width(TOOL_WIDTH)
+                                        .bg_fill(egui::Color32::WHITE),
                                     )
                                     .selected(is_selected),
                                 )
@@ -622,7 +611,7 @@ impl TShirtCheckerApp {
     }
 
     fn import_button(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        let import_icon = egui::Image::from_texture(self.import.texture_handle())
+        let import_icon = egui::Image::from_texture(self.icons.texture_handle(Icon::Import))
             .max_width(80.0)
             .bg_fill(egui::Color32::WHITE);
         if ui
@@ -635,10 +624,9 @@ impl TShirtCheckerApp {
     }
 
     fn partial_transparency_fix_button(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        let partialt_icon =
-            egui::Image::from_texture(self.partial_transparency_fix.texture_handle())
-                .max_width(80.0)
-                .bg_fill(egui::Color32::WHITE);
+        let partialt_icon = egui::Image::from_texture(self.icons.texture_handle(Icon::FixPT))
+            .max_width(80.0)
+            .bg_fill(egui::Color32::WHITE);
         if ui
             .add(egui::widgets::ImageButton::new(partialt_icon))
             .on_hover_text(
@@ -708,24 +696,6 @@ impl TShirtCheckerApp {
             "artwork_2",
             &cc.egui_ctx,
         );
-        let pass: LoadedImage =
-            load_image_from_trusted_source(include_bytes!("pass.png"), "pass", &cc.egui_ctx);
-        let warn: LoadedImage =
-            load_image_from_trusted_source(include_bytes!("warn.png"), "warn", &cc.egui_ctx);
-        let fail: LoadedImage =
-            load_image_from_trusted_source(include_bytes!("fail.png"), "fail", &cc.egui_ctx);
-        let tool: LoadedImage =
-            load_image_from_trusted_source(include_bytes!("tool.png"), "tool", &cc.egui_ctx);
-        let import: LoadedImage = load_image_from_trusted_source(
-            include_bytes!("import_80x80.png"),
-            "import",
-            &cc.egui_ctx,
-        );
-        let partial_transparency_fix: LoadedImage = load_image_from_trusted_source(
-            include_bytes!("partialt_80x80.png"),
-            "partialt",
-            &cc.egui_ctx,
-        );
 
         Self {
             art_dependent_data_0: Some(ArtworkDependentData::new(&cc.egui_ctx, &artwork_0)),
@@ -735,12 +705,7 @@ impl TShirtCheckerApp {
             footer_debug_0: String::new(),
             footer_debug_1: String::new(),
             tshirt_storage: TShirtStorage::new(&cc.egui_ctx),
-            pass,
-            warn,
-            fail,
-            tool,
-            import,
-            partial_transparency_fix,
+            icons: IconStorage::new(&cc.egui_ctx),
             zoom: 1.0,
             target: vector![0.50, 0.50, 1.0],
             last_drag_pos: None,

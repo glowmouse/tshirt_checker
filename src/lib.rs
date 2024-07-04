@@ -11,3 +11,4 @@ mod image_utils;
 mod report_templates;
 mod tshirt_storage;
 pub use tshirt_storage::TShirtStorage;
+mod icons;
