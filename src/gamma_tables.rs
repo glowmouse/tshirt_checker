@@ -1,4 +1,13 @@
-// Gamma correction tables.
+//! Precomputed gamma tables (functions) for fixed values.
+//!
+//! Precomputes f(x) = ((x/255) ^ gamma ) * 255
+//!
+//! Where the domain x and range f(x) are integers, gamma is a constant.  The tables are used
+//! to quickly do color adjustments on 8 bit images.
+//!
+
+// Table for f(x) = ((x/255) ^ 1.7 ) * 255
+//
 pub const GAMMA_17: [u8; 256] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 7,
     7, 7, 8, 8, 9, 9, 10, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15, 16, 17, 17, 18, 18, 19,
@@ -14,6 +23,8 @@ pub const GAMMA_17: [u8; 256] = [
     241, 243, 244, 246, 248, 249, 251, 253, 255,
 ];
 
+// Table for f(x) = ((x/255) ^ 3.0 ) * 255
+//
 pub const GAMMA_30: [u8; 256] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3,
@@ -28,6 +39,8 @@ pub const GAMMA_30: [u8; 256] = [
     226, 228, 231, 234, 237, 240, 243, 246, 249, 252, 255,
 ];
 
+// Table for f(x) = ((x/255) ^ 2.2 ) * 255
+//
 pub const GAMMA_22: [u8; 256] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2,
     2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 7, 7, 7, 8, 8, 8, 9, 9, 9, 10, 10, 10,
@@ -43,15 +56,25 @@ pub const GAMMA_22: [u8; 256] = [
     255,
 ];
 
-/*
-// TODO, verify table tables match result if computed from scratch in test.
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    for n in 0..256 {
-       let n_32= (n as f32) / 255.0;
-
-
+    // Helper function that compute tables algorithmicly.
+    fn compute_expected(gamma: f32) -> Vec<u8> {
+        let mut outvec = Vec::new();
+        for n in 0..256 {
+            let input = (n as f32) / 255.0;
+            let output = input.powf(gamma);
+            outvec.push((output * 255.0) as u8);
+        }
+        outvec
     }
-*/
+
+    #[test]
+    fn should_match_computed_output() {
+        assert_eq!(compute_expected(1.7), GAMMA_17);
+        assert_eq!(compute_expected(2.2), GAMMA_22);
+        assert_eq!(compute_expected(3.0), GAMMA_30);
+    }
+}
