@@ -77,6 +77,31 @@ impl MovementState {
             drag_count: 0,
         }
     }
+    fn stop_dragging(&mut self) {
+        self.last_drag_pos = None;
+        self.drag_display_to_tshirt = None;
+    }
+
+    fn do_dragging(
+        &mut self,
+        current_drag_pos: Vector3<f32>,
+        tshirt_to_display: Matrix3<f32>,
+    ) -> bool {
+        let mut movement_attempted: bool = false;
+
+        if let Some(last_drag_pos) = self.last_drag_pos {
+            let display_to_artspace = self.drag_display_to_tshirt.unwrap();
+            let last = display_to_artspace * last_drag_pos;
+            let curr = display_to_artspace * current_drag_pos;
+            self.target = self.target + last - curr;
+            movement_attempted = true;
+        } else {
+            self.drag_display_to_tshirt = Some(tshirt_to_display.try_inverse().unwrap());
+            self.drag_count += 1;
+        }
+        self.last_drag_pos = Some(current_drag_pos);
+        movement_attempted
+    }
 }
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
@@ -196,29 +221,15 @@ impl TShirtCheckerApp {
         response: &egui::Response,
         panel_size: egui::Vec2,
     ) -> bool {
-        let mut movement_attempted = false;
-
         if let Some(pointer_pos) = response.interact_pointer_pos() {
             let current_drag_pos = vector!(pointer_pos[0], pointer_pos[1], 1.0);
-
-            if let Some(last_drag_pos) = self.move_state.last_drag_pos {
-                let display_to_artspace = self.move_state.drag_display_to_tshirt.unwrap();
-                let last = display_to_artspace * last_drag_pos;
-                let curr = display_to_artspace * current_drag_pos;
-                self.move_state.target = self.move_state.target + last - curr;
-                movement_attempted = true;
-            } else {
-                let tshirt_to_display = self.tshirt_to_display(panel_size);
-                self.move_state.drag_display_to_tshirt =
-                    Some(tshirt_to_display.try_inverse().unwrap());
-                self.move_state.drag_count += 1;
-            }
-            self.move_state.last_drag_pos = Some(current_drag_pos);
+            let tshirt_to_display = self.tshirt_to_display(panel_size);
+            self.move_state
+                .do_dragging(current_drag_pos, tshirt_to_display)
         } else {
-            self.move_state.last_drag_pos = None;
-            self.move_state.drag_display_to_tshirt = None;
+            self.move_state.stop_dragging();
+            false
         }
-        movement_attempted
     }
 
     fn handle_central_movement_zoom(&mut self, ui: &egui::Ui, response: &egui::Response) -> bool {
