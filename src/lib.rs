@@ -13,3 +13,4 @@ mod tshirt_storage;
 pub use tshirt_storage::TShirtStorage;
 mod artwork;
 mod icons;
+mod math;

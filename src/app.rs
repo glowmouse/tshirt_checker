@@ -4,10 +4,11 @@ extern crate nalgebra as na;
 use crate::artwork::*;
 use crate::icons::*;
 use crate::loaded_image::*;
+use crate::math::*;
 use crate::report_templates::*;
 use crate::tshirt_storage::*;
 use egui_extras::{Size, StripBuilder};
-use na::{dvector, matrix, vector, Matrix3, Vector3};
+use na::{dvector, vector, Matrix3, Vector3};
 
 const DEBUG: bool = false;
 const TOOL_TOGGLE_RATE: u32 = 500; // in ms
@@ -163,95 +164,20 @@ impl TShirtCheckerApp {
             .set_art(self.selected_art, fixed_art, dependent_data);
     }
 
-    //
-    // Transforms from "t shirt space", where (0,0) is the top
-    // left corner of the t shirt image and (1,1) is the bottom
-    // right corner of the t-shirt image, to the display.
-    //
+    // temp, while I do refactoring.
     fn tshirt_to_display(&self, panel_size: egui::Vec2) -> Matrix3<f32> {
-        let panel_aspect = panel_size[0] / panel_size[1];
-
         let tshirt_size = self.tshirt_storage.size();
-        let tshirt_aspect = tshirt_size.x / tshirt_size.y;
-
-        let move_from_center: Matrix3<f32> = matrix![ 1.0,  0.0,  -self.target.x;
-                     0.0,  1.0,  -self.target.y;
-                     0.0,  0.0,  1.0 ];
-        let move_to_center: Matrix3<f32> = matrix![ 1.0,  0.0,  0.5;
-                     0.0,  1.0,  0.5;
-                     0.0,  0.0,  1.0 ];
-        let scale: Matrix3<f32> = matrix![ self.zoom,  0.0,        0.0;
-                     0.0,        self.zoom,  0.0;
-                     0.0,        0.0,        1.0 ];
-
-        let scale_centered = move_to_center * scale * move_from_center;
-
-        if panel_aspect > tshirt_aspect {
-            // panel is wider than the t-shirt
-            let x_width = panel_size[0] * tshirt_aspect / panel_aspect;
-            let x_margin = (panel_size[0] - x_width) / 2.0;
-            return matrix![  x_width,    0.0,             x_margin;
-                             0.0,        panel_size[1],   0.0;
-                             0.0,        0.0,             1.0  ]
-                * scale_centered;
-        }
-        // panel is higher than the t-shirt
-        let y_width = panel_size[1] / tshirt_aspect * panel_aspect;
-        let y_margin = (panel_size[1] - y_width) / 2.0;
-        matrix![  panel_size[0],    0.0,             0.0;
-                  0.0,              y_width,         y_margin;
-                  0.0,              0.0,             1.0  ]
-            * scale_centered
+        let target = self.target;
+        tshirt_to_display(panel_size, tshirt_size, self.zoom, &target)
     }
 
     fn get_selected_art(&self) -> &LoadedImage {
         self.art_storage.get_art(self.selected_art)
     }
 
-    fn art_to_art_space(art: &LoadedImage) -> Matrix3<f32> {
-        let artspace_size = vector!(11.0, 14.0);
-        let artspace_aspect = artspace_size.x / artspace_size.y;
-
-        let art_size = art.size();
-        let art_aspect = art_size.x / art_size.y;
-
-        if artspace_aspect > art_aspect {
-            // space for art is wider than the artwork
-            let x_width = artspace_size.x * art_aspect / artspace_aspect;
-            let x_margin = (artspace_size.x - x_width) / 2.0;
-            return matrix![  x_width,    0.0,               x_margin;
-                             0.0,        artspace_size.y,   0.0;
-                             0.0,        0.0,               1.0  ];
-        }
-        // panel is higher than the t-shirt
-        let y_width = artspace_size.y / art_aspect * artspace_aspect;
-        let y_margin = (artspace_size.y - y_width) / 2.0;
-        matrix![         artspace_size.x,    0.0,             0.0;
-                         0.0,                y_width,         y_margin;
-                         0.0,                0.0,             1.0  ]
-    }
-
-    //
-    // Transforms from "t shirt artwork space", where (0,0) is
-    // the top corner of the artwork and (11.0, 14.0) is the
-    // bottom corner, into "t shirt" space.
-    //
-    // 11.0 x 14.0 is the working area for the artwork in inches
-    //
+    // Temp, while I refactor.
     fn art_space_to_tshirt(&self) -> Matrix3<f32> {
-        let tshirt_size = self.tshirt_storage.size();
-        let tshirt_aspect = tshirt_size.x / tshirt_size.y;
-
-        let xcenter = 0.50; // center artwork mid point for X
-        let ycenter = 0.45; // center artwork 45% down for Y
-
-        let xarea = 0.48 / 11.0; // Artwork on 48% of the horizontal image
-                                 // Artwork as 11 x 14 inches, so use that to compute y area
-        let yarea = xarea * tshirt_aspect;
-
-        matrix![         xarea,          0.0,               xcenter - xarea * 11.0 / 2.0;
-                         0.0,            yarea,             ycenter - yarea * 14.0 / 2.0;
-                         0.0,            0.0,               1.0 ]
+        art_space_to_tshirt(self.tshirt_storage.size())
     }
 
     fn handle_central_movement_drag(
@@ -344,7 +270,7 @@ impl TShirtCheckerApp {
         let tshirt_to_display = self.tshirt_to_display(panel_size);
         let art = self.get_selected_art();
         let art_space_to_display = tshirt_to_display * self.art_space_to_tshirt();
-        let art_to_display = art_space_to_display * Self::art_to_art_space(art);
+        let art_to_display = art_space_to_display * art_to_art_space(art);
 
         let a0 = v3_to_egui(art_to_display * dvector![0.0, 0.0, 1.0]);
         let a1 = v3_to_egui(art_to_display * dvector![1.0, 1.0, 1.0]);
@@ -382,7 +308,7 @@ impl TShirtCheckerApp {
         let hot_spot = &dependent_data.top_hot_spots[slot as usize];
         let art_location = vector![hot_spot.location.x, hot_spot.location.y, 1.0];
         let art = self.get_selected_art();
-        let art_to_tshirt = self.art_space_to_tshirt() * Self::art_to_art_space(art);
+        let art_to_tshirt = self.art_space_to_tshirt() * art_to_art_space(art);
         let display_location = art_to_tshirt * art_location;
 
         // need to make modifications to self after dependent_data borrow is done.
@@ -472,8 +398,8 @@ impl TShirtCheckerApp {
     }
 
     fn compute_dpi(art: &LoadedImage, _art_dependent_data: &ArtworkDependentData) -> u32 {
-        let top_corner = Self::art_to_art_space(art) * dvector![0.0, 0.0, 1.0];
-        let bot_corner = Self::art_to_art_space(art) * dvector![1.0, 1.0, 1.0];
+        let top_corner = art_to_art_space(art) * dvector![0.0, 0.0, 1.0];
+        let bot_corner = art_to_art_space(art) * dvector![1.0, 1.0, 1.0];
         let dim_in_inches = bot_corner - top_corner;
         (art.size().x / dim_in_inches.x) as u32
     }
@@ -486,8 +412,8 @@ impl TShirtCheckerApp {
     }
 
     fn compute_area_used(art: &LoadedImage, _art_dependent_data: &ArtworkDependentData) -> u32 {
-        let top_corner = Self::art_to_art_space(art) * dvector![0.0, 0.0, 1.0];
-        let bot_corner = Self::art_to_art_space(art) * dvector![1.0, 1.0, 1.0];
+        let top_corner = art_to_art_space(art) * dvector![0.0, 0.0, 1.0];
+        let bot_corner = art_to_art_space(art) * dvector![1.0, 1.0, 1.0];
         let dim_in_inches = bot_corner - top_corner;
         let area_used = 100.0 * dim_in_inches[0] * dim_in_inches[1] / (11.0 * 14.0);
         area_used as u32
