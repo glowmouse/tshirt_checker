@@ -10,7 +10,7 @@ use egui_extras::{Size, StripBuilder};
 use na::{dvector, matrix, vector, Matrix3, Vector3};
 
 const DEBUG: bool = false;
-const TOOL_TOGGLE_RATE: u128 = 500; // in ms
+const TOOL_TOGGLE_RATE: u32 = 500; // in ms
 const TOOL_WIDTH: f32 = 20.0;
 
 #[derive(PartialEq, Copy, Clone)]
@@ -62,6 +62,45 @@ impl ArtworkDependentData {
     }
 }
 
+pub struct ToolSelection {
+    tool_selected_at: SystemTime,
+    tool_selected_for: std::option::Option<ReportTypes>,
+}
+
+impl ToolSelection {
+    fn new() -> Self {
+        Self {
+            tool_selected_for: None,
+            tool_selected_at: SystemTime::now(),
+        }
+    }
+    fn time_since_selection(&self) -> u32 {
+        self.tool_selected_at
+            .elapsed()
+            .unwrap()
+            .as_millis()
+            .try_into()
+            .unwrap()
+    }
+    fn reset(&mut self) {
+        self.tool_selected_for = None;
+    }
+    fn set(&mut self, tool: ReportTypes, active: bool) {
+        if active {
+            self.tool_selected_for = Some(tool);
+            self.tool_selected_at = SystemTime::now();
+        } else {
+            self.reset();
+        }
+    }
+    fn get_cycles(&self) -> u32 {
+        self.time_since_selection() / TOOL_TOGGLE_RATE
+    }
+    fn is_active(&self, report_type: ReportTypes) -> bool {
+        self.tool_selected_for.is_some() && self.tool_selected_for.unwrap() == report_type
+    }
+}
+
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 pub struct TShirtCheckerApp {
     artwork_0: LoadedImage,
@@ -80,11 +119,10 @@ pub struct TShirtCheckerApp {
     last_drag_pos: std::option::Option<Vector3<f32>>,
     drag_display_to_tshirt: std::option::Option<Matrix3<f32>>,
     drag_count: i32,
-    start_time: SystemTime,
-    tool_selected_for: std::option::Option<ReportTypes>,
     tshirt_selected_for: TShirtColors,
     report_templates: ReportTemplates,
     image_loader: Option<std::sync::mpsc::Receiver<Result<ImageLoad, String>>>,
+    selected_tool: ToolSelection,
 }
 
 fn v3_to_egui(item: Vector3<f32>) -> egui::Pos2 {
@@ -115,10 +153,6 @@ fn app_execute<F: Future<Output = ()> + 'static>(f: F) {
 }
 
 impl TShirtCheckerApp {
-    fn is_tool_active(&self, report_type: ReportTypes) -> bool {
-        self.tool_selected_for.is_some() && self.tool_selected_for.unwrap() == report_type
-    }
-
     fn do_bottom_panel(&self, ctx: &egui::Context) {
         egui::TopBottomPanel::bottom("bot_panel").show(ctx, |ui| {
             if DEBUG {
@@ -262,11 +296,10 @@ impl TShirtCheckerApp {
         self.art_enum_to_image(self.selected_art)
     }
 
-    fn art_to_art_space(&self) -> Matrix3<f32> {
+    fn art_to_art_space(art: &LoadedImage) -> Matrix3<f32> {
         let artspace_size = vector!(11.0, 14.0);
         let artspace_aspect = artspace_size.x / artspace_size.y;
 
-        let art = self.get_selected_art();
         let art_size = art.size();
         let art_aspect = art_size.x / art_size.y;
 
@@ -397,23 +430,26 @@ impl TShirtCheckerApp {
 
     fn paint_artwork(&self, painter: &egui::Painter, panel_size: egui::Vec2) {
         let tshirt_to_display = self.tshirt_to_display(panel_size);
+        let art = self.get_selected_art();
         let art_space_to_display = tshirt_to_display * self.art_space_to_tshirt();
-        let art_to_display = art_space_to_display * self.art_to_art_space();
+        let art_to_display = art_space_to_display * Self::art_to_art_space(art);
 
         let a0 = v3_to_egui(art_to_display * dvector![0.0, 0.0, 1.0]);
         let a1 = v3_to_egui(art_to_display * dvector![1.0, 1.0, 1.0]);
         let uv0 = egui::Pos2 { x: 0.0, y: 0.0 };
         let uv1 = egui::Pos2 { x: 1.0, y: 1.0 };
 
-        let time_in_ms = self.start_time.elapsed().unwrap().as_millis();
-        let state = (time_in_ms / TOOL_TOGGLE_RATE) % 2;
+        let cycle = self.selected_tool.get_cycles() % 2;
         let dependent_data = self.art_enum_to_dependent_data(self.selected_art);
-        let texture_to_display = if self.is_tool_active(ReportTypes::PartialTransparency) {
-            match state {
+        let texture_to_display = if self
+            .selected_tool
+            .is_active(ReportTypes::PartialTransparency)
+        {
+            match cycle {
                 0 => dependent_data.flagged_artwork.id(),
                 _ => dependent_data.fixed_artwork.id(),
             }
-        } else if self.is_tool_active(ReportTypes::Dpi) {
+        } else if self.selected_tool.is_active(ReportTypes::Dpi) {
             dependent_data.fixed_artwork.id()
         } else {
             self.get_selected_art().id()
@@ -428,13 +464,13 @@ impl TShirtCheckerApp {
     }
 
     fn do_dpi_tool(&mut self, movement_happened: bool) {
-        let time_in_ms = self.start_time.elapsed().unwrap().as_millis();
         let dependent_data = self.art_enum_to_dependent_data(self.selected_art);
-        let cycle = time_in_ms / TOOL_TOGGLE_RATE / 10;
-        let slot = cycle % (dependent_data.top_hot_spots.len() as u128);
+        let cycle = self.selected_tool.get_cycles() / 10;
+        let slot = cycle % (dependent_data.top_hot_spots.len() as u32);
         let hot_spot = &dependent_data.top_hot_spots[slot as usize];
         let art_location = vector![hot_spot.location.x, hot_spot.location.y, 1.0];
-        let art_to_tshirt = self.art_space_to_tshirt() * self.art_to_art_space();
+        let art = self.get_selected_art();
+        let art_to_tshirt = self.art_space_to_tshirt() * Self::art_to_art_space(art);
         let display_location = art_to_tshirt * art_location;
 
         // need to make modifications to self after dependent_data borrow is done.
@@ -443,12 +479,11 @@ impl TShirtCheckerApp {
             self.target = display_location;
         } else {
             // deselect tool if the user is trying to move or zoom.
-            self.tool_selected_for = None;
+            self.selected_tool.reset();
         }
     }
 
     fn paint_area_used_tool(&self, painter: &egui::Painter, panel_size: egui::Vec2) {
-        let time_in_ms = self.start_time.elapsed().unwrap().as_millis();
         let tshirt_to_display = self.tshirt_to_display(panel_size);
         let art_space_to_display = tshirt_to_display * self.art_space_to_tshirt();
         let art_space_border = vec![
@@ -466,7 +501,7 @@ impl TShirtCheckerApp {
         let gap_length = dash_length;
 
         // animate with 3 cycles
-        let cycle = (time_in_ms % (TOOL_TOGGLE_RATE * 3)) / TOOL_TOGGLE_RATE;
+        let cycle = self.selected_tool.get_cycles() % 3;
         let offset: f32 = (cycle as f32) / 3.0 * (dash_length + gap_length);
         let stroke_1 = egui::Stroke::new(dash_width, egui::Color32::from_rgb(200, 200, 200));
 
@@ -489,10 +524,10 @@ impl TShirtCheckerApp {
             self.paint_tshirt(&painter, panel_size);
             self.paint_artwork(&painter, panel_size);
 
-            if self.is_tool_active(ReportTypes::Dpi) {
+            if self.selected_tool.is_active(ReportTypes::Dpi) {
                 self.do_dpi_tool(movement_happened);
             }
-            if self.is_tool_active(ReportTypes::AreaUsed) {
+            if self.selected_tool.is_active(ReportTypes::AreaUsed) {
                 self.paint_area_used_tool(&painter, panel_size);
             }
         });
@@ -520,15 +555,14 @@ impl TShirtCheckerApp {
         {
             self.cache_in_art_dependent_data(ctx, artwork);
             self.selected_art = artwork;
-            self.tool_selected_for = None; // Reset tool selection.
+            self.selected_tool.reset();
         }
     }
 
-    fn compute_dpi(&self) -> u32 {
-        let top_corner = self.art_to_art_space() * dvector![0.0, 0.0, 1.0];
-        let bot_corner = self.art_to_art_space() * dvector![1.0, 1.0, 1.0];
+    fn compute_dpi(art: &LoadedImage) -> u32 {
+        let top_corner = Self::art_to_art_space(art) * dvector![0.0, 0.0, 1.0];
+        let bot_corner = Self::art_to_art_space(art) * dvector![1.0, 1.0, 1.0];
         let dim_in_inches = bot_corner - top_corner;
-        let art = &self.get_selected_art();
         (art.size().x / dim_in_inches.x) as u32
     }
 
@@ -537,16 +571,17 @@ impl TShirtCheckerApp {
         dependent_data.partial_transparency_percent
     }
 
-    fn compute_area_used(&self) -> u32 {
-        let top_corner = self.art_to_art_space() * dvector![0.0, 0.0, 1.0];
-        let bot_corner = self.art_to_art_space() * dvector![1.0, 1.0, 1.0];
+    fn compute_area_used(art: &LoadedImage) -> u32 {
+        let top_corner = Self::art_to_art_space(art) * dvector![0.0, 0.0, 1.0];
+        let bot_corner = Self::art_to_art_space(art) * dvector![1.0, 1.0, 1.0];
         let dim_in_inches = bot_corner - top_corner;
         let area_used = 100.0 * dim_in_inches[0] * dim_in_inches[1] / (11.0 * 14.0);
         area_used as u32
     }
 
     fn compute_bib_score(&self) -> u32 {
-        let area_used = self.compute_area_used();
+        let art = self.get_selected_art();
+        let area_used = Self::compute_area_used(art);
         let dependent_data = self.art_enum_to_dependent_data(self.selected_art);
         area_used * dependent_data.opaque_percent / 100
     }
@@ -585,7 +620,7 @@ impl TShirtCheckerApp {
                     });
                     strip.cell(|ui| {
                         if status != ReportStatus::Pass {
-                            let is_selected = self.is_tool_active(report_type);
+                            let is_selected = self.selected_tool.is_active(report_type);
                             if ui
                                 .add(
                                     self.icons
@@ -595,9 +630,7 @@ impl TShirtCheckerApp {
                                 .on_hover_text(tool_tip)
                                 .clicked()
                             {
-                                self.tool_selected_for =
-                                    if is_selected { None } else { Some(report_type) };
-                                self.start_time = SystemTime::now();
+                                self.selected_tool.set(report_type, !is_selected);
                             }
                         }
                     });
@@ -620,8 +653,16 @@ impl TShirtCheckerApp {
     }
 
     fn report_metrics(&mut self, ui: &mut egui::Ui) {
-        self.report_metric(ui, ReportTypes::Dpi, self.compute_dpi());
-        self.report_metric(ui, ReportTypes::AreaUsed, self.compute_area_used());
+        self.report_metric(
+            ui,
+            ReportTypes::Dpi,
+            Self::compute_dpi(self.get_selected_art()),
+        );
+        self.report_metric(
+            ui,
+            ReportTypes::AreaUsed,
+            Self::compute_area_used(self.get_selected_art()),
+        );
         self.report_metric(ui, ReportTypes::Bib, self.compute_bib_score());
         self.report_metric(
             ui,
@@ -749,14 +790,13 @@ impl TShirtCheckerApp {
             last_drag_pos: None,
             drag_display_to_tshirt: None,
             drag_count: 0,
-            start_time: SystemTime::now(),
-            tool_selected_for: None,
             tshirt_selected_for: TShirtColors::Red,
             artwork_0,
             artwork_1,
             artwork_2,
             report_templates: ReportTemplates::new(),
             image_loader: None,
+            selected_tool: ToolSelection::new(),
         }
     }
 }
@@ -768,7 +808,7 @@ fn mtexts(text: &String) -> egui::widget_text::RichText {
 impl eframe::App for TShirtCheckerApp {
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.footer_debug_0 = format!("time {}", self.start_time.elapsed().unwrap().as_millis());
+        self.footer_debug_0 = format!("time {}", self.selected_tool.time_since_selection());
         if self.image_loader.is_some() {
             let rcv = self.image_loader.as_ref().unwrap();
             let data_attempt = rcv.try_recv();
@@ -788,17 +828,17 @@ impl eframe::App for TShirtCheckerApp {
         self.do_bottom_panel(ctx);
         self.do_right_panel(ctx);
         self.do_central_panel(ctx);
-        if self.is_tool_active(ReportTypes::PartialTransparency)
-            || self.is_tool_active(ReportTypes::AreaUsed)
-            || self.is_tool_active(ReportTypes::Dpi)
+        if self
+            .selected_tool
+            .is_active(ReportTypes::PartialTransparency)
+            || self.selected_tool.is_active(ReportTypes::AreaUsed)
+            || self.selected_tool.is_active(ReportTypes::Dpi)
         {
-            let time_in_ms = self.start_time.elapsed().unwrap().as_millis();
+            let time_in_ms = self.selected_tool.time_since_selection();
             let next_epoch = (time_in_ms / TOOL_TOGGLE_RATE + 1) * TOOL_TOGGLE_RATE + 1;
             let time_to_wait = next_epoch - time_in_ms;
 
-            ctx.request_repaint_after(std::time::Duration::from_millis(
-                time_to_wait.try_into().unwrap(),
-            ))
+            ctx.request_repaint_after(std::time::Duration::from_millis(time_to_wait.into()))
         }
     }
 }
