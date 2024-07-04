@@ -8,4 +8,3 @@ mod gamma_tables;
 mod loaded_image;
 pub use loaded_image::LoadedImage;
 mod image_utils;
-

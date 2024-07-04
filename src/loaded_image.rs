@@ -4,13 +4,13 @@
 //! access to the image pixel data, which seems like the right thing to do in most use cases.
 //!
 //! A lot of the images I'm using are smallish icons, they're baked into the wasm executable,
-//! and I just don't care if they're loading in immediate mode.  I added 
+//! and I just don't care if they're loading in immediate mode.  I added
 //! load_image_from_trusted_source so I could initialize images from a trusted source - say
 //! constant bytes in the wasm executable where I know image is a properly done .png file.
 //!
 //! I have a second use case where I need to modify existing images (i.e., change t-shirt
 //! colors).  For the sake of convenience, I'm always storing the underlying egui::ColorImage
-//! 
+//!
 
 use std::sync::Arc;
 
@@ -176,4 +176,3 @@ pub fn heat_map_from_image(
         texture,
     }
 }
-

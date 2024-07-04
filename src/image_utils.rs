@@ -179,4 +179,3 @@ pub fn hot_spots_from_heat_map(heat_map: &LoadedImage) -> Vec<HotSpot> {
     }
     chosen_hotspots
 }
-

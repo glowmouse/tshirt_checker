@@ -1,13 +1,13 @@
 use web_time::SystemTime;
 
 extern crate nalgebra as na;
+use crate::image_utils::*;
+use crate::loaded_image::*;
 use egui_extras::{Size, StripBuilder};
 use na::{dvector, matrix, vector, Matrix3, Vector3};
-use crate::loaded_image::*;
-use crate::image_utils::*;
 
 const DEBUG: bool = false;
-const TRANSPARENCY_TOGGLE_RATE: u128 = 500;
+const TOOL_TOGGLE_RATE: u128 = 500; // in ms
 const TOOL_WIDTH: f32 = 20.0;
 
 #[derive(PartialEq, Copy, Clone)]
@@ -420,7 +420,7 @@ impl TShirtCheckerApp {
             }
 
             let time_in_ms = self.start_time.elapsed().unwrap().as_millis();
-            let state = (time_in_ms / TRANSPARENCY_TOGGLE_RATE) % 2;
+            let state = (time_in_ms / TOOL_TOGGLE_RATE) % 2;
             let dependent_data = self.art_enum_to_dependent_data(self.selected_art);
             let texture_to_display = if self.is_tool_active(ReportTypes::BadTransparency) {
                 match state {
@@ -441,7 +441,7 @@ impl TShirtCheckerApp {
             );
 
             if self.is_tool_active(ReportTypes::Dpi) {
-                let cycle = time_in_ms / TRANSPARENCY_TOGGLE_RATE / 10;
+                let cycle = time_in_ms / TOOL_TOGGLE_RATE / 10;
                 let slot = cycle % (dependent_data.top_hot_spots.len() as u128);
                 let hot_spot = &dependent_data.top_hot_spots[slot as usize];
                 let art_location = vector![hot_spot.location.x, hot_spot.location.y, 1.0];
@@ -474,8 +474,7 @@ impl TShirtCheckerApp {
                 let gap_length = dash_length;
 
                 // animate with 3 cycles
-                let cycle =
-                    (time_in_ms % (TRANSPARENCY_TOGGLE_RATE * 3)) / TRANSPARENCY_TOGGLE_RATE;
+                let cycle = (time_in_ms % (TOOL_TOGGLE_RATE * 3)) / TOOL_TOGGLE_RATE;
                 let offset: f32 = (cycle as f32) / 3.0 * (dash_length + gap_length);
                 let stroke_1 =
                     egui::Stroke::new(dash_width, egui::Color32::from_rgb(200, 200, 200));
@@ -938,8 +937,7 @@ impl eframe::App for TShirtCheckerApp {
             || self.is_tool_active(ReportTypes::Dpi)
         {
             let time_in_ms = self.start_time.elapsed().unwrap().as_millis();
-            let next_epoch =
-                (time_in_ms / TRANSPARENCY_TOGGLE_RATE + 1) * TRANSPARENCY_TOGGLE_RATE + 1;
+            let next_epoch = (time_in_ms / TOOL_TOGGLE_RATE + 1) * TOOL_TOGGLE_RATE + 1;
             let time_to_wait = next_epoch - time_in_ms;
 
             ctx.request_repaint_after(std::time::Duration::from_millis(
