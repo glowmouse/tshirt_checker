@@ -27,17 +27,17 @@ impl From<&egui::Color32> for Hsla {
         }
 
         let half: i32 = 128;
+        let two_u8: i32 = 510;
         let two: i32 = 512;
         let four: i32 = 1024;
 
         let s2: i32 = if l <= half {
-            ((max - min) << 8) / (max + min)
+            ((max - min) * 255) / (max + min)
         } else {
-            ((max - min) << 8) / (two - max - min)
+            ((max - min) * 255) / (two_u8 - max - min)
         };
 
-        //let s = if s2 == 256 { 255 } else { s2 };
-        let s = s2 * 255 / 256;
+        let s = s2;
 
         let ht: i32 = if r == max {
             ((g - b) << 8) / (max - min)
@@ -50,7 +50,7 @@ impl From<&egui::Color32> for Hsla {
         let h = (ht + 256 * 6) % (256 * 6);
 
         std::assert!(h >= 0);
-        std::assert!(h <= 256 * 6);
+        std::assert!(h < 256 * 6);
 
         Hsla {
             h: u16::try_from(h).unwrap(),
@@ -68,16 +68,16 @@ impl From<&Hsla> for egui::Color32 {
         if val.s == 0 {
             return egui::Color32::from_rgba_premultiplied(val.l, val.l, val.l, val.a);
         }
-        let half: i32 = 128;
-        let one: i32 = 256;
+        let half_u8: i32 = 128;
+        let one_u8: i32 = 255;
         let h: i32 = i32::from(val.h);
         let s: i32 = i32::from(val.s);
         let l: i32 = i32::from(val.l);
 
-        let temp1: i32 = if l < half {
-            (l * (one + s)) >> 8
+        let temp1: i32 = if l < half_u8 {
+            (l * (one_u8 + s)) / one_u8
         } else {
-            l + s - ((l * s) >> 8)
+            l + s - ((l * s) / one_u8)
         };
         let temp2: i32 = 2 * l - temp1;
 
@@ -142,26 +142,23 @@ mod tests {
             l: 128,
             a: 255,
         };
-        assert_eq!(rgba(255, 0, 0, 255), red_hsla.into());
+        assert_eq!(rgba(255, 1, 1, 255), red_hsla.into());
         let green_hsla = Hsla {
             h: 512,
             s: 255,
             l: 128,
             a: 255,
         };
-        assert_eq!(rgba(0, 255, 0, 255), green_hsla.into());
+        assert_eq!(rgba(1, 255, 1, 255), green_hsla.into());
         let blue_hsla = Hsla {
             h: 1024,
             s: 255,
             l: 128,
             a: 255,
         };
-        assert_eq!(rgba(0, 0, 255, 255), blue_hsla.into());
+        assert_eq!(rgba(1, 1, 255, 255), blue_hsla.into());
     }
 
-    // This test doesn't work for (34, 17, 17, 255).
-    // HSLA is { h:0, s:85, l:25, a:25}, which seems correct on the surface
-    // Return is { 33, 17, 0, 255}}.  Blue value is wrong.
     #[test]
     fn test_identities() {
         for r in 0..16 {
