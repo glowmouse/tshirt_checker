@@ -330,11 +330,61 @@ impl TShirtCheckerApp {
         );
     }
 
+    fn handle_central_movement(
+        &mut self,
+        ui: &egui::Ui,
+        response: egui::Response,
+        panel_size: egui::Vec2,
+    ) -> bool {
+        let tshirt_to_display = self.tshirt_to_display(panel_size);
+        let mut movement_attempted = false;
+
+        if let Some(pointer_pos) = response.interact_pointer_pos() {
+            let current_drag_pos = vector!(pointer_pos[0], pointer_pos[1], 1.0);
+
+            if let Some(last_drag_pos) = self.last_drag_pos {
+                let display_to_artspace = self.drag_display_to_tshirt.unwrap();
+                let last = display_to_artspace * last_drag_pos;
+                let curr = display_to_artspace * current_drag_pos;
+                self.target = self.target + last - curr;
+                movement_attempted = true;
+            } else {
+                self.drag_display_to_tshirt = Some(tshirt_to_display.try_inverse().unwrap());
+                self.drag_count += 1;
+            }
+            self.last_drag_pos = Some(current_drag_pos);
+        } else {
+            self.last_drag_pos = None;
+            self.drag_display_to_tshirt = None;
+        }
+
+        if response.hovered() {
+            let zoom_delta_0 = 1.0 + ui.ctx().input(|i| i.smooth_scroll_delta)[1] / 200.0;
+            let zoom_delta_1 = ui.ctx().input(|i| i.zoom_delta());
+            let zoom_delta = if zoom_delta_0 != 1.0 {
+                zoom_delta_0
+            } else {
+                zoom_delta_1
+            };
+            if zoom_delta != 1.0 {
+                movement_attempted = true;
+            }
+
+            self.zoom *= zoom_delta;
+            if self.zoom < 1.0 {
+                self.zoom = 1.0;
+            }
+        }
+        movement_attempted
+    }
+
     fn do_central_panel(&mut self, ctx: &egui::Context) {
         egui::CentralPanel::default().show(ctx, |ui| {
             let panel_size = ui.available_size_before_wrap();
             let (response, painter) =
                 ui.allocate_painter(panel_size, egui::Sense::click_and_drag());
+
+            let movement_happened = self.handle_central_movement(ui, response, panel_size);
             self.paint_tshirt(&painter, panel_size);
 
             let tshirt_to_display = self.tshirt_to_display(panel_size);
@@ -345,45 +395,6 @@ impl TShirtCheckerApp {
             let a1 = v3_to_egui(art_to_display * dvector![1.0, 1.0, 1.0]);
             let uv0 = egui::Pos2 { x: 0.0, y: 0.0 };
             let uv1 = egui::Pos2 { x: 1.0, y: 1.0 };
-
-            let mut movement_attempted = false;
-
-            if let Some(pointer_pos) = response.interact_pointer_pos() {
-                let current_drag_pos = vector!(pointer_pos[0], pointer_pos[1], 1.0);
-
-                if let Some(last_drag_pos) = self.last_drag_pos {
-                    let display_to_artspace = self.drag_display_to_tshirt.unwrap();
-                    let last = display_to_artspace * last_drag_pos;
-                    let curr = display_to_artspace * current_drag_pos;
-                    self.target = self.target + last - curr;
-                    movement_attempted = true;
-                } else {
-                    self.drag_display_to_tshirt = Some(tshirt_to_display.try_inverse().unwrap());
-                    self.drag_count += 1;
-                }
-                self.last_drag_pos = Some(current_drag_pos);
-            } else {
-                self.last_drag_pos = None;
-                self.drag_display_to_tshirt = None;
-            }
-
-            if response.hovered() {
-                let zoom_delta_0 = 1.0 + ui.ctx().input(|i| i.smooth_scroll_delta)[1] / 200.0;
-                let zoom_delta_1 = ui.ctx().input(|i| i.zoom_delta());
-                let zoom_delta = if zoom_delta_0 != 1.0 {
-                    zoom_delta_0
-                } else {
-                    zoom_delta_1
-                };
-                if zoom_delta != 1.0 {
-                    movement_attempted = true;
-                }
-
-                self.zoom *= zoom_delta;
-                if self.zoom < 1.0 {
-                    self.zoom = 1.0;
-                }
-            }
 
             let time_in_ms = self.start_time.elapsed().unwrap().as_millis();
             let state = (time_in_ms / TOOL_TOGGLE_RATE) % 2;
@@ -415,7 +426,7 @@ impl TShirtCheckerApp {
                 let display_location = art_to_tshirt * art_location;
 
                 // need to make modifications to self after dependent_data borrow is done.
-                if !movement_attempted {
+                if !movement_happened {
                     self.zoom = 10.0;
                     self.target = display_location;
                 } else {
