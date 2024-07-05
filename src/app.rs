@@ -9,7 +9,7 @@ use crate::movement_state::MovementState;
 use crate::report_templates::*;
 use crate::tshirt_storage::*;
 use egui_extras::{Size, StripBuilder};
-use na::{dvector, vector, Matrix3, Vector3};
+use na::{dvector, vector};
 
 const DEBUG: bool = false;
 const TOOL_TOGGLE_RATE: u32 = 500; // in ms
@@ -73,13 +73,6 @@ pub struct TShirtCheckerApp {
     report_templates: ReportTemplates,
     image_loader: Option<std::sync::mpsc::Receiver<Result<ImageLoad, String>>>,
     selected_tool: ToolSelection,
-}
-
-fn v3_to_egui(item: Vector3<f32>) -> egui::Pos2 {
-    egui::Pos2 {
-        x: item.x,
-        y: item.y,
-    }
 }
 
 //
@@ -161,11 +154,13 @@ impl TShirtCheckerApp {
             .set_art(self.selected_art, fixed_art, dependent_data);
     }
 
-    // temp, while I do refactoring.
-    fn tshirt_to_display(&self, panel_size: egui::Vec2) -> Matrix3<f32> {
-        let tshirt_size = self.tshirt_storage.size();
-        let target = self.move_state.target;
-        tshirt_to_display(panel_size, tshirt_size, self.move_state.zoom, &target)
+    fn construct_viewport(&self, panel_size: egui::Vec2) -> ViewPort {
+        ViewPort {
+            zoom: self.move_state.zoom,
+            target: self.move_state.target,
+            panel_size,
+            tshirt_size: self.tshirt_storage.size(),
+        }
     }
 
     fn get_selected_art(&self) -> &LoadedImage {
@@ -178,10 +173,10 @@ impl TShirtCheckerApp {
         panel_size: egui::Vec2,
     ) -> bool {
         if let Some(pointer_pos) = response.interact_pointer_pos() {
-            let current_drag_pos = vector!(pointer_pos[0], pointer_pos[1], 1.0);
-            let tshirt_to_display = self.tshirt_to_display(panel_size);
+            let mouse_down_pos = vector!(pointer_pos[0], pointer_pos[1], 1.0);
+            let tshirt_to_display = tshirt_to_display(self.construct_viewport(panel_size));
             self.move_state
-                .event_mouse_down_movement(current_drag_pos, tshirt_to_display);
+                .event_mouse_down_movement(mouse_down_pos, tshirt_to_display);
             true
         } else {
             self.move_state.event_mouse_released();
@@ -212,7 +207,7 @@ impl TShirtCheckerApp {
     }
 
     fn paint_tshirt(&self, painter: &egui::Painter, panel_size: egui::Vec2) {
-        let tshirt_to_display = self.tshirt_to_display(panel_size);
+        let tshirt_to_display = tshirt_to_display(self.construct_viewport(panel_size));
 
         let uv0 = egui::Pos2 { x: 0.0, y: 0.0 };
         let uv1 = egui::Pos2 { x: 1.0, y: 1.0 };
@@ -233,7 +228,7 @@ impl TShirtCheckerApp {
     }
 
     fn paint_artwork(&self, painter: &egui::Painter, panel_size: egui::Vec2) {
-        let tshirt_to_display = self.tshirt_to_display(panel_size);
+        let tshirt_to_display = tshirt_to_display(self.construct_viewport(panel_size));
         let art = self.get_selected_art();
         let art_space_to_display =
             tshirt_to_display * art_space_to_tshirt(self.tshirt_storage.size());
@@ -289,7 +284,7 @@ impl TShirtCheckerApp {
     }
 
     fn paint_area_used_tool(&self, painter: &egui::Painter, panel_size: egui::Vec2) {
-        let tshirt_to_display = self.tshirt_to_display(panel_size);
+        let tshirt_to_display = tshirt_to_display(self.construct_viewport(panel_size));
         let art_space_to_display =
             tshirt_to_display * art_space_to_tshirt(self.tshirt_storage.size());
 
