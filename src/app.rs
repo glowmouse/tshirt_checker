@@ -64,7 +64,6 @@ struct MovementState {
     target: Vector3<f32>,
     last_drag_pos: std::option::Option<Vector3<f32>>,
     drag_display_to_tshirt: std::option::Option<Matrix3<f32>>,
-    drag_count: i32,
 }
 
 impl MovementState {
@@ -74,33 +73,41 @@ impl MovementState {
             target: vector![0.50, 0.50, 1.0],
             last_drag_pos: None,
             drag_display_to_tshirt: None,
-            drag_count: 0,
         }
     }
-    fn stop_dragging(&mut self) {
+    fn event_mouse_released(&mut self) {
         self.last_drag_pos = None;
         self.drag_display_to_tshirt = None;
     }
 
-    fn do_dragging(
+    fn is_currently_dragging(&self) -> bool {
+        self.last_drag_pos.is_some()
+    }
+
+    fn start_dragging(&mut self, current_drag_pos: Vector3<f32>, tshirt_to_display: Matrix3<f32>) {
+        self.drag_display_to_tshirt = Some(tshirt_to_display.try_inverse().unwrap());
+        self.last_drag_pos = Some(current_drag_pos);
+    }
+
+    fn continue_dragging(&mut self, current_drag_pos: Vector3<f32>) {
+        let last_drag_pos = self.last_drag_pos.unwrap();
+        let display_to_artspace = self.drag_display_to_tshirt.unwrap();
+        let last = display_to_artspace * last_drag_pos;
+        let curr = display_to_artspace * current_drag_pos;
+        self.target = self.target + last - curr;
+        self.last_drag_pos = Some(current_drag_pos);
+    }
+
+    fn event_mouse_down_movement(
         &mut self,
         current_drag_pos: Vector3<f32>,
         tshirt_to_display: Matrix3<f32>,
-    ) -> bool {
-        let mut movement_attempted: bool = false;
-
-        if let Some(last_drag_pos) = self.last_drag_pos {
-            let display_to_artspace = self.drag_display_to_tshirt.unwrap();
-            let last = display_to_artspace * last_drag_pos;
-            let curr = display_to_artspace * current_drag_pos;
-            self.target = self.target + last - curr;
-            movement_attempted = true;
+    ) {
+        if self.is_currently_dragging() {
+            self.continue_dragging(current_drag_pos);
         } else {
-            self.drag_display_to_tshirt = Some(tshirt_to_display.try_inverse().unwrap());
-            self.drag_count += 1;
+            self.start_dragging(current_drag_pos, tshirt_to_display);
         }
-        self.last_drag_pos = Some(current_drag_pos);
-        movement_attempted
     }
 }
 
@@ -222,12 +229,14 @@ impl TShirtCheckerApp {
         panel_size: egui::Vec2,
     ) -> bool {
         if let Some(pointer_pos) = response.interact_pointer_pos() {
+            let movement_occured = self.move_state.is_currently_dragging();
             let current_drag_pos = vector!(pointer_pos[0], pointer_pos[1], 1.0);
             let tshirt_to_display = self.tshirt_to_display(panel_size);
             self.move_state
-                .do_dragging(current_drag_pos, tshirt_to_display)
+                .event_mouse_down_movement(current_drag_pos, tshirt_to_display);
+            movement_occured
         } else {
-            self.move_state.stop_dragging();
+            self.move_state.event_mouse_released();
             false
         }
     }
