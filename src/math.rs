@@ -2,6 +2,7 @@ extern crate nalgebra as na;
 use crate::loaded_image::*;
 use na::{matrix, vector, Matrix3, Vector3};
 
+#[derive(Debug)]
 pub struct ViewPort {
     pub zoom: f32,
     pub target: Vector3<f32>,
@@ -40,9 +41,9 @@ pub fn tshirt_to_display(viewport: ViewPort) -> Matrix3<f32> {
         let y_img_on_display_dim = viewport.display_size.y; // a
         let x_img_on_display_dim = y_img_on_display_dim * tshirt_aspect; // b
         let x_margin = (viewport.display_size.x - x_img_on_display_dim) / 2.0; // c
-        return matrix![  x_img_on_display_dim,    0.0,             x_margin;
+        matrix![  x_img_on_display_dim,    0.0,             x_margin;
                              0.0,        y_img_on_display_dim,   0.0;
-                             0.0,        0.0,             1.0  ];
+                             0.0,        0.0,             1.0  ]
     } else {
         // display is higher than the t-shirt
 
@@ -108,5 +109,69 @@ pub fn v3_to_egui(item: Vector3<f32>) -> egui::Pos2 {
     egui::Pos2 {
         x: item.x,
         y: item.y,
+    }
+}
+
+#[cfg(test)]
+mod display_to_tshirt_should {
+    use super::*;
+
+    #[test]
+    fn work_for_wide_displays() {
+        let viewport = ViewPort {
+            zoom: 1.0,
+            target: vector![0.5, 0.5, 1.0],
+            display_size: egui::Vec2::new(1000.0, 1000.0),
+            tshirt_size: egui::Vec2::new(300.0, 500.0),
+        };
+        let actual = tshirt_to_display(viewport);
+        let expected = matrix![ 600.0, 0.0, 200.0 ;
+                            0.0,   1000.0, 0.0 ;
+                            0.0,   0.0,    1.0 ];
+        assert_eq!(actual, expected);
+    }
+    #[test]
+    fn work_for_non_centered_wide_displays() {
+        let viewport = ViewPort {
+            zoom: 1.0,
+            target: vector![1.0, 1.0, 1.0],
+            display_size: egui::Vec2::new(1000.0, 1000.0),
+            tshirt_size: egui::Vec2::new(300.0, 500.0),
+        };
+        let actual = tshirt_to_display(viewport);
+        let expected = matrix![ 600.0, 0.0, -100.0 ;
+                            0.0,   1000.0, -500.0 ;
+                            0.0,   0.0,    1.0 ];
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn work_for_tall_displays() {
+        let viewport = ViewPort {
+            zoom: 1.0,
+            target: vector![0.5, 0.5, 1.0],
+            display_size: egui::Vec2::new(1000.0, 2000.0),
+            tshirt_size: egui::Vec2::new(500.0, 500.0),
+        };
+        let actual = tshirt_to_display(viewport);
+        let expected = matrix![ 1000.0, 0.0, 0.0 ;
+                            0.0,   1000.0, 500.0 ;
+                            0.0,   0.0,    1.0 ];
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn worked_for_tall_displays_zoomed() {
+        let viewport = ViewPort {
+            zoom: 3.0,
+            target: vector![0.5, 0.5, 1.0],
+            display_size: egui::Vec2::new(1000.0, 2000.0),
+            tshirt_size: egui::Vec2::new(500.0, 500.0),
+        };
+        let actual = tshirt_to_display(viewport);
+        let expected = matrix![ 3000.0, 0.0, -1000.0 ;
+                            0.0,   3000.0, -500.0 ;
+                            0.0,   0.0,    1.0 ];
+        assert_eq!(actual, expected);
     }
 }
