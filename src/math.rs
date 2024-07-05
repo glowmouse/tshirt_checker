@@ -1,5 +1,4 @@
 extern crate nalgebra as na;
-use crate::loaded_image::*;
 use na::{matrix, vector, Matrix3, Vector3};
 
 #[derive(Debug)]
@@ -60,27 +59,35 @@ pub fn tshirt_to_display(viewport: ViewPort) -> Matrix3<f32> {
     centered_tshirt_to_display * center_at_target_and_scale
 }
 
-pub fn art_to_art_space(art: &LoadedImage) -> Matrix3<f32> {
+pub fn art_to_art_space(art_size: egui::Vec2) -> Matrix3<f32> {
+    //pub fn art_to_art_space(art: &LoadedImage) -> Matrix3<f32> {
+    // The space for the artwork is aways 11 x 14 inches
     let artspace_size = vector!(11.0, 14.0);
     let artspace_aspect = artspace_size.x / artspace_size.y;
-
-    let art_size = art.size();
     let art_aspect = art_size.x / art_size.y;
 
     if artspace_aspect > art_aspect {
         // space for art is wider than the artwork
-        let x_width = artspace_size.x * art_aspect / artspace_aspect;
-        let x_margin = (artspace_size.x - x_width) / 2.0;
-        return matrix![  x_width,    0.0,               x_margin;
-                             0.0,        artspace_size.y,   0.0;
-                             0.0,        0.0,               1.0  ];
-    }
-    // display is higher than the t-shirt
-    let y_width = artspace_size.y / art_aspect * artspace_aspect;
-    let y_margin = (artspace_size.y - y_width) / 2.0;
-    matrix![         artspace_size.x,    0.0,             0.0;
-                         0.0,                y_width,         y_margin;
+        // map the art so the art's length is 14 inches
+        // preserve the art's aspect ratio for the width
+
+        let y_art_on_artspace_dim = artspace_size.y;
+        let x_art_on_artspace_dim = y_art_on_artspace_dim * art_aspect;
+        let x_margin = (artspace_size.x - x_art_on_artspace_dim) / 2.0;
+        matrix![  x_art_on_artspace_dim,    0.0,               x_margin;
+                             0.0,        y_art_on_artspace_dim,   0.0;
+                             0.0,        0.0,               1.0  ]
+    } else {
+        // space for art is taller than the artwork
+        // map the art so the art's width is 11 inches
+        // preserve the art's aspect ratio for the width
+        let x_art_on_artspace_dim = artspace_size.x;
+        let y_art_on_artspace_dim = x_art_on_artspace_dim / art_aspect;
+        let y_margin = (artspace_size.y - y_art_on_artspace_dim) / 2.0;
+        matrix![         x_art_on_artspace_dim,    0.0,             0.0;
+                         0.0,                y_art_on_artspace_dim,         y_margin;
                          0.0,                0.0,             1.0  ]
+    }
 }
 
 //
@@ -128,7 +135,7 @@ mod display_to_tshirt_should {
         let expected = matrix![ 600.0, 0.0, 200.0 ;
                             0.0,   1000.0, 0.0 ;
                             0.0,   0.0,    1.0 ];
-        assert_eq!(actual, expected);
+        assert_eq!(expected, actual);
     }
     #[test]
     fn work_for_non_centered_wide_displays() {
@@ -142,7 +149,7 @@ mod display_to_tshirt_should {
         let expected = matrix![ 600.0, 0.0, -100.0 ;
                             0.0,   1000.0, -500.0 ;
                             0.0,   0.0,    1.0 ];
-        assert_eq!(actual, expected);
+        assert_eq!(expected, actual);
     }
 
     #[test]
@@ -157,7 +164,7 @@ mod display_to_tshirt_should {
         let expected = matrix![ 1000.0, 0.0, 0.0 ;
                             0.0,   1000.0, 500.0 ;
                             0.0,   0.0,    1.0 ];
-        assert_eq!(actual, expected);
+        assert_eq!(expected, actual);
     }
 
     #[test]
@@ -172,6 +179,46 @@ mod display_to_tshirt_should {
         let expected = matrix![ 3000.0, 0.0, -1000.0 ;
                             0.0,   3000.0, -500.0 ;
                             0.0,   0.0,    1.0 ];
-        assert_eq!(actual, expected);
+        assert_eq!(expected, actual);
+    }
+}
+
+#[cfg(test)]
+mod art_space_to_tshirt_should {
+    use super::*;
+
+    #[test]
+    fn work_with_proportions_that_mirror_target_art() {
+        // 11 x 14 tshirt dimension
+        let matrix = art_space_to_tshirt(egui::Vec2::new(2200.0, 2800.0));
+        let top_left = matrix * vector!(0.0, 0.0, 1.0);
+        let bot_right = matrix * vector!(11.0, 14.0, 1.0);
+        assert_eq!(vector![0.26, 0.21, 1.0], top_left);
+        assert_eq!(vector![0.74, 0.69, 1.0], bot_right);
+    }
+}
+
+#[cfg(test)]
+mod art_to_art_size_should {
+    use super::*;
+
+    #[test]
+    fn work_with_wide_images() {
+        let actual = art_to_art_space(egui::Vec2::new(2200.0, 1400.0));
+        // 11 inches wide, 7 inches tall, 3.5 inch margin
+        let expected = matrix![ 11.0, 0.0, 0.0 ;
+                            0.0,   7.0, 3.5 ;
+                            0.0,   0.0,    1.0 ];
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn work_with_narrow_images() {
+        let actual = art_to_art_space(egui::Vec2::new(1100.0, 2800.0));
+        // 14 inches tall, 5.5 inches wide, 2.75 inch margin
+        let expected = matrix![ 5.5, 0.0, 2.75 ;
+                            0.0,   14.0, 0.0 ;
+                            0.0,   0.0,    1.0 ];
+        assert_eq!(expected, actual);
     }
 }

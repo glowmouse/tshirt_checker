@@ -37,8 +37,8 @@ fn dpi_to_status(dpi: u32) -> ReportStatus {
 }
 
 fn compute_dpi(art: &LoadedImage, _art_dependent_data: &ArtworkDependentData) -> u32 {
-    let top_corner = art_to_art_space(art) * dvector![0.0, 0.0, 1.0];
-    let bot_corner = art_to_art_space(art) * dvector![1.0, 1.0, 1.0];
+    let top_corner = art_to_art_space(art.size()) * dvector![0.0, 0.0, 1.0];
+    let bot_corner = art_to_art_space(art.size()) * dvector![1.0, 1.0, 1.0];
     let dim_in_inches = bot_corner - top_corner;
     (art.size().x / dim_in_inches.x) as u32
 }
@@ -67,8 +67,8 @@ fn opaque_to_status(opaque_area: u32) -> ReportStatus {
 }
 
 fn compute_area_used(art: &LoadedImage, _art_dependent_data: &ArtworkDependentData) -> u32 {
-    let top_corner = art_to_art_space(art) * dvector![0.0, 0.0, 1.0];
-    let bot_corner = art_to_art_space(art) * dvector![1.0, 1.0, 1.0];
+    let top_corner = art_to_art_space(art.size()) * dvector![0.0, 0.0, 1.0];
+    let bot_corner = art_to_art_space(art.size()) * dvector![1.0, 1.0, 1.0];
     let dim_in_inches = bot_corner - top_corner;
     let area_used = 100.0 * dim_in_inches[0] * dim_in_inches[1] / (11.0 * 14.0);
     area_used as u32

@@ -232,7 +232,7 @@ impl TShirtCheckerApp {
         let art = self.get_selected_art();
         let art_space_to_display =
             tshirt_to_display * art_space_to_tshirt(self.tshirt_storage.size());
-        let art_to_display = art_space_to_display * art_to_art_space(art);
+        let art_to_display = art_space_to_display * art_to_art_space(art.size());
 
         let a0 = v3_to_egui(art_to_display * dvector![0.0, 0.0, 1.0]);
         let a1 = v3_to_egui(art_to_display * dvector![1.0, 1.0, 1.0]);
@@ -270,7 +270,8 @@ impl TShirtCheckerApp {
         let hot_spot = &dependent_data.top_hot_spots[slot as usize];
         let art_location = vector![hot_spot.location.x, hot_spot.location.y, 1.0];
         let art = self.get_selected_art();
-        let art_to_tshirt = art_space_to_tshirt(self.tshirt_storage.size()) * art_to_art_space(art);
+        let art_to_tshirt =
+            art_space_to_tshirt(self.tshirt_storage.size()) * art_to_art_space(art.size());
         let display_location = art_to_tshirt * art_location;
 
         // need to make modifications to self after dependent_data borrow is done.
