@@ -109,6 +109,20 @@ impl MovementState {
             self.start_dragging(current_drag_pos, tshirt_to_display);
         }
     }
+
+    fn handle_zoom(&mut self, zoom_delta_0: f32, zoom_delta_1: f32) -> bool {
+        let zoom_delta = if zoom_delta_0 != 1.0 {
+            zoom_delta_0
+        } else {
+            zoom_delta_1
+        };
+
+        self.zoom *= zoom_delta;
+        if self.zoom < 1.0 {
+            self.zoom = 1.0;
+        }
+        zoom_delta != 1.0
+    }
 }
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
@@ -229,12 +243,11 @@ impl TShirtCheckerApp {
         panel_size: egui::Vec2,
     ) -> bool {
         if let Some(pointer_pos) = response.interact_pointer_pos() {
-            let movement_occured = self.move_state.is_currently_dragging();
             let current_drag_pos = vector!(pointer_pos[0], pointer_pos[1], 1.0);
             let tshirt_to_display = self.tshirt_to_display(panel_size);
             self.move_state
                 .event_mouse_down_movement(current_drag_pos, tshirt_to_display);
-            movement_occured
+            true
         } else {
             self.move_state.event_mouse_released();
             false
@@ -242,27 +255,13 @@ impl TShirtCheckerApp {
     }
 
     fn handle_central_movement_zoom(&mut self, ui: &egui::Ui, response: &egui::Response) -> bool {
-        let mut movement_attempted = false;
-
         if response.hovered() {
             let zoom_delta_0 = 1.0 + ui.ctx().input(|i| i.smooth_scroll_delta)[1] / 200.0;
             let zoom_delta_1 = ui.ctx().input(|i| i.zoom_delta());
-            let zoom_delta = if zoom_delta_0 != 1.0 {
-                zoom_delta_0
-            } else {
-                zoom_delta_1
-            };
-            if zoom_delta != 1.0 {
-                movement_attempted = true;
-            }
-
-            self.move_state.zoom *= zoom_delta;
-            if self.move_state.zoom < 1.0 {
-                self.move_state.zoom = 1.0;
-            }
+            self.move_state.handle_zoom(zoom_delta_0, zoom_delta_1)
+        } else {
+            false
         }
-
-        movement_attempted
     }
 
     fn handle_central_movement(
