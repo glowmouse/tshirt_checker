@@ -14,3 +14,4 @@ pub use tshirt_storage::TShirtStorage;
 mod artwork;
 mod icons;
 mod math;
+mod movement_state;
