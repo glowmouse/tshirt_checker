@@ -154,11 +154,11 @@ impl TShirtCheckerApp {
             .set_art(self.selected_art, fixed_art, dependent_data);
     }
 
-    fn construct_viewport(&self, panel_size: egui::Vec2) -> ViewPort {
+    fn construct_viewport(&self, display_size: egui::Vec2) -> ViewPort {
         ViewPort {
             zoom: self.move_state.zoom,
             target: self.move_state.target,
-            panel_size,
+            display_size,
             tshirt_size: self.tshirt_storage.size(),
         }
     }
@@ -170,11 +170,11 @@ impl TShirtCheckerApp {
     fn handle_central_movement_drag(
         &mut self,
         response: &egui::Response,
-        panel_size: egui::Vec2,
+        display_size: egui::Vec2,
     ) -> bool {
         if let Some(pointer_pos) = response.interact_pointer_pos() {
             let mouse_down_pos = vector!(pointer_pos[0], pointer_pos[1], 1.0);
-            let tshirt_to_display = tshirt_to_display(self.construct_viewport(panel_size));
+            let tshirt_to_display = tshirt_to_display(self.construct_viewport(display_size));
             self.move_state
                 .event_mouse_down_movement(mouse_down_pos, tshirt_to_display);
             true
@@ -198,16 +198,16 @@ impl TShirtCheckerApp {
         &mut self,
         ui: &egui::Ui,
         response: egui::Response,
-        panel_size: egui::Vec2,
+        display_size: egui::Vec2,
     ) -> bool {
-        let dragged = self.handle_central_movement_drag(&response, panel_size);
+        let dragged = self.handle_central_movement_drag(&response, display_size);
         let zoomed = self.handle_central_movement_zoom(ui, &response);
 
         dragged || zoomed
     }
 
-    fn paint_tshirt(&self, painter: &egui::Painter, panel_size: egui::Vec2) {
-        let tshirt_to_display = tshirt_to_display(self.construct_viewport(panel_size));
+    fn paint_tshirt(&self, painter: &egui::Painter, display_size: egui::Vec2) {
+        let tshirt_to_display = tshirt_to_display(self.construct_viewport(display_size));
 
         let uv0 = egui::Pos2 { x: 0.0, y: 0.0 };
         let uv1 = egui::Pos2 { x: 1.0, y: 1.0 };
@@ -227,8 +227,8 @@ impl TShirtCheckerApp {
         );
     }
 
-    fn paint_artwork(&self, painter: &egui::Painter, panel_size: egui::Vec2) {
-        let tshirt_to_display = tshirt_to_display(self.construct_viewport(panel_size));
+    fn paint_artwork(&self, painter: &egui::Painter, display_size: egui::Vec2) {
+        let tshirt_to_display = tshirt_to_display(self.construct_viewport(display_size));
         let art = self.get_selected_art();
         let art_space_to_display =
             tshirt_to_display * art_space_to_tshirt(self.tshirt_storage.size());
@@ -283,8 +283,8 @@ impl TShirtCheckerApp {
         }
     }
 
-    fn paint_area_used_tool(&self, painter: &egui::Painter, panel_size: egui::Vec2) {
-        let tshirt_to_display = tshirt_to_display(self.construct_viewport(panel_size));
+    fn paint_area_used_tool(&self, painter: &egui::Painter, display_size: egui::Vec2) {
+        let tshirt_to_display = tshirt_to_display(self.construct_viewport(display_size));
         let art_space_to_display =
             tshirt_to_display * art_space_to_tshirt(self.tshirt_storage.size());
 
@@ -318,19 +318,19 @@ impl TShirtCheckerApp {
 
     fn do_central_panel(&mut self, ctx: &egui::Context) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            let panel_size = ui.available_size_before_wrap();
+            let display_size = ui.available_size_before_wrap();
             let (response, painter) =
-                ui.allocate_painter(panel_size, egui::Sense::click_and_drag());
+                ui.allocate_painter(display_size, egui::Sense::click_and_drag());
 
-            let movement_happened = self.handle_central_movement(ui, response, panel_size);
-            self.paint_tshirt(&painter, panel_size);
-            self.paint_artwork(&painter, panel_size);
+            let movement_happened = self.handle_central_movement(ui, response, display_size);
+            self.paint_tshirt(&painter, display_size);
+            self.paint_artwork(&painter, display_size);
 
             if self.selected_tool.is_active(ReportTypes::Dpi) {
                 self.do_dpi_tool(movement_happened);
             }
             if self.selected_tool.is_active(ReportTypes::AreaUsed) {
-                self.paint_area_used_tool(&painter, panel_size);
+                self.paint_area_used_tool(&painter, display_size);
             }
         });
     }

@@ -5,47 +5,58 @@ use na::{matrix, vector, Matrix3, Vector3};
 pub struct ViewPort {
     pub zoom: f32,
     pub target: Vector3<f32>,
-    pub panel_size: egui::Vec2,
+    pub display_size: egui::Vec2,
     pub tshirt_size: egui::Vec2,
 }
 
 //
-// Transforms from "t shirt space", where (0,0) is the top
-// left corner of the t shirt image and (1,1) is the bottom
-// right corner of the t-shirt image, to the display.
+// Transforms from "tshirt space", where (0,0) is the top
+// left corner of the tshirt image and (1,1) is the bottom
+// right corner of the tshirt image, to the display.
 //
 pub fn tshirt_to_display(viewport: ViewPort) -> Matrix3<f32> {
-    let panel_aspect = viewport.panel_size[0] / viewport.panel_size[1];
+    let display_aspect = viewport.display_size.x / viewport.display_size.y;
     let tshirt_aspect = viewport.tshirt_size.x / viewport.tshirt_size.y;
 
-    let move_from_center: Matrix3<f32> = matrix![ 1.0,  0.0,  -viewport.target.x;
+    let move_target_to_origin: Matrix3<f32> = matrix![ 1.0,  0.0,  -viewport.target.x;
                      0.0,  1.0,  -viewport.target.y;
                      0.0,  0.0,  1.0 ];
-    let move_to_center: Matrix3<f32> = matrix![ 1.0,  0.0,  0.5;
+    let move_origin_to_center: Matrix3<f32> = matrix![ 1.0,  0.0,  0.5;
                      0.0,  1.0,  0.5;
                      0.0,  0.0,  1.0 ];
-    let scale: Matrix3<f32> = matrix![ viewport.zoom,  0.0,        0.0;
+    let scale_at_origin: Matrix3<f32> = matrix![ viewport.zoom,  0.0,        0.0;
                      0.0,        viewport.zoom,  0.0;
                      0.0,        0.0,        1.0 ];
 
-    let scale_centered = move_to_center * scale * move_from_center;
+    let center_at_target_and_scale =
+        move_origin_to_center * scale_at_origin * move_target_to_origin;
 
-    if panel_aspect > tshirt_aspect {
-        // panel is wider than the t-shirt
-        let x_width = viewport.panel_size[0] * tshirt_aspect / panel_aspect;
-        let x_margin = (viewport.panel_size[0] - x_width) / 2.0;
-        return matrix![  x_width,    0.0,             x_margin;
-                             0.0,        viewport.panel_size[1],   0.0;
-                             0.0,        0.0,             1.0  ]
-            * scale_centered;
-    }
-    // panel is higher than the t-shirt
-    let y_width = viewport.panel_size[1] / tshirt_aspect * panel_aspect;
-    let y_margin = (viewport.panel_size[1] - y_width) / 2.0;
-    matrix![  viewport.panel_size[0],    0.0,             0.0;
-                  0.0,              y_width,         y_margin;
+    let centered_tshirt_to_display = if display_aspect > tshirt_aspect {
+        // Display is wider than the t-shirt
+
+        // a. T-shirt occupies the entire Y dimension of the display
+        // b. Adjust Y tshirt dimension by aspect ratio to get the X dimension
+        // c. Divide the unused space in half and use it as the x margin
+        let y_img_on_display_dim = viewport.display_size.y; // a
+        let x_img_on_display_dim = y_img_on_display_dim * tshirt_aspect; // b
+        let x_margin = (viewport.display_size.x - x_img_on_display_dim) / 2.0; // c
+        return matrix![  x_img_on_display_dim,    0.0,             x_margin;
+                             0.0,        y_img_on_display_dim,   0.0;
+                             0.0,        0.0,             1.0  ];
+    } else {
+        // display is higher than the t-shirt
+
+        // a. T-shirt occupies the entire X dimension of the display
+        // b. Adjust X tshirt dimension by aspect ratio to get the Y dimension
+        // c. Divide the unused space in half and use it as the Y margin
+        let x_img_on_display_dim = viewport.display_size.x;
+        let y_img_on_display_dim = x_img_on_display_dim / tshirt_aspect;
+        let y_margin = (viewport.display_size.y - y_img_on_display_dim) / 2.0;
+        matrix![  x_img_on_display_dim,    0.0,             0.0;
+                  0.0,              y_img_on_display_dim,         y_margin;
                   0.0,              0.0,             1.0  ]
-        * scale_centered
+    };
+    centered_tshirt_to_display * center_at_target_and_scale
 }
 
 pub fn art_to_art_space(art: &LoadedImage) -> Matrix3<f32> {
@@ -63,7 +74,7 @@ pub fn art_to_art_space(art: &LoadedImage) -> Matrix3<f32> {
                              0.0,        artspace_size.y,   0.0;
                              0.0,        0.0,               1.0  ];
     }
-    // panel is higher than the t-shirt
+    // display is higher than the t-shirt
     let y_width = artspace_size.y / art_aspect * artspace_aspect;
     let y_margin = (artspace_size.y - y_width) / 2.0;
     matrix![         artspace_size.x,    0.0,             0.0;
