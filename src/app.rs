@@ -390,8 +390,11 @@ impl TShirtCheckerApp {
                     });
                     strip.cell(|ui| {
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
-                            ui.label(mtexts(&format!("{}", metric)))
-                                .on_hover_text(&report_tip);
+                            let text = match metric {
+                                Some(n) => format!("{}", n),
+                                None => "???".to_string(),
+                            };
+                            ui.label(mtexts(&text)).on_hover_text(&report_tip);
                         });
                     });
                     let cell_string = (if report.display_percent { "%" } else { "" }).to_string();

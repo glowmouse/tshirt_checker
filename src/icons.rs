@@ -6,6 +6,7 @@ pub enum Icon {
     Pass,
     Warn,
     Fail,
+    Loading,
     Tool,
     Import,
     FixPT,
@@ -15,6 +16,7 @@ pub struct IconStorage {
     pass: LoadedImage,
     warn: LoadedImage,
     fail: LoadedImage,
+    loading: LoadedImage,
     tool: LoadedImage,
     import: LoadedImage,
     partial_transparency_fix: LoadedImage,
@@ -30,6 +32,8 @@ impl IconStorage {
             load_image_from_trusted_source(include_bytes!("fail.png"), "fail", ctx);
         let tool: LoadedImage =
             load_image_from_trusted_source(include_bytes!("tool.png"), "tool", ctx);
+        let loading: LoadedImage =
+            load_image_from_trusted_source(include_bytes!("spinner.png"), "loading", ctx);
         let import: LoadedImage =
             load_image_from_trusted_source(include_bytes!("import_80x80.png"), "import", ctx);
         let partial_transparency_fix: LoadedImage =
@@ -39,6 +43,7 @@ impl IconStorage {
             pass,
             warn,
             fail,
+            loading,
             tool,
             import,
             partial_transparency_fix,
@@ -50,6 +55,7 @@ impl IconStorage {
             Icon::Pass => &self.pass,
             Icon::Warn => &self.warn,
             Icon::Fail => &self.fail,
+            Icon::Loading => &self.loading,
             Icon::Tool => &self.tool,
             Icon::Import => &self.import,
             Icon::FixPT => &self.partial_transparency_fix,
@@ -61,6 +67,7 @@ impl IconStorage {
 
     pub fn status_icon(&self, status: ReportStatus) -> egui::Image<'_> {
         egui::Image::from_texture(match status {
+            ReportStatus::Unknown => self.texture_handle(Icon::Loading),
             ReportStatus::Fail => self.texture_handle(Icon::Fail),
             ReportStatus::Warn => self.texture_handle(Icon::Warn),
             ReportStatus::Pass => self.texture_handle(Icon::Pass),
