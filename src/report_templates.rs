@@ -27,7 +27,7 @@ pub struct ReportTemplate {
     pub display_percent: bool,
     pub metric_to_status: fn(metric: Option<u32>) -> ReportStatus,
     pub generate_metric:
-        fn(art: &LoadedImage, art_dependent_data: &ArtworkDependentData) -> Option<u32>,
+        fn(art: &LoadedImage, art_dependent_data: Option<&ArtworkDependentData>) -> Option<u32>,
 }
 
 fn dpi_to_status(dpi: Option<u32>) -> ReportStatus {
@@ -41,7 +41,11 @@ fn dpi_to_status(dpi: Option<u32>) -> ReportStatus {
     }
 }
 
-fn compute_dpi(art: &LoadedImage, _art_dependent_data: &ArtworkDependentData) -> Option<u32> {
+fn compute_dpi(
+    art: &LoadedImage,
+    art_dependent_data: Option<&ArtworkDependentData>,
+) -> Option<u32> {
+    art_dependent_data?;
     let top_corner = art_to_art_space(art.size()) * dvector![0.0, 0.0, 1.0];
     let bot_corner = art_to_art_space(art.size()) * dvector![1.0, 1.0, 1.0];
     let dim_in_inches = bot_corner - top_corner;
@@ -81,7 +85,10 @@ fn opaque_to_status(opaque_area: Option<u32>) -> ReportStatus {
     }
 }
 
-fn compute_area_used(art: &LoadedImage, _art_dependent_data: &ArtworkDependentData) -> Option<u32> {
+fn compute_area_used(
+    art: &LoadedImage,
+    _art_dependent_data: Option<&ArtworkDependentData>,
+) -> Option<u32> {
     let top_corner = art_to_art_space(art.size()) * dvector![0.0, 0.0, 1.0];
     let bot_corner = art_to_art_space(art.size()) * dvector![1.0, 1.0, 1.0];
     let dim_in_inches = bot_corner - top_corner;
@@ -89,16 +96,21 @@ fn compute_area_used(art: &LoadedImage, _art_dependent_data: &ArtworkDependentDa
     Some(area_used as u32)
 }
 
-fn compute_bib_score(art: &LoadedImage, art_dependent_data: &ArtworkDependentData) -> Option<u32> {
-    let area_used = compute_area_used(art, art_dependent_data)?;
+fn compute_bib_score(
+    art: &LoadedImage,
+    optional_art_dependent_data: Option<&ArtworkDependentData>,
+) -> Option<u32> {
+    let art_dependent_data = optional_art_dependent_data?;
+    let area_used = compute_area_used(art, Some(art_dependent_data))?;
     let bib_score = area_used * art_dependent_data.opaque_percent / 100;
     Some(bib_score)
 }
 
 fn compute_badtransparency_pixels(
     _art: &LoadedImage,
-    art_dependent_data: &ArtworkDependentData,
+    optional_art_dependent_data: Option<&ArtworkDependentData>,
 ) -> Option<u32> {
+    let art_dependent_data = optional_art_dependent_data?;
     Some(art_dependent_data.partial_transparency_percent)
 }
 

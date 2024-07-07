@@ -240,16 +240,23 @@ impl TShirtCheckerApp {
         let uv1 = egui::Pos2 { x: 1.0, y: 1.0 };
 
         let cycle = self.selected_tool.get_cycles() % 2;
-        let dependent_data = self.art_storage.get_dependent_data(self.selected_art);
         let texture_to_display = if self
             .selected_tool
             .is_active(ReportTypes::PartialTransparency)
         {
+            let dependent_data = self
+                .art_storage
+                .get_dependent_data(self.selected_art)
+                .unwrap();
             match cycle {
                 0 => dependent_data.flagged_artwork.id(),
                 _ => dependent_data.fixed_artwork.id(),
             }
         } else if self.selected_tool.is_active(ReportTypes::Dpi) {
+            let dependent_data = self
+                .art_storage
+                .get_dependent_data(self.selected_art)
+                .unwrap();
             dependent_data.fixed_artwork.id()
         } else {
             self.get_selected_art().id()
@@ -264,7 +271,10 @@ impl TShirtCheckerApp {
     }
 
     fn do_dpi_tool(&mut self, movement_happened: bool) {
-        let dependent_data = self.art_storage.get_dependent_data(self.selected_art);
+        let dependent_data = self
+            .art_storage
+            .get_dependent_data(self.selected_art)
+            .unwrap();
         let cycle = self.selected_tool.get_cycles() / 10;
         let slot = cycle % (dependent_data.top_hot_spots.len() as u32);
         let hot_spot = &dependent_data.top_hot_spots[slot as usize];
@@ -402,7 +412,7 @@ impl TShirtCheckerApp {
                         ui.label(mtexts(&cell_string));
                     });
                     strip.cell(|ui| {
-                        if status != ReportStatus::Pass {
+                        if status != ReportStatus::Pass && status != ReportStatus::Unknown {
                             let is_selected = self.selected_tool.is_active(report_type);
                             if ui
                                 .add(

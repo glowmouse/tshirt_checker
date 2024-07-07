@@ -77,14 +77,11 @@ impl ArtStorage {
             artwork_2,
         }
     }
-    pub fn get_dependent_data(&self, artwork: Artwork) -> &ArtworkDependentData {
-        // For now I guess I guarantee, through logic that's hard to reason about
-        // that the unwrap always succeeds.  Definately a comments are a code
-        // smell moment.
+    pub fn get_dependent_data(&self, artwork: Artwork) -> Option<&ArtworkDependentData> {
         match artwork {
-            Artwork::Artwork0 => self.art_dependent_data_0.as_ref().unwrap(),
-            Artwork::Artwork1 => self.art_dependent_data_1.as_ref().unwrap(),
-            Artwork::Artwork2 => self.art_dependent_data_2.as_ref().unwrap(),
+            Artwork::Artwork0 => self.art_dependent_data_0.as_ref(),
+            Artwork::Artwork1 => self.art_dependent_data_1.as_ref(),
+            Artwork::Artwork2 => self.art_dependent_data_2.as_ref(),
         }
     }
 
