@@ -1,5 +1,3 @@
-use web_time::SystemTime;
-
 extern crate nalgebra as na;
 use crate::artwork::*;
 use crate::icons::*;
@@ -7,57 +5,18 @@ use crate::loaded_image::*;
 use crate::math::*;
 use crate::movement_state::MovementState;
 use crate::report_templates::*;
+use crate::tool_select::*;
 use crate::tshirt_storage::*;
 use egui_extras::{Size, StripBuilder};
 use na::{dvector, vector};
 
 const DEBUG: bool = false;
-const TOOL_TOGGLE_RATE: u32 = 500; // in ms
 const TOOL_WIDTH: f32 = 20.0;
 
 pub struct ImageLoad {
     artwork: Artwork,
     image: LoadedImage,
     dependent_data: ArtworkDependentData,
-}
-
-pub struct ToolSelection {
-    tool_selected_at: SystemTime,
-    tool_selected_for: std::option::Option<ReportTypes>,
-}
-
-impl ToolSelection {
-    fn new() -> Self {
-        Self {
-            tool_selected_for: None,
-            tool_selected_at: SystemTime::now(),
-        }
-    }
-    fn time_since_selection(&self) -> u32 {
-        self.tool_selected_at
-            .elapsed()
-            .unwrap()
-            .as_millis()
-            .try_into()
-            .unwrap()
-    }
-    fn reset(&mut self) {
-        self.tool_selected_for = None;
-    }
-    fn set(&mut self, tool: ReportTypes, active: bool) {
-        if active {
-            self.tool_selected_for = Some(tool);
-            self.tool_selected_at = SystemTime::now();
-        } else {
-            self.reset();
-        }
-    }
-    fn get_cycles(&self) -> u32 {
-        self.time_since_selection() / TOOL_TOGGLE_RATE
-    }
-    fn is_active(&self, report_type: ReportTypes) -> bool {
-        self.tool_selected_for.is_some() && self.tool_selected_for.unwrap() == report_type
-    }
 }
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
@@ -570,9 +529,7 @@ impl eframe::App for TShirtCheckerApp {
             || self.selected_tool.is_active(ReportTypes::AreaUsed)
             || self.selected_tool.is_active(ReportTypes::Dpi)
         {
-            let time_in_ms = self.selected_tool.time_since_selection();
-            let next_epoch = (time_in_ms / TOOL_TOGGLE_RATE + 1) * TOOL_TOGGLE_RATE + 1;
-            let time_to_wait = next_epoch - time_in_ms;
+            let time_to_wait = self.selected_tool.time_to_next_epoch();
 
             ctx.request_repaint_after(std::time::Duration::from_millis(time_to_wait.into()))
         }

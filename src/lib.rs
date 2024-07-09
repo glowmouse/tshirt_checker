@@ -15,3 +15,4 @@ mod artwork;
 mod icons;
 mod math;
 mod movement_state;
+mod tool_select;
