@@ -364,7 +364,12 @@ impl TShirtCheckerApp {
         }
     }
 
-    fn handle_art_button(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, artwork: Artwork) {
+    fn handle_art_button(
+        &self,
+        mut new_events: &mut AppEvents,
+        ui: &mut egui::Ui,
+        artwork: Artwork,
+    ) {
         let image: &LoadedImage = self.art_storage.get_art(artwork);
         let egui_image = egui::Image::from_texture(image.texture_handle()).max_width(80.0);
         let is_selected = self.selected_art == artwork;
@@ -372,9 +377,13 @@ impl TShirtCheckerApp {
             .add(egui::widgets::ImageButton::new(egui_image).selected(is_selected))
             .clicked()
         {
-            self.art_storage.cache_in_art_dependent_data(ctx, artwork);
-            self.selected_art = artwork;
-            self.selected_tool.reset();
+            new_events.add_heavy_task(Box::new(move |app: &mut Self, ctx: &egui::Context| {
+                app.art_storage.cache_in_art_dependent_data(ctx, artwork);
+            }));
+            new_events += Box::new(move |app: &mut Self| {
+                app.selected_art = artwork;
+                app.selected_tool.reset();
+            });
         }
     }
 
@@ -481,11 +490,11 @@ impl TShirtCheckerApp {
         Self::panel_separator(ui);
     }
 
-    fn artwork_selection_panel(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+    fn artwork_selection_panel(&mut self, new_events: &mut AppEvents, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            self.handle_art_button(ctx, ui, Artwork::Artwork0);
-            self.handle_art_button(ctx, ui, Artwork::Artwork1);
-            self.handle_art_button(ctx, ui, Artwork::Artwork2);
+            self.handle_art_button(new_events, ui, Artwork::Artwork0);
+            self.handle_art_button(new_events, ui, Artwork::Artwork1);
+            self.handle_art_button(new_events, ui, Artwork::Artwork2);
         });
         Self::panel_separator(ui);
     }
@@ -523,7 +532,7 @@ impl TShirtCheckerApp {
                     Self::display_title(ui);
                     self.report_metrics(new_events, ui);
                     self.tshirt_selection_panel(new_events, ui);
-                    self.artwork_selection_panel(ui, ctx);
+                    self.artwork_selection_panel(new_events, ui);
 
                     ui.horizontal(|ui| {
                         self.import_button(ui, ctx);
