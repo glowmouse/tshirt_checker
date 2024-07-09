@@ -36,7 +36,7 @@ impl MovementState {
         assert!(self.is_currently_dragging());
     }
 
-    pub fn handle_zoom(&mut self, zoom_delta_0: f32, zoom_delta_1: f32) -> bool {
+    pub fn handle_zoom(&mut self, zoom_delta_0: f32, zoom_delta_1: f32) {
         let zoom_delta = if zoom_delta_0 != 1.0 {
             zoom_delta_0
         } else {
@@ -47,7 +47,6 @@ impl MovementState {
         if self.zoom < 1.0 {
             self.zoom = 1.0;
         }
-        zoom_delta != 1.0
     }
 
     fn is_currently_dragging(&self) -> bool {

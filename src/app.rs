@@ -34,6 +34,19 @@ pub struct TShirtCheckerApp {
     selected_tool: ToolSelection,
 }
 
+pub type AppEvent = Box<dyn Fn(&mut TShirtCheckerApp)>;
+
+#[derive(Default)]
+pub struct AppEvents {
+    events: Vec<AppEvent>,
+}
+
+impl std::ops::AddAssign<AppEvent> for &mut AppEvents {
+    fn add_assign(&mut self, rhs: AppEvent) {
+        self.events.push(rhs);
+    }
+}
+
 //
 // Copied from https://github.com/PolyMeilex/rfd/blob/master/examples/async.rs
 //
@@ -127,40 +140,54 @@ impl TShirtCheckerApp {
     }
 
     fn handle_central_movement_drag(
-        &mut self,
+        &self,
+        mut new_events: &mut AppEvents,
         response: &egui::Response,
         display_size: egui::Vec2,
     ) -> bool {
         if let Some(pointer_pos) = response.interact_pointer_pos() {
             let mouse_down_pos = vector!(pointer_pos[0], pointer_pos[1], 1.0);
             let tshirt_to_display = tshirt_to_display(self.construct_viewport(display_size));
-            self.move_state
-                .event_mouse_down_movement(mouse_down_pos, tshirt_to_display);
+            new_events += Box::new(move |app: &mut Self| {
+                app.move_state
+                    .event_mouse_down_movement(mouse_down_pos, tshirt_to_display);
+            });
             true
         } else {
-            self.move_state.event_mouse_released();
+            new_events += Box::new(move |app: &mut Self| {
+                app.move_state.event_mouse_released();
+            });
             false
         }
     }
 
-    fn handle_central_movement_zoom(&mut self, ui: &egui::Ui, response: &egui::Response) -> bool {
+    fn handle_central_movement_zoom(
+        &self,
+        mut new_events: &mut AppEvents,
+        ui: &egui::Ui,
+        response: &egui::Response,
+    ) -> bool {
         if response.hovered() {
             let zoom_delta_0 = 1.0 + ui.ctx().input(|i| i.smooth_scroll_delta)[1] / 200.0;
             let zoom_delta_1 = ui.ctx().input(|i| i.zoom_delta());
-            self.move_state.handle_zoom(zoom_delta_0, zoom_delta_1)
+            new_events += Box::new(move |app: &mut Self| {
+                app.move_state.handle_zoom(zoom_delta_0, zoom_delta_1);
+            });
+            zoom_delta_0 != 1.0 || zoom_delta_1 != 1.0
         } else {
             false
         }
     }
 
     fn handle_central_movement(
-        &mut self,
+        &self,
+        events: &mut AppEvents,
         ui: &egui::Ui,
         response: egui::Response,
         display_size: egui::Vec2,
     ) -> bool {
-        let dragged = self.handle_central_movement_drag(&response, display_size);
-        let zoomed = self.handle_central_movement_zoom(ui, &response);
+        let dragged = self.handle_central_movement_drag(events, &response, display_size);
+        let zoomed = self.handle_central_movement_zoom(events, ui, &response);
 
         dragged || zoomed
     }
@@ -229,7 +256,7 @@ impl TShirtCheckerApp {
         );
     }
 
-    fn do_dpi_tool(&mut self, movement_happened: bool) {
+    fn do_dpi_tool(&self, mut new_events: &mut AppEvents, movement_happened: bool) {
         let dependent_data = self
             .art_storage
             .get_dependent_data(self.selected_art)
@@ -245,11 +272,15 @@ impl TShirtCheckerApp {
 
         // need to make modifications to self after dependent_data borrow is done.
         if !movement_happened {
-            self.move_state.zoom = 10.0;
-            self.move_state.target = display_location;
+            new_events += Box::new(move |app: &mut Self| {
+                app.move_state.zoom = 10.0;
+                app.move_state.target = display_location;
+            });
         } else {
             // deselect tool if the user is trying to move or zoom.
-            self.selected_tool.reset();
+            new_events += Box::new(move |app: &mut Self| {
+                app.selected_tool.reset();
+            });
         }
     }
 
@@ -286,18 +317,19 @@ impl TShirtCheckerApp {
         ));
     }
 
-    fn do_central_panel(&mut self, ctx: &egui::Context) {
+    fn do_central_panel(&self, new_events: &mut AppEvents, ctx: &egui::Context) {
         egui::CentralPanel::default().show(ctx, |ui| {
             let display_size = ui.available_size_before_wrap();
             let (response, painter) =
                 ui.allocate_painter(display_size, egui::Sense::click_and_drag());
 
-            let movement_happened = self.handle_central_movement(ui, response, display_size);
+            let movement_happened =
+                self.handle_central_movement(new_events, ui, response, display_size);
             self.paint_tshirt(&painter, display_size);
             self.paint_artwork(&painter, display_size);
 
             if self.selected_tool.is_active(ReportTypes::Dpi) {
-                self.do_dpi_tool(movement_happened);
+                self.do_dpi_tool(new_events, movement_happened);
             }
             if self.selected_tool.is_active(ReportTypes::AreaUsed) {
                 self.paint_area_used_tool(&painter, display_size);
@@ -305,7 +337,12 @@ impl TShirtCheckerApp {
         });
     }
 
-    fn handle_tshirt_button(&mut self, ui: &mut egui::Ui, color: TShirtColors) {
+    fn handle_tshirt_button(
+        &self,
+        mut new_events: &mut AppEvents,
+        ui: &mut egui::Ui,
+        color: TShirtColors,
+    ) {
         let image: &LoadedImage = self.tshirt_storage.tshirt_enum_to_image(color);
         let egui_image = egui::Image::from_texture(image.texture_handle()).max_width(80.0);
         let is_selected = self.tshirt_selected_for == color;
@@ -313,7 +350,9 @@ impl TShirtCheckerApp {
             .add(egui::widgets::ImageButton::new(egui_image).selected(is_selected))
             .clicked()
         {
-            self.tshirt_selected_for = color;
+            new_events += Box::new(move |app: &mut Self| {
+                app.tshirt_selected_for = color;
+            });
         }
     }
 
@@ -331,7 +370,12 @@ impl TShirtCheckerApp {
         }
     }
 
-    fn report_metric(&mut self, ui: &mut egui::Ui, report_type: ReportTypes) {
+    fn report_metric(
+        &self,
+        mut new_events: &mut AppEvents,
+        ui: &mut egui::Ui,
+        report_type: ReportTypes,
+    ) {
         ui.horizontal(|ui| {
             StripBuilder::new(ui)
                 .size(Size::exact(25.0))
@@ -382,7 +426,9 @@ impl TShirtCheckerApp {
                                 .on_hover_text(tool_tip)
                                 .clicked()
                             {
-                                self.selected_tool.set(report_type, !is_selected);
+                                new_events += Box::new(move |app: &mut Self| {
+                                    app.selected_tool.set(report_type, !is_selected);
+                                });
                             }
                         }
                     });
@@ -404,25 +450,25 @@ impl TShirtCheckerApp {
         Self::panel_separator(ui);
     }
 
-    fn report_metrics(&mut self, ui: &mut egui::Ui) {
-        self.report_metric(ui, ReportTypes::Dpi);
-        self.report_metric(ui, ReportTypes::AreaUsed);
-        self.report_metric(ui, ReportTypes::Bib);
-        self.report_metric(ui, ReportTypes::PartialTransparency);
+    fn report_metrics(&self, new_events: &mut AppEvents, ui: &mut egui::Ui) {
+        self.report_metric(new_events, ui, ReportTypes::Dpi);
+        self.report_metric(new_events, ui, ReportTypes::AreaUsed);
+        self.report_metric(new_events, ui, ReportTypes::Bib);
+        self.report_metric(new_events, ui, ReportTypes::PartialTransparency);
 
         Self::panel_separator(ui);
     }
 
-    fn tshirt_selection_panel(&mut self, ui: &mut egui::Ui) {
+    fn tshirt_selection_panel(&mut self, new_events: &mut AppEvents, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            self.handle_tshirt_button(ui, TShirtColors::Red);
-            self.handle_tshirt_button(ui, TShirtColors::Green);
-            self.handle_tshirt_button(ui, TShirtColors::Blue);
+            self.handle_tshirt_button(new_events, ui, TShirtColors::Red);
+            self.handle_tshirt_button(new_events, ui, TShirtColors::Green);
+            self.handle_tshirt_button(new_events, ui, TShirtColors::Blue);
         });
         ui.horizontal(|ui| {
-            self.handle_tshirt_button(ui, TShirtColors::DRed);
-            self.handle_tshirt_button(ui, TShirtColors::DGreen);
-            self.handle_tshirt_button(ui, TShirtColors::DBlue);
+            self.handle_tshirt_button(new_events, ui, TShirtColors::DRed);
+            self.handle_tshirt_button(new_events, ui, TShirtColors::DGreen);
+            self.handle_tshirt_button(new_events, ui, TShirtColors::DBlue);
         });
         Self::panel_separator(ui);
     }
@@ -458,15 +504,15 @@ impl TShirtCheckerApp {
         }
     }
 
-    fn do_right_panel(&mut self, ctx: &egui::Context) {
+    fn do_right_panel(&mut self, new_events: &mut AppEvents, ctx: &egui::Context) {
         egui::SidePanel::right("stuff")
             .resizable(true)
             .min_width(200.0)
             .show(ctx, |ui| {
                 ui.vertical(|ui| {
                     Self::display_title(ui);
-                    self.report_metrics(ui);
-                    self.tshirt_selection_panel(ui);
+                    self.report_metrics(new_events, ui);
+                    self.tshirt_selection_panel(new_events, ui);
                     self.artwork_selection_panel(ui, ctx);
 
                     ui.horizontal(|ui| {
@@ -502,6 +548,7 @@ fn mtexts(text: &String) -> egui::widget_text::RichText {
 impl eframe::App for TShirtCheckerApp {
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let mut new_events: AppEvents = Default::default();
         self.footer_debug_0 = format!("time {}", self.selected_tool.time_since_selection());
         if self.image_loader.is_some() {
             let rcv = self.image_loader.as_ref().unwrap();
@@ -521,8 +568,13 @@ impl eframe::App for TShirtCheckerApp {
             }
         }
         self.do_bottom_panel(ctx);
-        self.do_right_panel(ctx);
-        self.do_central_panel(ctx);
+        self.do_right_panel(&mut new_events, ctx);
+        self.do_central_panel(&mut new_events, ctx);
+
+        for closure in new_events.events.iter() {
+            closure(self);
+        }
+
         if self
             .selected_tool
             .is_active(ReportTypes::PartialTransparency)
