@@ -476,7 +476,7 @@ impl TShirtCheckerApp {
         Self::panel_separator(ui);
     }
 
-    fn tshirt_selection_panel(&mut self, new_events: &mut AppEvents, ui: &mut egui::Ui) {
+    fn tshirt_selection_panel(&self, new_events: &mut AppEvents, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             self.handle_tshirt_button(new_events, ui, TShirtColors::Red);
             self.handle_tshirt_button(new_events, ui, TShirtColors::Green);
@@ -490,7 +490,7 @@ impl TShirtCheckerApp {
         Self::panel_separator(ui);
     }
 
-    fn artwork_selection_panel(&mut self, new_events: &mut AppEvents, ui: &mut egui::Ui) {
+    fn artwork_selection_panel(&self, new_events: &mut AppEvents, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             self.handle_art_button(new_events, ui, Artwork::Artwork0);
             self.handle_art_button(new_events, ui, Artwork::Artwork1);
@@ -499,17 +499,19 @@ impl TShirtCheckerApp {
         Self::panel_separator(ui);
     }
 
-    fn import_button(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+    fn import_button(&self, new_events: &mut AppEvents, ui: &mut egui::Ui) {
         if ui
             .add(self.icons.button(Icon::Import, 80.0))
             .on_hover_text("Import an image to the selected artwork slot.")
             .clicked()
         {
-            self.do_load(ctx);
+            new_events.add_heavy_task(Box::new(move |app: &mut Self, ctx: &egui::Context| {
+                app.do_load(ctx);
+            }));
         }
     }
 
-    fn partial_transparency_fix_button(&mut self, new_events: &mut AppEvents, ui: &mut egui::Ui) {
+    fn partial_transparency_fix_button(&self, new_events: &mut AppEvents, ui: &mut egui::Ui) {
         if ui
             .add(self.icons.button(Icon::FixPT, 80.0))
             .on_hover_text(
@@ -523,7 +525,7 @@ impl TShirtCheckerApp {
         }
     }
 
-    fn do_right_panel(&mut self, new_events: &mut AppEvents, ctx: &egui::Context) {
+    fn do_right_panel(&self, new_events: &mut AppEvents, ctx: &egui::Context) {
         egui::SidePanel::right("stuff")
             .resizable(true)
             .min_width(200.0)
@@ -535,7 +537,7 @@ impl TShirtCheckerApp {
                     self.artwork_selection_panel(new_events, ui);
 
                     ui.horizontal(|ui| {
-                        self.import_button(ui, ctx);
+                        self.import_button(new_events, ui);
                         self.partial_transparency_fix_button(new_events, ui);
                     });
                 })
