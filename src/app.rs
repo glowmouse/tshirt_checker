@@ -35,15 +35,23 @@ pub struct TShirtCheckerApp {
 }
 
 pub type AppEvent = Box<dyn Fn(&mut TShirtCheckerApp)>;
+pub type HeavyAppEvent = Box<dyn Fn(&mut TShirtCheckerApp, &egui::Context)>;
 
 #[derive(Default)]
 pub struct AppEvents {
     events: Vec<AppEvent>,
+    hevents: Vec<HeavyAppEvent>,
 }
 
 impl std::ops::AddAssign<AppEvent> for &mut AppEvents {
     fn add_assign(&mut self, rhs: AppEvent) {
         self.events.push(rhs);
+    }
+}
+
+impl AppEvents {
+    fn add_heavy_task(&mut self, rhs: HeavyAppEvent) {
+        self.hevents.push(rhs);
     }
 }
 
@@ -492,7 +500,7 @@ impl TShirtCheckerApp {
         }
     }
 
-    fn partial_transparency_fix_button(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+    fn partial_transparency_fix_button(&mut self, new_events: &mut AppEvents, ui: &mut egui::Ui) {
         if ui
             .add(self.icons.button(Icon::FixPT, 80.0))
             .on_hover_text(
@@ -500,7 +508,9 @@ impl TShirtCheckerApp {
             )
             .clicked()
         {
-            self.partialt_fix(ctx);
+            new_events.add_heavy_task(Box::new(move |app: &mut Self, ctx: &egui::Context| {
+                app.partialt_fix(ctx);
+            }));
         }
     }
 
@@ -517,7 +527,7 @@ impl TShirtCheckerApp {
 
                     ui.horizontal(|ui| {
                         self.import_button(ui, ctx);
-                        self.partial_transparency_fix_button(ui, ctx);
+                        self.partial_transparency_fix_button(new_events, ui);
                     });
                 })
             });
@@ -573,6 +583,9 @@ impl eframe::App for TShirtCheckerApp {
 
         for closure in new_events.events.iter() {
             closure(self);
+        }
+        for heavy_closure in new_events.hevents.iter() {
+            heavy_closure(self, ctx);
         }
 
         if self
