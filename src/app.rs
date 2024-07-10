@@ -36,7 +36,7 @@ pub struct TShirtCheckerApp {
 }
 
 pub type AppEvent = Box<dyn Fn(&mut TShirtCheckerApp)>;
-pub type HeavyAppEvent = Box<dyn Fn(&mut ArtStorage)>;
+pub type HeavyAppEvent = Box<dyn Fn()>;
 
 #[derive(Default)]
 pub struct AppEvents {
@@ -139,6 +139,22 @@ impl TShirtCheckerApp {
         let image_to_send = Ok(ImageLoad {
             artwork: art_id,
             image: fixed_art,
+            dependent_data,
+        });
+        thread_sender.send(image_to_send).unwrap();
+        ctx.request_repaint();
+    }
+
+    fn cache_in_dependent_data(
+        ctx: &egui::Context,
+        art: &LoadedImage,
+        art_id: Artwork,
+        thread_sender: std::sync::mpsc::Sender<Result<ImageLoad, String>>,
+    ) {
+        let dependent_data = ArtworkDependentData::new(ctx, art);
+        let image_to_send = Ok(ImageLoad {
+            artwork: art_id,
+            image: art.clone(),
             dependent_data,
         });
         thread_sender.send(image_to_send).unwrap();
@@ -389,13 +405,22 @@ impl TShirtCheckerApp {
             .add(egui::widgets::ImageButton::new(egui_image).selected(is_selected))
             .clicked()
         {
-            let thread_ctx = ctx.clone();
-            new_events.add_heavy_task(Box::new(move |art_storage: &mut ArtStorage| {
-                art_storage.cache_in_art_dependent_data(&thread_ctx, artwork);
-            }));
+            if self.art_storage.get_dependent_data(artwork).is_none() {
+                let selected_art = artwork;
+                let thread_ctx = ctx.clone();
+                let thread_sender = self.sender.clone();
+                let thread_art = self.art_storage.get_art(selected_art).clone();
+                new_events.add_heavy_task(Box::new(move || {
+                    Self::cache_in_dependent_data(
+                        &thread_ctx,
+                        &thread_art,
+                        selected_art,
+                        thread_sender.clone(),
+                    );
+                }));
+            }
             new_events += Box::new(move |app: &mut Self| {
                 app.selected_art = artwork;
-                app.selected_tool.reset();
             });
         }
     }
@@ -526,7 +551,7 @@ impl TShirtCheckerApp {
             let thread_ctx = ctx.clone();
             let selected_art = self.selected_art;
             let thread_sender = self.sender.clone();
-            new_events.add_heavy_task(Box::new(move |_: &mut ArtStorage| {
+            new_events.add_heavy_task(Box::new(move || {
                 // TODO, why do I need to clone thread_sender again?
                 Self::do_load(&thread_ctx, selected_art, thread_sender.clone());
             }));
@@ -550,7 +575,7 @@ impl TShirtCheckerApp {
             let thread_ctx = ctx.clone();
             let thread_sender = self.sender.clone();
             let thread_art = self.art_storage.get_art(selected_art).clone();
-            new_events.add_heavy_task(Box::new(move |_art_storage: &mut ArtStorage| {
+            new_events.add_heavy_task(Box::new(move || {
                 Self::partialt_fix(
                     &thread_ctx,
                     &thread_art,
@@ -630,7 +655,7 @@ impl eframe::App for TShirtCheckerApp {
             closure(self);
         }
         for heavy_closure in new_events.hevents.iter() {
-            heavy_closure(&mut self.art_storage);
+            heavy_closure();
         }
 
         if self

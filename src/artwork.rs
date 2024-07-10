@@ -85,28 +85,6 @@ impl ArtStorage {
         }
     }
 
-    pub fn cache_in_art_dependent_data(&mut self, ctx: &egui::Context, artwork: Artwork) {
-        let image: &LoadedImage = self.get_art(artwork);
-
-        match artwork {
-            Artwork::Artwork0 => {
-                if self.art_dependent_data_0.is_none() {
-                    self.art_dependent_data_0 = Some(ArtworkDependentData::new(ctx, image));
-                }
-            }
-            Artwork::Artwork1 => {
-                if self.art_dependent_data_1.is_none() {
-                    self.art_dependent_data_1 = Some(ArtworkDependentData::new(ctx, image));
-                }
-            }
-            Artwork::Artwork2 => {
-                if self.art_dependent_data_2.is_none() {
-                    self.art_dependent_data_2 = Some(ArtworkDependentData::new(ctx, image));
-                }
-            }
-        }
-    }
-
     pub fn get_art(&self, artwork: Artwork) -> &LoadedImage {
         match artwork {
             Artwork::Artwork0 => &self.artwork_0,
