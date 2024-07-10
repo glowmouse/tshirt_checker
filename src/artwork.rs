@@ -19,29 +19,30 @@ pub struct ArtworkDependentData {
 
 impl ArtworkDependentData {
     pub async fn new(ctx: &egui::Context, artwork: &LoadedImage) -> Self {
-        async_std::task::yield_now().await;
+        let one_milli = std::time::Duration::from_millis(1);
+        async_std::task::sleep(one_milli).await;
         let default_fixed_art: LoadedImage = load_image_from_existing_image(
             artwork,
             correct_alpha_for_tshirt,
             "fixed default art",
             ctx,
         );
-        async_std::task::yield_now().await;
+        async_std::task::sleep(one_milli).await;
         let default_flagged_art: LoadedImage = load_image_from_existing_image(
             artwork,
             flag_alpha_for_shirt,
             "flagged default art",
             ctx,
         );
-        async_std::task::yield_now().await;
+        async_std::task::sleep(one_milli).await;
         let heat_map = heat_map_from_image(artwork, "heatmap", ctx);
-        async_std::task::yield_now().await;
+        async_std::task::sleep(one_milli).await;
         let opaque_percent = compute_percent_opaque(artwork.pixels());
-        async_std::task::yield_now().await;
+        async_std::task::sleep(one_milli).await;
         let partial_transparency_percent = compute_bad_tpixels(artwork.pixels());
-        async_std::task::yield_now().await;
+        async_std::task::sleep(one_milli).await;
         let top_hot_spots = hot_spots_from_heat_map(&heat_map);
-        async_std::task::yield_now().await;
+        async_std::task::sleep(one_milli).await;
 
         Self {
             partial_transparency_percent,
