@@ -120,8 +120,12 @@ impl TShirtCheckerApp {
         });
     }
 
-    fn partialt_fix(art_storage: &mut ArtStorage, ctx: &egui::Context, art_id: Artwork) {
-        let art = art_storage.get_art(art_id);
+    fn partialt_fix(
+        ctx: &egui::Context,
+        art: &LoadedImage,
+        art_id: Artwork,
+        thread_sender: std::sync::mpsc::Sender<Result<ImageLoad, String>>,
+    ) {
         let fixed_art = load_image_from_existing_image(
             art,
             |p| {
@@ -132,7 +136,13 @@ impl TShirtCheckerApp {
             ctx,
         );
         let dependent_data = ArtworkDependentData::new(ctx, &fixed_art);
-        art_storage.set_art(art_id, fixed_art, dependent_data);
+        let image_to_send = Ok(ImageLoad {
+            artwork: art_id,
+            image: fixed_art,
+            dependent_data,
+        });
+        thread_sender.send(image_to_send).unwrap();
+        ctx.request_repaint();
     }
 
     fn construct_viewport(&self, display_size: egui::Vec2) -> ViewPort {
@@ -538,8 +548,15 @@ impl TShirtCheckerApp {
         {
             let selected_art = self.selected_art;
             let thread_ctx = ctx.clone();
-            new_events.add_heavy_task(Box::new(move |art_storage: &mut ArtStorage| {
-                Self::partialt_fix(art_storage, &thread_ctx, selected_art);
+            let thread_sender = self.sender.clone();
+            let thread_art = self.art_storage.get_art(selected_art).clone();
+            new_events.add_heavy_task(Box::new(move |_art_storage: &mut ArtStorage| {
+                Self::partialt_fix(
+                    &thread_ctx,
+                    &thread_art,
+                    selected_art,
+                    thread_sender.clone(),
+                );
             }));
         }
     }
