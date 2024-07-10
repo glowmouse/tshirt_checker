@@ -126,23 +126,28 @@ impl TShirtCheckerApp {
         art_id: Artwork,
         thread_sender: std::sync::mpsc::Sender<Result<ImageLoad, String>>,
     ) {
-        let fixed_art = load_image_from_existing_image(
-            art,
-            |p| {
-                let new_alpha: u8 = if p.a() < 25 { 0 } else { 255 };
-                egui::Color32::from_rgba_premultiplied(p.r(), p.g(), p.b(), new_alpha)
-            },
-            "fixed_art", // todo, better name...
-            ctx,
-        );
-        let dependent_data = ArtworkDependentData::new(ctx, &fixed_art);
-        let image_to_send = Ok(ImageLoad {
-            artwork: art_id,
-            image: fixed_art,
-            dependent_data,
+        // Execute in another thread
+        let thread_art = art.clone();
+        let thread_ctx = ctx.clone();
+        app_execute(async move {
+            let fixed_art = load_image_from_existing_image(
+                &thread_art,
+                |p| {
+                    let new_alpha: u8 = if p.a() < 25 { 0 } else { 255 };
+                    egui::Color32::from_rgba_premultiplied(p.r(), p.g(), p.b(), new_alpha)
+                },
+                "fixed_art", // todo, better name...
+                &thread_ctx,
+            );
+            let dependent_data = ArtworkDependentData::new(&thread_ctx, &fixed_art);
+            let image_to_send = Ok(ImageLoad {
+                artwork: art_id,
+                image: fixed_art,
+                dependent_data,
+            });
+            thread_sender.send(image_to_send).unwrap();
+            thread_ctx.request_repaint();
         });
-        thread_sender.send(image_to_send).unwrap();
-        ctx.request_repaint();
     }
 
     fn cache_in_dependent_data(
@@ -151,14 +156,19 @@ impl TShirtCheckerApp {
         art_id: Artwork,
         thread_sender: std::sync::mpsc::Sender<Result<ImageLoad, String>>,
     ) {
-        let dependent_data = ArtworkDependentData::new(ctx, art);
-        let image_to_send = Ok(ImageLoad {
-            artwork: art_id,
-            image: art.clone(),
-            dependent_data,
+        let thread_art = art.clone();
+        let thread_ctx = ctx.clone();
+
+        app_execute(async move {
+            let dependent_data = ArtworkDependentData::new(&thread_ctx, &thread_art);
+            let image_to_send = Ok(ImageLoad {
+                artwork: art_id,
+                image: thread_art,
+                dependent_data,
+            });
+            thread_sender.send(image_to_send).unwrap();
+            thread_ctx.request_repaint();
         });
-        thread_sender.send(image_to_send).unwrap();
-        ctx.request_repaint();
     }
 
     fn construct_viewport(&self, display_size: egui::Vec2) -> ViewPort {
