@@ -36,7 +36,7 @@ pub struct TShirtCheckerApp {
 }
 
 pub type AppEvent = Box<dyn Fn(&mut TShirtCheckerApp)>;
-pub type HeavyAppEvent = Box<dyn Fn(&mut TShirtCheckerApp, &egui::Context)>;
+pub type HeavyAppEvent = Box<dyn Fn(&mut TShirtCheckerApp)>;
 
 #[derive(Default)]
 pub struct AppEvents {
@@ -367,6 +367,7 @@ impl TShirtCheckerApp {
         &self,
         mut new_events: &mut AppEvents,
         ui: &mut egui::Ui,
+        ctx: &egui::Context,
         artwork: Artwork,
     ) {
         let image: &LoadedImage = self.art_storage.get_art(artwork);
@@ -376,8 +377,10 @@ impl TShirtCheckerApp {
             .add(egui::widgets::ImageButton::new(egui_image).selected(is_selected))
             .clicked()
         {
-            new_events.add_heavy_task(Box::new(move |app: &mut Self, ctx: &egui::Context| {
-                app.art_storage.cache_in_art_dependent_data(ctx, artwork);
+            let thread_ctx = ctx.clone();
+            new_events.add_heavy_task(Box::new(move |app: &mut Self| {
+                app.art_storage
+                    .cache_in_art_dependent_data(&thread_ctx, artwork);
             }));
             new_events += Box::new(move |app: &mut Self| {
                 app.selected_art = artwork;
@@ -489,28 +492,39 @@ impl TShirtCheckerApp {
         Self::panel_separator(ui);
     }
 
-    fn artwork_selection_panel(&self, new_events: &mut AppEvents, ui: &mut egui::Ui) {
+    fn artwork_selection_panel(
+        &self,
+        new_events: &mut AppEvents,
+        ui: &mut egui::Ui,
+        ctx: &egui::Context,
+    ) {
         ui.horizontal(|ui| {
-            self.handle_art_button(new_events, ui, Artwork::Artwork0);
-            self.handle_art_button(new_events, ui, Artwork::Artwork1);
-            self.handle_art_button(new_events, ui, Artwork::Artwork2);
+            self.handle_art_button(new_events, ui, ctx, Artwork::Artwork0);
+            self.handle_art_button(new_events, ui, ctx, Artwork::Artwork1);
+            self.handle_art_button(new_events, ui, ctx, Artwork::Artwork2);
         });
         Self::panel_separator(ui);
     }
 
-    fn import_button(&self, new_events: &mut AppEvents, ui: &mut egui::Ui) {
+    fn import_button(&self, new_events: &mut AppEvents, ui: &mut egui::Ui, ctx: &egui::Context) {
         if ui
             .add(self.icons.button(Icon::Import, 80.0))
             .on_hover_text("Import an image to the selected artwork slot.")
             .clicked()
         {
-            new_events.add_heavy_task(Box::new(move |app: &mut Self, ctx: &egui::Context| {
-                app.do_load(ctx);
+            let thread_ctx = ctx.clone();
+            new_events.add_heavy_task(Box::new(move |app: &mut Self| {
+                app.do_load(&thread_ctx);
             }));
         }
     }
 
-    fn partial_transparency_fix_button(&self, new_events: &mut AppEvents, ui: &mut egui::Ui) {
+    fn partial_transparency_fix_button(
+        &self,
+        new_events: &mut AppEvents,
+        ui: &mut egui::Ui,
+        ctx: &egui::Context,
+    ) {
         if ui
             .add(self.icons.button(Icon::FixPT, 80.0))
             .on_hover_text(
@@ -519,8 +533,9 @@ impl TShirtCheckerApp {
             .clicked()
         {
             let selected_art = self.selected_art;
-            new_events.add_heavy_task(Box::new(move |app: &mut Self, ctx: &egui::Context| {
-                Self::partialt_fix(&mut (app.art_storage), ctx, selected_art);
+            let thread_ctx = ctx.clone();
+            new_events.add_heavy_task(Box::new(move |app: &mut Self| {
+                Self::partialt_fix(&mut (app.art_storage), &thread_ctx, selected_art);
             }));
         }
     }
@@ -534,11 +549,11 @@ impl TShirtCheckerApp {
                     Self::display_title(ui);
                     self.report_metrics(new_events, ui);
                     self.tshirt_selection_panel(new_events, ui);
-                    self.artwork_selection_panel(new_events, ui);
+                    self.artwork_selection_panel(new_events, ui, ctx);
 
                     ui.horizontal(|ui| {
-                        self.import_button(new_events, ui);
-                        self.partial_transparency_fix_button(new_events, ui);
+                        self.import_button(new_events, ui, ctx);
+                        self.partial_transparency_fix_button(new_events, ui, ctx);
                     });
                 })
             });
@@ -594,7 +609,7 @@ impl eframe::App for TShirtCheckerApp {
             closure(self);
         }
         for heavy_closure in new_events.hevents.iter() {
-            heavy_closure(self, ctx);
+            heavy_closure(self);
         }
 
         if self
