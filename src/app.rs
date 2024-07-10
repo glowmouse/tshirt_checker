@@ -99,17 +99,17 @@ impl TShirtCheckerApp {
             let file = rfd::AsyncFileDialog::new().pick_file().await;
             let data: Vec<u8> = file.unwrap().read().await;
 
-            let image = || -> Result<ImageLoad, String> {
-                let image = load_image_from_untrusted_source(&data, "loaded_data", &thread_ctx)?;
-                let dependent_data = ArtworkDependentData::new(&thread_ctx, &image);
-                Ok(ImageLoad {
-                    artwork: art_slot,
-                    image,
-                    dependent_data,
-                })
-            };
+            let image =
+                load_image_from_untrusted_source(&data, "loaded_data", &thread_ctx).unwrap();
+            let dependent_data = ArtworkDependentData::new(&thread_ctx, &image).await;
 
-            thread_sender.send(image()).unwrap();
+            let send_image = Ok(ImageLoad {
+                artwork: art_slot,
+                image,
+                dependent_data,
+            });
+
+            thread_sender.send(send_image).unwrap();
             thread_ctx.request_repaint();
         });
     }
@@ -135,7 +135,7 @@ impl TShirtCheckerApp {
                 "fixed_art", // todo, better name...
                 &thread_ctx,
             );
-            let dependent_data = ArtworkDependentData::new(&thread_ctx, &fixed_art);
+            let dependent_data = ArtworkDependentData::new(&thread_ctx, &fixed_art).await;
             let image_to_send = Ok(ImageLoad {
                 artwork: art_id,
                 image: fixed_art,
@@ -157,7 +157,9 @@ impl TShirtCheckerApp {
         let thread_sender = sender.clone();
 
         app_execute(async move {
-            let dependent_data = ArtworkDependentData::new(&thread_ctx, &thread_art);
+            async_std::task::yield_now().await;
+            let dependent_data = ArtworkDependentData::new(&thread_ctx, &thread_art).await;
+            async_std::task::yield_now().await;
             let image_to_send = Ok(ImageLoad {
                 artwork: art_id,
                 image: thread_art,
@@ -592,9 +594,18 @@ impl TShirtCheckerApp {
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let (sender, receiver) = std::sync::mpsc::channel::<Result<ImageLoad, String>>();
+        let art_storage = ArtStorage::new(&cc.egui_ctx);
+        let selected_art = Artwork::Artwork0;
+        Self::cache_in_dependent_data(
+            &cc.egui_ctx,
+            art_storage.get_art(selected_art),
+            selected_art,
+            &sender,
+        );
+
         Self {
-            art_storage: ArtStorage::new(&cc.egui_ctx),
-            selected_art: Artwork::Artwork0,
+            art_storage,
+            selected_art,
             footer_debug_0: String::new(),
             footer_debug_1: String::new(),
             tshirt_storage: TShirtStorage::new(&cc.egui_ctx),

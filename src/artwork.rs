@@ -13,33 +13,43 @@ pub struct ArtworkDependentData {
     pub opaque_percent: u32,
     pub fixed_artwork: LoadedImage,
     pub flagged_artwork: LoadedImage,
-    _heat_map: LoadedImage,
+    //_heat_map: LoadedImage,
     pub top_hot_spots: Vec<HotSpot>,
 }
 
 impl ArtworkDependentData {
-    pub fn new(ctx: &egui::Context, artwork: &LoadedImage) -> Self {
+    pub async fn new(ctx: &egui::Context, artwork: &LoadedImage) -> Self {
+        async_std::task::yield_now().await;
         let default_fixed_art: LoadedImage = load_image_from_existing_image(
             artwork,
             correct_alpha_for_tshirt,
             "fixed default art",
             ctx,
         );
+        async_std::task::yield_now().await;
         let default_flagged_art: LoadedImage = load_image_from_existing_image(
             artwork,
             flag_alpha_for_shirt,
             "flagged default art",
             ctx,
         );
+        async_std::task::yield_now().await;
         let heat_map = heat_map_from_image(artwork, "heatmap", ctx);
+        async_std::task::yield_now().await;
+        let opaque_percent = compute_percent_opaque(artwork.pixels());
+        async_std::task::yield_now().await;
+        let partial_transparency_percent = compute_bad_tpixels(artwork.pixels());
+        async_std::task::yield_now().await;
+        let top_hot_spots = hot_spots_from_heat_map(&heat_map);
+        async_std::task::yield_now().await;
 
         Self {
-            partial_transparency_percent: compute_bad_tpixels(artwork.pixels()),
-            opaque_percent: compute_percent_opaque(artwork.pixels()),
+            partial_transparency_percent,
+            opaque_percent,
             fixed_artwork: default_fixed_art,
             flagged_artwork: default_flagged_art,
-            top_hot_spots: hot_spots_from_heat_map(&heat_map),
-            _heat_map: heat_map_from_image(artwork, "heatmap", ctx),
+            top_hot_spots,
+            //_heat_map: heat_map_from_image(artwork, "heatmap", ctx),
         }
     }
 }
@@ -69,7 +79,7 @@ impl ArtStorage {
         );
 
         Self {
-            art_dependent_data_0: Some(ArtworkDependentData::new(ctx, &artwork_0)),
+            art_dependent_data_0: None,
             art_dependent_data_1: None,
             art_dependent_data_2: None,
             artwork_0,
