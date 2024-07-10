@@ -30,7 +30,8 @@ pub struct TShirtCheckerApp {
     tshirt_storage: TShirtStorage,
     tshirt_selected_for: TShirtColors,
     report_templates: ReportTemplates,
-    image_loader: Option<std::sync::mpsc::Receiver<Result<ImageLoad, String>>>,
+    receiver: std::sync::mpsc::Receiver<Result<ImageLoad, String>>,
+    sender: std::sync::mpsc::Sender<Result<ImageLoad, String>>,
     selected_tool: ToolSelection,
 }
 
@@ -94,10 +95,9 @@ impl TShirtCheckerApp {
     }
 
     fn do_load(&mut self, ctx: &egui::Context) {
-        let (sender, receiver) = std::sync::mpsc::channel::<Result<ImageLoad, String>>();
         let art_slot = self.selected_art;
-        self.image_loader = Some(receiver);
         let thread_ctx = ctx.clone();
+        let thread_sender = self.sender.clone();
         // Execute in another thread
         app_execute(async move {
             let file = rfd::AsyncFileDialog::new().pick_file().await;
@@ -113,7 +113,7 @@ impl TShirtCheckerApp {
                 })
             };
 
-            sender.send(image()).unwrap();
+            thread_sender.send(image()).unwrap();
             thread_ctx.request_repaint();
         });
     }
@@ -546,6 +546,7 @@ impl TShirtCheckerApp {
 
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        let (sender, receiver) = std::sync::mpsc::channel::<Result<ImageLoad, String>>();
         Self {
             art_storage: ArtStorage::new(&cc.egui_ctx),
             selected_art: Artwork::Artwork0,
@@ -556,8 +557,9 @@ impl TShirtCheckerApp {
             icons: IconStorage::new(&cc.egui_ctx),
             tshirt_selected_for: TShirtColors::Red,
             report_templates: ReportTemplates::new(),
-            image_loader: None,
             selected_tool: ToolSelection::new(),
+            receiver,
+            sender,
         }
     }
 }
@@ -571,21 +573,17 @@ impl eframe::App for TShirtCheckerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let mut new_events: AppEvents = Default::default();
         self.footer_debug_0 = format!("time {}", self.selected_tool.time_since_selection());
-        if self.image_loader.is_some() {
-            let rcv = self.image_loader.as_ref().unwrap();
-            let data_attempt = rcv.try_recv();
-            if data_attempt.is_ok() {
-                let loaded_result = data_attempt.unwrap();
-                match loaded_result {
-                    Err(e) => {
-                        self.footer_debug_1 = format!("Error: {}", e);
-                    }
-                    Ok(f) => {
-                        self.art_storage
-                            .set_art(f.artwork, f.image, f.dependent_data);
-                    }
+        let data_attempt = self.receiver.try_recv();
+        if data_attempt.is_ok() {
+            let loaded_result = data_attempt.unwrap();
+            match loaded_result {
+                Err(e) => {
+                    self.footer_debug_1 = format!("Error: {}", e);
                 }
-                self.image_loader = None;
+                Ok(f) => {
+                    self.art_storage
+                        .set_art(f.artwork, f.image, f.dependent_data);
+                }
             }
         }
         self.do_bottom_panel(ctx);
