@@ -36,23 +36,15 @@ pub struct TShirtCheckerApp {
 }
 
 pub type AppEvent = Box<dyn Fn(&mut TShirtCheckerApp)>;
-pub type HeavyAppEvent = Box<dyn Fn()>;
 
 #[derive(Default)]
 pub struct AppEvents {
     events: Vec<AppEvent>,
-    hevents: Vec<HeavyAppEvent>,
 }
 
 impl std::ops::AddAssign<AppEvent> for &mut AppEvents {
     fn add_assign(&mut self, rhs: AppEvent) {
         self.events.push(rhs);
-    }
-}
-
-impl AppEvents {
-    fn add_heavy_task(&mut self, rhs: HeavyAppEvent) {
-        self.hevents.push(rhs);
     }
 }
 
@@ -97,9 +89,11 @@ impl TShirtCheckerApp {
     fn do_load(
         ctx: &egui::Context,
         art_slot: Artwork,
-        thread_sender: std::sync::mpsc::Sender<Result<ImageLoad, String>>,
+        sender: &std::sync::mpsc::Sender<Result<ImageLoad, String>>,
     ) {
         let thread_ctx = ctx.clone();
+        let thread_sender = sender.clone();
+
         // Execute in another thread
         app_execute(async move {
             let file = rfd::AsyncFileDialog::new().pick_file().await;
@@ -124,11 +118,13 @@ impl TShirtCheckerApp {
         ctx: &egui::Context,
         art: &LoadedImage,
         art_id: Artwork,
-        thread_sender: std::sync::mpsc::Sender<Result<ImageLoad, String>>,
+        sender: &std::sync::mpsc::Sender<Result<ImageLoad, String>>,
     ) {
         // Execute in another thread
         let thread_art = art.clone();
         let thread_ctx = ctx.clone();
+        let thread_sender = sender.clone();
+
         app_execute(async move {
             let fixed_art = load_image_from_existing_image(
                 &thread_art,
@@ -154,10 +150,11 @@ impl TShirtCheckerApp {
         ctx: &egui::Context,
         art: &LoadedImage,
         art_id: Artwork,
-        thread_sender: std::sync::mpsc::Sender<Result<ImageLoad, String>>,
+        sender: &std::sync::mpsc::Sender<Result<ImageLoad, String>>,
     ) {
         let thread_art = art.clone();
         let thread_ctx = ctx.clone();
+        let thread_sender = sender.clone();
 
         app_execute(async move {
             let dependent_data = ArtworkDependentData::new(&thread_ctx, &thread_art);
@@ -416,18 +413,12 @@ impl TShirtCheckerApp {
             .clicked()
         {
             if self.art_storage.get_dependent_data(artwork).is_none() {
-                let selected_art = artwork;
-                let thread_ctx = ctx.clone();
-                let thread_sender = self.sender.clone();
-                let thread_art = self.art_storage.get_art(selected_art).clone();
-                new_events.add_heavy_task(Box::new(move || {
-                    Self::cache_in_dependent_data(
-                        &thread_ctx,
-                        &thread_art,
-                        selected_art,
-                        thread_sender.clone(),
-                    );
-                }));
+                Self::cache_in_dependent_data(
+                    ctx,
+                    self.art_storage.get_art(artwork),
+                    artwork,
+                    &self.sender,
+                );
             }
             new_events += Box::new(move |app: &mut Self| {
                 app.selected_art = artwork;
@@ -552,28 +543,17 @@ impl TShirtCheckerApp {
         Self::panel_separator(ui);
     }
 
-    fn import_button(&self, new_events: &mut AppEvents, ui: &mut egui::Ui, ctx: &egui::Context) {
+    fn import_button(&self, ui: &mut egui::Ui, ctx: &egui::Context) {
         if ui
             .add(self.icons.button(Icon::Import, 80.0))
             .on_hover_text("Import an image to the selected artwork slot.")
             .clicked()
         {
-            let thread_ctx = ctx.clone();
-            let selected_art = self.selected_art;
-            let thread_sender = self.sender.clone();
-            new_events.add_heavy_task(Box::new(move || {
-                // TODO, why do I need to clone thread_sender again?
-                Self::do_load(&thread_ctx, selected_art, thread_sender.clone());
-            }));
+            Self::do_load(ctx, self.selected_art, &self.sender);
         }
     }
 
-    fn partial_transparency_fix_button(
-        &self,
-        new_events: &mut AppEvents,
-        ui: &mut egui::Ui,
-        ctx: &egui::Context,
-    ) {
+    fn partial_transparency_fix_button(&self, ui: &mut egui::Ui, ctx: &egui::Context) {
         if ui
             .add(self.icons.button(Icon::FixPT, 80.0))
             .on_hover_text(
@@ -581,18 +561,12 @@ impl TShirtCheckerApp {
             )
             .clicked()
         {
-            let selected_art = self.selected_art;
-            let thread_ctx = ctx.clone();
-            let thread_sender = self.sender.clone();
-            let thread_art = self.art_storage.get_art(selected_art).clone();
-            new_events.add_heavy_task(Box::new(move || {
-                Self::partialt_fix(
-                    &thread_ctx,
-                    &thread_art,
-                    selected_art,
-                    thread_sender.clone(),
-                );
-            }));
+            Self::partialt_fix(
+                ctx,
+                self.art_storage.get_art(self.selected_art),
+                self.selected_art,
+                &self.sender,
+            );
         }
     }
 
@@ -608,8 +582,8 @@ impl TShirtCheckerApp {
                     self.artwork_selection_panel(new_events, ui, ctx);
 
                     ui.horizontal(|ui| {
-                        self.import_button(new_events, ui, ctx);
-                        self.partial_transparency_fix_button(new_events, ui, ctx);
+                        self.import_button(ui, ctx);
+                        self.partial_transparency_fix_button(ui, ctx);
                     });
                 })
             });
@@ -654,6 +628,7 @@ impl eframe::App for TShirtCheckerApp {
                 Ok(f) => {
                     self.art_storage
                         .set_art(f.artwork, f.image, f.dependent_data);
+                    self.selected_tool.reset();
                 }
             }
         }
@@ -663,9 +638,6 @@ impl eframe::App for TShirtCheckerApp {
 
         for closure in new_events.events.iter() {
             closure(self);
-        }
-        for heavy_closure in new_events.hevents.iter() {
-            heavy_closure();
         }
 
         if self
