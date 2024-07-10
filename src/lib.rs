@@ -12,6 +12,7 @@ mod report_templates;
 mod tshirt_storage;
 pub use tshirt_storage::TShirtStorage;
 mod artwork;
+mod async_tasks;
 mod icons;
 mod math;
 mod movement_state;
