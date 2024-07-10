@@ -118,8 +118,8 @@ impl TShirtCheckerApp {
         });
     }
 
-    fn partialt_fix(&mut self, ctx: &egui::Context) {
-        let art = self.get_selected_art();
+    fn partialt_fix(art_storage: &mut ArtStorage, ctx: &egui::Context, art_id: Artwork) {
+        let art = art_storage.get_art(art_id);
         let fixed_art = load_image_from_existing_image(
             art,
             |p| {
@@ -130,8 +130,7 @@ impl TShirtCheckerApp {
             ctx,
         );
         let dependent_data = ArtworkDependentData::new(ctx, &fixed_art);
-        self.art_storage
-            .set_art(self.selected_art, fixed_art, dependent_data);
+        art_storage.set_art(art_id, fixed_art, dependent_data);
     }
 
     fn construct_viewport(&self, display_size: egui::Vec2) -> ViewPort {
@@ -519,8 +518,9 @@ impl TShirtCheckerApp {
             )
             .clicked()
         {
+            let selected_art = self.selected_art;
             new_events.add_heavy_task(Box::new(move |app: &mut Self, ctx: &egui::Context| {
-                app.partialt_fix(ctx);
+                Self::partialt_fix(&mut (app.art_storage), ctx, selected_art);
             }));
         }
     }
