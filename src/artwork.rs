@@ -13,6 +13,7 @@ pub struct ArtworkDependentData {
     pub opaque_percent: u32,
     pub fixed_artwork: LoadedImage,
     pub flagged_artwork: LoadedImage,
+    pub thin_lines: LoadedImage,
     //_heat_map: LoadedImage,
     pub top_hot_spots: Vec<HotSpot>,
 }
@@ -43,6 +44,8 @@ impl ArtworkDependentData {
         async_std::task::sleep(one_milli).await;
         let top_hot_spots = hot_spots_from_heat_map(&heat_map);
         async_std::task::sleep(one_milli).await;
+        let thin_lines = flag_thin_lines(artwork, ctx);
+        async_std::task::sleep(one_milli).await;
 
         Self {
             partial_transparency_percent,
@@ -50,6 +53,7 @@ impl ArtworkDependentData {
             fixed_artwork: default_fixed_art,
             flagged_artwork: default_flagged_art,
             top_hot_spots,
+            thin_lines,
             //_heat_map: heat_map_from_image(artwork, "heatmap", ctx),
         }
     }

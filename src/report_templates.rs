@@ -18,6 +18,7 @@ pub enum ReportTypes {
     PartialTransparency,
     Bib,
     AreaUsed,
+    ThinLines,
 }
 
 pub struct ReportTemplate {
@@ -85,6 +86,16 @@ fn opaque_to_status(opaque_area: Option<u32>) -> ReportStatus {
     }
 }
 
+fn thin_line_to_status(opaque_area: Option<u32>) -> ReportStatus {
+    match opaque_area {
+        None => ReportStatus::Unknown,
+        Some(n) => match n {
+            0 => ReportStatus::Pass,
+            _ => ReportStatus::Fail,
+        },
+    }
+}
+
 fn compute_area_used(
     art: &LoadedImage,
     _art_dependent_data: Option<&ArtworkDependentData>,
@@ -114,11 +125,19 @@ fn compute_badtransparency_pixels(
     Some(art_dependent_data.partial_transparency_percent)
 }
 
+fn compute_thin_line(
+    _art: &LoadedImage,
+    _art_dependent_data: Option<&ArtworkDependentData>,
+) -> Option<u32> {
+    Some(1_u32)
+}
+
 pub struct ReportTemplates {
     area_used_report: ReportTemplate,
     transparency_report: ReportTemplate,
     opaque_report: ReportTemplate,
     dpi_report: ReportTemplate,
+    thin_lines_report: ReportTemplate,
 }
 
 impl ReportTemplates {
@@ -155,11 +174,20 @@ impl ReportTemplates {
             metric_to_status: opaque_to_status,
             generate_metric: compute_bib_score,
         };
+        let thin_lines_report = ReportTemplate {
+            label: "Thin Lines".to_string(),
+            report_tip: "The T-Shirt shouldn't have thin lines or small splotches of non-opaque artwork.  The concern is that the art won't survive the laundry".to_string(),
+            tool_tip: "Shows problem areas in the artwork.".to_string(),
+            display_percent: true,
+            metric_to_status: thin_line_to_status,
+            generate_metric: compute_thin_line,
+        };
         Self {
             area_used_report,
             dpi_report,
             opaque_report,
             transparency_report,
+            thin_lines_report,
         }
     }
 
@@ -169,6 +197,7 @@ impl ReportTemplates {
             ReportTypes::AreaUsed => &self.area_used_report,
             ReportTypes::PartialTransparency => &self.transparency_report,
             ReportTypes::Bib => &self.opaque_report,
+            ReportTypes::ThinLines => &self.thin_lines_report,
         }
     }
 }

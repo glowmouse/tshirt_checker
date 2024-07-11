@@ -1,4 +1,5 @@
 use crate::artwork::*;
+use crate::image_utils::*;
 use crate::loaded_image::*;
 
 pub struct ImageLoad {
@@ -68,11 +69,8 @@ pub fn partialt_fix(
     app_execute(async move {
         let fixed_art = load_image_from_existing_image(
             &thread_art,
-            |p| {
-                let new_alpha: u8 = if p.a() < 25 { 0 } else { 255 };
-                egui::Color32::from_rgba_premultiplied(p.r(), p.g(), p.b(), new_alpha)
-            },
-            "fixed_art", // todo, better name...
+            correct_alpha_for_tshirt,
+            "blah_blah_fixed_art", // todo, better name...
             &thread_ctx,
         );
         let dependent_data = ArtworkDependentData::new(&thread_ctx, &fixed_art).await;

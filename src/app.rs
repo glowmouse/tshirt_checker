@@ -179,6 +179,15 @@ impl TShirtCheckerApp {
                 .get_dependent_data(self.selected_art)
                 .unwrap();
             dependent_data.fixed_artwork.id()
+        } else if self.selected_tool.is_active(ReportTypes::ThinLines) {
+            let dependent_data = self
+                .art_storage
+                .get_dependent_data(self.selected_art)
+                .unwrap();
+            match cycle {
+                0 => dependent_data.thin_lines.id(),
+                _ => dependent_data.fixed_artwork.id(),
+            }
         } else {
             self.get_selected_art().id()
         };
@@ -315,6 +324,7 @@ impl TShirtCheckerApp {
             }
             new_events += Box::new(move |app: &mut Self| {
                 app.selected_art = artwork;
+                app.selected_tool.reset();
             });
         }
     }
@@ -403,6 +413,7 @@ impl TShirtCheckerApp {
         self.report_metric(new_events, ui, ReportTypes::Dpi);
         self.report_metric(new_events, ui, ReportTypes::AreaUsed);
         self.report_metric(new_events, ui, ReportTypes::Bib);
+        self.report_metric(new_events, ui, ReportTypes::ThinLines);
         self.report_metric(new_events, ui, ReportTypes::PartialTransparency);
 
         Self::panel_separator(ui);
@@ -546,6 +557,7 @@ impl eframe::App for TShirtCheckerApp {
             .selected_tool
             .is_active(ReportTypes::PartialTransparency)
             || self.selected_tool.is_active(ReportTypes::AreaUsed)
+            || self.selected_tool.is_active(ReportTypes::ThinLines)
             || self.selected_tool.is_active(ReportTypes::Dpi)
         {
             let time_to_wait = self.selected_tool.time_to_next_epoch();

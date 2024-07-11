@@ -102,6 +102,21 @@ pub fn load_image_from_existing_image(
     }
 }
 
+pub fn load_image_from_pixels(
+    pixels: Vec<egui::Color32>,
+    size: [usize; 2],
+    name: impl Into<String>,
+    ctx: &egui::Context,
+) -> LoadedImage {
+    let uncompressed_image = Arc::new(egui::ColorImage { size, pixels });
+    let texture: egui::TextureHandle =
+        ctx.load_texture(name, uncompressed_image.clone(), Default::default());
+    LoadedImage {
+        uncompressed_image,
+        texture,
+    }
+}
+
 pub fn heat_map_from_image(
     existing: &LoadedImage,
     name: impl Into<String>,

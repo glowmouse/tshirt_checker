@@ -73,8 +73,11 @@ pub fn blue_to_burg(input: &egui::Color32) -> egui::Color32 {
 }
 
 pub fn correct_alpha_for_tshirt(input: &egui::Color32) -> egui::Color32 {
-    let new_a = if input.a() == 0 { 0 } else { 255 };
-    egui::Color32::from_rgba_premultiplied(input.r(), input.g(), input.b(), new_a)
+    if input.a() < 25 {
+        egui::Color32::TRANSPARENT
+    } else {
+        egui::Color32::from_rgb(input.r(), input.g(), input.b())
+    }
 }
 
 pub fn flag_alpha_for_shirt(input: &egui::Color32) -> egui::Color32 {
@@ -179,3 +182,114 @@ pub fn hot_spots_from_heat_map(heat_map: &LoadedImage) -> Vec<HotSpot> {
     }
     chosen_hotspots
 }
+
+struct ThinLineState<'a, const N: usize> {
+    input: &'a Vec<egui::Color32>,
+    output: &'a mut Vec<egui::Color32>,
+    last_pixels: [usize; N],
+    ring_index: usize,
+    current_pixels: usize,
+    max_pixels: usize,
+}
+
+impl<'a, const N: usize> ThinLineState<'a, N> {
+    fn new(
+        input: &'a Vec<egui::Color32>,
+        output: &'a mut Vec<egui::Color32>,
+        max_pixels: usize,
+    ) -> Self {
+        Self {
+            input,
+            output,
+            last_pixels: [0; N],
+            current_pixels: 0,
+            ring_index: 0,
+            max_pixels,
+        }
+    }
+    pub fn transparent(&mut self) {
+        if self.current_pixels > 0 && self.current_pixels <= self.max_pixels {
+            for c in 0..self.current_pixels {
+                let index = self.last_pixels[(N - c + self.ring_index) % N];
+                let in_pixel = self.input[index];
+                self.output[index] = egui::Color32::from_rgba_premultiplied(
+                    255 - in_pixel.r(),
+                    255 - in_pixel.g(),
+                    255 - in_pixel.b(),
+                    255,
+                );
+            }
+        }
+        self.current_pixels = 0;
+    }
+
+    fn opaque(&mut self) {
+        self.current_pixels += 1;
+    }
+
+    fn pixel(&mut self, index: usize) {
+        let transparent = self.input[index].a() == 0;
+        if !transparent {
+            self.opaque();
+        }
+        if transparent {
+            self.transparent();
+        }
+        self.ring_index = (self.ring_index + 1) % N;
+        self.last_pixels[self.ring_index] = index;
+    }
+}
+
+fn thin_line_detect(output: &mut Vec<egui::Color32>, input: &Vec<egui::Color32>, size: [usize; 2]) {
+    let xdim = size[0];
+    let ydim = size[1];
+    let mut thin_line_state: ThinLineState<'_, 128> = ThinLineState::new(input, output, 4);
+
+    for x in 0..xdim {
+        for y in 0..ydim {
+            thin_line_state.pixel(x + y * xdim);
+        }
+        thin_line_state.transparent();
+    }
+    //for y in 0..ydim {
+    //    for x in 0..xdim {
+    //        thin_line_state.pixel( x + y * xdim );
+    //    }
+    //    thin_line_state.transparent();
+    //}
+}
+
+pub fn flag_thin_lines(input: &LoadedImage, ctx: &egui::Context) -> LoadedImage {
+    let mut output = input.pixels().clone();
+    thin_line_detect(&mut output, input.pixels(), *input.size_as_array());
+    return load_image_from_pixels(output, *input.size_as_array(), "thin_lines", ctx);
+}
+
+/*
+pub fn thin_line_detect(output: &mut egui::ColorImage, input: &Vec<egui::Color32>, xd: u32, yd: u32 )
+{
+    thin_line_state: ThinLineState<'a, 16> = ThinLineState::new(
+        &output.pixels, input, 5 );
+
+    let xdim = output.size[0];
+    let ydim = output.size[1];
+
+    let x_dominant = xd >= yd;
+    let ratio = if x_dominant { (yd << 8) / xd } else { (xd << 8 ) / yd }
+
+    let sweep_x = yd != 0;
+    let sweep_y = xd != 0;
+
+    if sweep_x {
+        for xstart in 0..xdim {
+            if x_dominant {
+                let mut y_fixp = 0;
+                let mut y_index = 0;
+                for x : xstart..xdim {
+
+                }
+            }
+        }
+    }
+}
+*/
