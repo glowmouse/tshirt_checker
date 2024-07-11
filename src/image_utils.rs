@@ -190,10 +190,16 @@ struct ThinLineState<'a, const N: usize> {
     ring_index: usize,
     current_pixels: usize,
     max_pixels: usize,
+    xdim: i32,
 }
 
 impl<'a, const N: usize> ThinLineState<'a, N> {
-    fn new(input: &'a Vec<egui::Color32>, output: &'a mut Vec<u32>, max_pixels: usize) -> Self {
+    fn new(
+        input: &'a Vec<egui::Color32>,
+        output: &'a mut Vec<u32>,
+        max_pixels: usize,
+        xdim: i32,
+    ) -> Self {
         Self {
             input,
             output,
@@ -201,6 +207,7 @@ impl<'a, const N: usize> ThinLineState<'a, N> {
             current_pixels: 0,
             ring_index: 0,
             max_pixels,
+            xdim,
         }
     }
     #[inline(always)]
@@ -220,7 +227,8 @@ impl<'a, const N: usize> ThinLineState<'a, N> {
     }
 
     #[inline(always)]
-    fn pixel(&mut self, index: i32) {
+    fn pixel(&mut self, x: i32, y: i32) {
+        let index = x + y * self.xdim;
         let transparent = self.input[index as usize].a() == 0;
         if !transparent {
             self.opaque();
@@ -238,7 +246,7 @@ const RBS: usize = 32;
 fn thin_line_vertical(thin_line_state: &mut ThinLineState<'_, RBS>, xdim: i32, ydim: i32) {
     for x in 0..xdim {
         for y in 0..ydim {
-            thin_line_state.pixel(x + y * xdim);
+            thin_line_state.pixel(x, y);
         }
         thin_line_state.transparent();
     }
@@ -247,7 +255,7 @@ fn thin_line_vertical(thin_line_state: &mut ThinLineState<'_, RBS>, xdim: i32, y
 fn thin_line_horizontal(thin_line_state: &mut ThinLineState<'_, RBS>, xdim: i32, ydim: i32) {
     for y in 0..ydim {
         for x in 0..xdim {
-            thin_line_state.pixel(x + y * xdim);
+            thin_line_state.pixel(x, y);
         }
         thin_line_state.transparent();
     }
@@ -272,7 +280,7 @@ fn thin_line_diag_execute<const DX: i32, const DY: i32>(
         if x == xend || y == yend {
             break;
         }
-        thin_line_state.pixel(x + y * xdim);
+        thin_line_state.pixel(x, y);
         xfixed += DX;
         yfixed += DY;
     }
@@ -302,7 +310,7 @@ fn thin_line_detect(input: &Vec<egui::Color32>, size: [usize; 2]) -> Vec<egui::C
     let mut output: Vec<u32> = vec![0; input.len()];
 
     let mut thin_line_state: ThinLineState<'_, RBS> =
-        ThinLineState::new(input, &mut output, min_pixels);
+        ThinLineState::new(input, &mut output, min_pixels, xdim);
 
     thin_line_vertical(&mut thin_line_state, xdim, ydim);
     thin_line_horizontal(&mut thin_line_state, xdim, ydim);
