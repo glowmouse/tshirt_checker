@@ -56,7 +56,18 @@ pub fn load_image_from_untrusted_source(
     name: impl Into<String>,
     ctx: &egui::Context,
 ) -> Result<LoadedImage, String> {
-    let uncompressed_image = Arc::new(egui_extras::image::load_image_bytes(bytes)?);
+    // 3300 = 11 inches x 300 DPI
+    let maybe_svg =
+        egui_extras::image::load_svg_bytes_with_size(bytes, Some(egui::SizeHint::Width(3300)));
+    let raw_uncompressed_image = {
+        if maybe_svg.is_ok() {
+            // TODO, if it's an SVG, fix partial transparency
+            maybe_svg
+        } else {
+            egui_extras::image::load_image_bytes(bytes)
+        }
+    };
+    let uncompressed_image = Arc::new(raw_uncompressed_image?);
     let texture: egui::TextureHandle =
         ctx.load_texture(name, uncompressed_image.clone(), Default::default());
     Ok(LoadedImage {

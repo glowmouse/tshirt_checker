@@ -68,16 +68,10 @@ impl ArtStorage {
     pub fn new(ctx: &egui::Context) -> Self {
         let artwork_0: LoadedImage =
             load_image_from_trusted_source(include_bytes!("test_artwork.png"), "artwork_0", ctx);
-        let artwork_1: LoadedImage = load_image_from_trusted_source(
-            include_bytes!("sf2024-attendee-v1.png"),
-            "artwork_1",
-            ctx,
-        );
-        let artwork_2: LoadedImage = load_image_from_trusted_source(
-            include_bytes!("sf2024-attendee-v2.png"),
-            "artwork_2",
-            ctx,
-        );
+        let artwork_1: LoadedImage =
+            load_image_from_trusted_source(include_bytes!("ferris.svg"), "artwork_1", ctx);
+        let artwork_2: LoadedImage =
+            load_image_from_trusted_source(include_bytes!("rust_crab.svg"), "artwork_2", ctx);
 
         Self {
             art_dependent_data_0: None,
