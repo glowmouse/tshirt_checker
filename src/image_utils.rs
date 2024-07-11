@@ -73,7 +73,7 @@ pub fn blue_to_burg(input: &egui::Color32) -> egui::Color32 {
 }
 
 pub fn correct_alpha_for_tshirt(input: &egui::Color32) -> egui::Color32 {
-    if input.a() < 25 {
+    if input.a() < 255 {
         egui::Color32::TRANSPARENT
     } else {
         egui::Color32::from_rgb(input.r(), input.g(), input.b())
@@ -207,6 +207,7 @@ impl<'a, const N: usize> ThinLineState<'a, N> {
             max_pixels,
         }
     }
+    #[inline(always)]
     pub fn transparent(&mut self) {
         if self.current_pixels > 0 && self.current_pixels <= self.max_pixels {
             for c in 0..self.current_pixels {
@@ -223,10 +224,12 @@ impl<'a, const N: usize> ThinLineState<'a, N> {
         self.current_pixels = 0;
     }
 
+    #[inline(always)]
     fn opaque(&mut self) {
         self.current_pixels += 1;
     }
 
+    #[inline(always)]
     fn pixel(&mut self, index: usize) {
         let transparent = self.input[index].a() == 0;
         if !transparent {
@@ -240,10 +243,16 @@ impl<'a, const N: usize> ThinLineState<'a, N> {
     }
 }
 
-fn thin_line_detect(output: &mut Vec<egui::Color32>, input: &Vec<egui::Color32>, size: [usize; 2]) {
-    let xdim = size[0];
-    let ydim = size[1];
-    let mut thin_line_state: ThinLineState<'_, 128> = ThinLineState::new(input, output, 4);
+const RBS: usize = 32;
+
+fn thin_line_vertical(
+    output: &mut Vec<egui::Color32>,
+    input: &Vec<egui::Color32>,
+    xdim: usize,
+    ydim: usize,
+    min_pixels: usize,
+) {
+    let mut thin_line_state: ThinLineState<'_, RBS> = ThinLineState::new(input, output, min_pixels);
 
     for x in 0..xdim {
         for y in 0..ydim {
@@ -251,12 +260,120 @@ fn thin_line_detect(output: &mut Vec<egui::Color32>, input: &Vec<egui::Color32>,
         }
         thin_line_state.transparent();
     }
-    //for y in 0..ydim {
-    //    for x in 0..xdim {
-    //        thin_line_state.pixel( x + y * xdim );
-    //    }
-    //    thin_line_state.transparent();
-    //}
+}
+
+fn thin_line_horizontal(
+    output: &mut Vec<egui::Color32>,
+    input: &Vec<egui::Color32>,
+    xdim: usize,
+    ydim: usize,
+    min_pixels: usize,
+) {
+    let mut thin_line_state: ThinLineState<'_, RBS> = ThinLineState::new(input, output, min_pixels);
+    for y in 0..ydim {
+        for x in 0..xdim {
+            thin_line_state.pixel(x + y * xdim);
+        }
+        thin_line_state.transparent();
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn thin_line_diag_vdominant_execute(
+    output: &mut Vec<egui::Color32>,
+    input: &Vec<egui::Color32>,
+    xdim: usize,
+    ydim: usize,
+    min_pixels: usize,
+    vdelta: u32,
+    xin: usize,
+    yin: usize,
+) {
+    let mut x = xin;
+    let mut y = yin;
+    let mut thin_line_state: ThinLineState<'_, RBS> = ThinLineState::new(input, output, min_pixels);
+    let mut fraction = vdelta / 2;
+
+    while x != xdim && y != ydim {
+        thin_line_state.pixel(x + y * xdim);
+        y += 1;
+        fraction += vdelta;
+        if fraction >= 256 {
+            fraction -= 256;
+            x += 1;
+        }
+    }
+}
+
+fn thin_line_diag_vdominant(
+    output: &mut Vec<egui::Color32>,
+    input: &Vec<egui::Color32>,
+    xdim: usize,
+    ydim: usize,
+    min_pixels: usize,
+    vdelta: u32,
+) {
+    for y in 0..ydim {
+        thin_line_diag_vdominant_execute(output, input, xdim, ydim, min_pixels, vdelta, 0, y);
+    }
+    for x in 0..xdim {
+        thin_line_diag_vdominant_execute(output, input, xdim, ydim, min_pixels, vdelta, x, 0);
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn thin_line_diag_hdominant_execute(
+    output: &mut Vec<egui::Color32>,
+    input: &Vec<egui::Color32>,
+    xdim: usize,
+    ydim: usize,
+    min_pixels: usize,
+    vdelta: u32,
+    xin: usize,
+    yin: usize,
+) {
+    let mut x = xin;
+    let mut y = yin;
+    let mut thin_line_state: ThinLineState<'_, RBS> = ThinLineState::new(input, output, min_pixels);
+    let mut fraction = vdelta / 2;
+
+    while x != xdim && y != ydim {
+        thin_line_state.pixel(x + y * xdim);
+        x += 1;
+        fraction += vdelta;
+        if fraction >= 256 {
+            fraction -= 256;
+            y += 1;
+        }
+    }
+}
+
+fn thin_line_diag_hdominant(
+    output: &mut Vec<egui::Color32>,
+    input: &Vec<egui::Color32>,
+    xdim: usize,
+    ydim: usize,
+    min_pixels: usize,
+    vdelta: u32,
+) {
+    for y in 0..ydim {
+        thin_line_diag_hdominant_execute(output, input, xdim, ydim, min_pixels, vdelta, 0, y);
+    }
+    for x in 0..xdim {
+        thin_line_diag_hdominant_execute(output, input, xdim, ydim, min_pixels, vdelta, x, 0);
+    }
+}
+
+fn thin_line_detect(output: &mut Vec<egui::Color32>, input: &Vec<egui::Color32>, size: [usize; 2]) {
+    let xdim = size[0];
+    let ydim = size[1];
+    let min_pixels = 4;
+
+    thin_line_vertical(output, input, xdim, ydim, min_pixels);
+    thin_line_horizontal(output, input, xdim, ydim, min_pixels);
+    thin_line_diag_hdominant(output, input, xdim, ydim, min_pixels, 256);
+    thin_line_diag_hdominant(output, input, xdim, ydim, min_pixels, 128);
+    thin_line_diag_vdominant(output, input, xdim, ydim, min_pixels, 128);
 }
 
 pub fn flag_thin_lines(input: &LoadedImage, ctx: &egui::Context) -> LoadedImage {
@@ -265,31 +382,24 @@ pub fn flag_thin_lines(input: &LoadedImage, ctx: &egui::Context) -> LoadedImage 
     return load_image_from_pixels(output, *input.size_as_array(), "thin_lines", ctx);
 }
 
-/*
-pub fn thin_line_detect(output: &mut egui::ColorImage, input: &Vec<egui::Color32>, xd: u32, yd: u32 )
-{
-    thin_line_state: ThinLineState<'a, 16> = ThinLineState::new(
-        &output.pixels, input, 5 );
+pub fn count_diffs(in0: &LoadedImage, in1: &LoadedImage) -> usize {
+    let in0_pixels = in0.pixels();
+    let in1_pixels = in1.pixels();
 
-    let xdim = output.size[0];
-    let ydim = output.size[1];
+    in0_pixels
+        .iter()
+        .zip(in1_pixels)
+        .filter(|&(a, b)| a == b)
+        .count()
+}
 
-    let x_dominant = xd >= yd;
-    let ratio = if x_dominant { (yd << 8) / xd } else { (xd << 8 ) / yd }
-
-    let sweep_x = yd != 0;
-    let sweep_y = xd != 0;
-
-    if sweep_x {
-        for xstart in 0..xdim {
-            if x_dominant {
-                let mut y_fixp = 0;
-                let mut y_index = 0;
-                for x : xstart..xdim {
-
-                }
-            }
-        }
+pub fn compute_percent_diff(in0: &LoadedImage, in1: &LoadedImage) -> u32 {
+    let thin_line_pixels: u32 = count_diffs(in0, in1).try_into().unwrap();
+    let total_pixels: u32 = (in0.size()[0] * in0.size()[1]) as u32;
+    let percent_thin_line: u32 = thin_line_pixels / total_pixels;
+    if percent_thin_line == 0 && total_pixels != 0 {
+        1
+    } else {
+        percent_thin_line
     }
 }
-*/

@@ -11,6 +11,7 @@ pub enum Artwork {
 pub struct ArtworkDependentData {
     pub partial_transparency_percent: u32,
     pub opaque_percent: u32,
+    pub thin_line_percent: u32,
     pub fixed_artwork: LoadedImage,
     pub flagged_artwork: LoadedImage,
     pub thin_lines: LoadedImage,
@@ -46,6 +47,8 @@ impl ArtworkDependentData {
         async_std::task::sleep(one_milli).await;
         let thin_lines = flag_thin_lines(artwork, ctx);
         async_std::task::sleep(one_milli).await;
+        let thin_line_percent = compute_percent_diff(&thin_lines, artwork);
+        async_std::task::sleep(one_milli).await;
 
         Self {
             partial_transparency_percent,
@@ -54,6 +57,7 @@ impl ArtworkDependentData {
             flagged_artwork: default_flagged_art,
             top_hot_spots,
             thin_lines,
+            thin_line_percent,
             //_heat_map: heat_map_from_image(artwork, "heatmap", ctx),
         }
     }
@@ -71,7 +75,8 @@ pub struct ArtStorage {
 impl ArtStorage {
     pub fn new(ctx: &egui::Context) -> Self {
         let artwork_0: LoadedImage =
-            load_image_from_trusted_source(include_bytes!("test_artwork.png"), "artwork_0", ctx);
+            //load_image_from_trusted_source(include_bytes!("test_artwork.png"), "artwork_0", ctx);
+            load_image_from_trusted_source(include_bytes!("ptfix1.png"), "artwork_0", ctx);
         let artwork_1: LoadedImage =
             load_image_from_trusted_source(include_bytes!("ferris.svg"), "artwork_1", ctx);
         let artwork_2: LoadedImage =

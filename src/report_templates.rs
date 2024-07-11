@@ -127,9 +127,10 @@ fn compute_badtransparency_pixels(
 
 fn compute_thin_line(
     _art: &LoadedImage,
-    _art_dependent_data: Option<&ArtworkDependentData>,
+    optional_art_dependent_data: Option<&ArtworkDependentData>,
 ) -> Option<u32> {
-    Some(1_u32)
+    let art_dependent_data = optional_art_dependent_data?;
+    Some(art_dependent_data.thin_line_percent)
 }
 
 pub struct ReportTemplates {
