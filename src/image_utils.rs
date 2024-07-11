@@ -302,10 +302,13 @@ fn thin_line_diag<const DX: i32, const DY: i32>(
     }
 }
 
-fn thin_line_detect(input: &Vec<egui::Color32>, size: [usize; 2]) -> Vec<egui::Color32> {
+fn thin_line_detect(
+    input: &Vec<egui::Color32>,
+    size: [usize; 2],
+    min_pixels: usize,
+) -> Vec<egui::Color32> {
     let xdim = size[0] as i32;
     let ydim = size[1] as i32;
-    let min_pixels = 4;
 
     let mut output: Vec<u32> = vec![0; input.len()];
 
@@ -334,8 +337,8 @@ fn thin_line_detect(input: &Vec<egui::Color32>, size: [usize; 2]) -> Vec<egui::C
         .collect()
 }
 
-pub fn flag_thin_lines(input: &LoadedImage, ctx: &egui::Context) -> LoadedImage {
-    let output = thin_line_detect(input.pixels(), *input.size_as_array());
+pub fn flag_thin_lines(input: &LoadedImage, ctx: &egui::Context, min_pixels: usize) -> LoadedImage {
+    let output = thin_line_detect(input.pixels(), *input.size_as_array(), min_pixels);
     return load_image_from_pixels(output, *input.size_as_array(), "thin_lines", ctx);
 }
 

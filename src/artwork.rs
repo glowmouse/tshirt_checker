@@ -1,5 +1,7 @@
 use crate::image_utils::*;
 use crate::loaded_image::*;
+use crate::math::*;
+use nalgebra::dvector;
 
 #[derive(PartialEq, Copy, Clone)]
 pub enum Artwork {
@@ -45,7 +47,16 @@ impl ArtworkDependentData {
         async_std::task::sleep(one_milli).await;
         let top_hot_spots = hot_spots_from_heat_map(&heat_map);
         async_std::task::sleep(one_milli).await;
-        let thin_lines = flag_thin_lines(artwork, ctx);
+
+        // Cut and paste from report_templates.rs, should refactor.
+        let top_corner = art_to_art_space(artwork.size()) * dvector![0.0, 0.0, 1.0];
+        let bot_corner = art_to_art_space(artwork.size()) * dvector![1.0, 1.0, 1.0];
+        let dim_in_inches = bot_corner - top_corner;
+        let dpi = artwork.size().x / dim_in_inches.x;
+        // going to say that 1/64 inches is too thin for now
+        let dots = (dpi * (1.0 / 64.0)).ceil() as usize;
+
+        let thin_lines = flag_thin_lines(artwork, ctx, dots);
         async_std::task::sleep(one_milli).await;
         let thin_line_percent = compute_percent_diff(&thin_lines, artwork);
         async_std::task::sleep(one_milli).await;
