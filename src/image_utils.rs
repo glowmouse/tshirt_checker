@@ -253,8 +253,7 @@ fn thin_line_horizontal(thin_line_state: &mut ThinLineState<'_, RBS>, xdim: usiz
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn thin_line_diag_vdominant_execute(
+fn thin_line_diag_execute<const HDOMINANT: bool>(
     thin_line_state: &mut ThinLineState<'_, RBS>,
     xdim: usize,
     ydim: usize,
@@ -262,72 +261,42 @@ fn thin_line_diag_vdominant_execute(
     xin: usize,
     yin: usize,
 ) {
-    let mut x = xin;
-    let mut y = yin;
     let mut fraction = vdelta / 2;
+    let mut secondary = if HDOMINANT { yin } else { xin };
+    let secondary_end = if HDOMINANT { ydim } else { xdim };
 
-    while x != xdim && y != ydim {
+    let start = if HDOMINANT { xin } else { yin };
+    let end = if HDOMINANT { xdim } else { ydim };
+
+    for dominant in start..end {
+        if secondary == secondary_end {
+            break;
+        }
+        let x = if HDOMINANT { dominant } else { secondary };
+        let y = if HDOMINANT { secondary } else { dominant };
         thin_line_state.pixel(x + y * xdim);
-        y += 1;
+
         fraction += vdelta;
-        if fraction >= 256 {
-            fraction -= 256;
-            x += 1;
+        if fraction > 256 {
+            fraction -= vdelta;
+            secondary += 1;
         }
     }
+
     thin_line_state.transparent();
 }
 
-fn thin_line_diag_vdominant(
+fn thin_line_diag<const HDOMINANT: bool>(
     thin_line_state: &mut ThinLineState<'_, RBS>,
     xdim: usize,
     ydim: usize,
     vdelta: u32,
 ) {
-    for y in 0..ydim {
-        thin_line_diag_vdominant_execute(thin_line_state, xdim, ydim, vdelta, 0, y);
+    for y in 1..ydim {
+        thin_line_diag_execute::<HDOMINANT>(thin_line_state, xdim, ydim, vdelta, 0, y);
     }
     for x in 0..xdim {
-        thin_line_diag_vdominant_execute(thin_line_state, xdim, ydim, vdelta, x, 0);
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-fn thin_line_diag_hdominant_execute(
-    thin_line_state: &mut ThinLineState<'_, RBS>,
-    xdim: usize,
-    ydim: usize,
-    vdelta: u32,
-    xin: usize,
-    yin: usize,
-) {
-    let mut x = xin;
-    let mut y = yin;
-    let mut fraction = vdelta / 2;
-
-    while x != xdim && y != ydim {
-        thin_line_state.pixel(x + y * xdim);
-        x += 1;
-        fraction += vdelta;
-        if fraction >= 256 {
-            fraction -= 256;
-            y += 1;
-        }
-    }
-    thin_line_state.transparent();
-}
-
-fn thin_line_diag_hdominant(
-    thin_line_state: &mut ThinLineState<'_, RBS>,
-    xdim: usize,
-    ydim: usize,
-    vdelta: u32,
-) {
-    for y in 0..ydim {
-        thin_line_diag_hdominant_execute(thin_line_state, xdim, ydim, vdelta, 0, y);
-    }
-    for x in 0..xdim {
-        thin_line_diag_hdominant_execute(thin_line_state, xdim, ydim, vdelta, x, 0);
+        thin_line_diag_execute::<HDOMINANT>(thin_line_state, xdim, ydim, vdelta, x, 0);
     }
 }
 
@@ -343,9 +312,9 @@ fn thin_line_detect(input: &Vec<egui::Color32>, size: [usize; 2]) -> Vec<egui::C
 
     thin_line_vertical(&mut thin_line_state, xdim, ydim);
     thin_line_horizontal(&mut thin_line_state, xdim, ydim);
-    thin_line_diag_hdominant(&mut thin_line_state, xdim, ydim, 256);
-    thin_line_diag_hdominant(&mut thin_line_state, xdim, ydim, 128);
-    thin_line_diag_vdominant(&mut thin_line_state, xdim, ydim, 128);
+    thin_line_diag::<true>(&mut thin_line_state, xdim, ydim, 256);
+    thin_line_diag::<true>(&mut thin_line_state, xdim, ydim, 128);
+    thin_line_diag::<false>(&mut thin_line_state, xdim, ydim, 128);
 
     input
         .iter()
