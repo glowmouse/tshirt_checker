@@ -302,6 +302,12 @@ fn thin_line_diag<const DX: i32, const DY: i32>(
     }
 }
 
+pub enum ThinLineCategory {
+    OpaqueOk,
+    OpaqueProblem,
+    Transparent,
+}
+
 fn thin_line_detect(
     input: &Vec<egui::Color32>,
     size: [usize; 2],
@@ -324,15 +330,29 @@ fn thin_line_detect(
     thin_line_diag::<128, 256>(&mut thin_line_state, xdim, ydim);
     thin_line_diag::<-128, 256>(&mut thin_line_state, xdim, ydim);
 
-    input
+    let thin_line_state: Vec<_> = input
         .iter()
         .zip(output)
         .map(|(a, b)| {
-            if b < 3 {
-                *a
+            if a.a() == 0 {
+                ThinLineCategory::Transparent
+            } else if b < 3 {
+                ThinLineCategory::OpaqueOk
             } else {
+                ThinLineCategory::OpaqueProblem
+            }
+        })
+        .collect();
+
+    input
+        .iter()
+        .zip(thin_line_state)
+        .map(|(a, b)| match b {
+            ThinLineCategory::OpaqueOk => *a,
+            ThinLineCategory::OpaqueProblem => {
                 egui::Color32::from_rgb(255 - a.r(), 255 - a.g(), 255 - a.b())
             }
+            ThinLineCategory::Transparent => *a,
         })
         .collect()
 }
