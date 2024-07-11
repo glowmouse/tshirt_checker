@@ -186,7 +186,7 @@ pub fn hot_spots_from_heat_map(heat_map: &LoadedImage) -> Vec<HotSpot> {
 struct ThinLineState<'a, const N: usize> {
     input: &'a Vec<egui::Color32>,
     output: &'a mut Vec<u32>,
-    last_pixels: [usize; N],
+    last_pixels: [i32; N],
     ring_index: usize,
     current_pixels: usize,
     max_pixels: usize,
@@ -208,7 +208,7 @@ impl<'a, const N: usize> ThinLineState<'a, N> {
         if self.current_pixels > 0 && self.current_pixels <= self.max_pixels {
             for c in 0..self.current_pixels {
                 let index = self.last_pixels[(N - c + self.ring_index) % N];
-                self.output[index] += 1
+                self.output[index as usize] += 1
             }
         }
         self.current_pixels = 0;
@@ -220,8 +220,8 @@ impl<'a, const N: usize> ThinLineState<'a, N> {
     }
 
     #[inline(always)]
-    fn pixel(&mut self, index: usize) {
-        let transparent = self.input[index].a() == 0;
+    fn pixel(&mut self, index: i32) {
+        let transparent = self.input[index as usize].a() == 0;
         if !transparent {
             self.opaque();
         }
@@ -235,7 +235,7 @@ impl<'a, const N: usize> ThinLineState<'a, N> {
 
 const RBS: usize = 32;
 
-fn thin_line_vertical(thin_line_state: &mut ThinLineState<'_, RBS>, xdim: usize, ydim: usize) {
+fn thin_line_vertical(thin_line_state: &mut ThinLineState<'_, RBS>, xdim: i32, ydim: i32) {
     for x in 0..xdim {
         for y in 0..ydim {
             thin_line_state.pixel(x + y * xdim);
@@ -244,7 +244,7 @@ fn thin_line_vertical(thin_line_state: &mut ThinLineState<'_, RBS>, xdim: usize,
     }
 }
 
-fn thin_line_horizontal(thin_line_state: &mut ThinLineState<'_, RBS>, xdim: usize, ydim: usize) {
+fn thin_line_horizontal(thin_line_state: &mut ThinLineState<'_, RBS>, xdim: i32, ydim: i32) {
     for y in 0..ydim {
         for x in 0..xdim {
             thin_line_state.pixel(x + y * xdim);
@@ -255,11 +255,11 @@ fn thin_line_horizontal(thin_line_state: &mut ThinLineState<'_, RBS>, xdim: usiz
 
 fn thin_line_diag_execute<const HDOMINANT: bool>(
     thin_line_state: &mut ThinLineState<'_, RBS>,
-    xdim: usize,
-    ydim: usize,
+    xdim: i32,
+    ydim: i32,
     vdelta: u32,
-    xin: usize,
-    yin: usize,
+    xin: i32,
+    yin: i32,
 ) {
     let mut fraction = vdelta / 2;
     let mut secondary = if HDOMINANT { yin } else { xin };
@@ -278,7 +278,7 @@ fn thin_line_diag_execute<const HDOMINANT: bool>(
 
         fraction += vdelta;
         if fraction > 256 {
-            fraction -= vdelta;
+            fraction -= 256;
             secondary += 1;
         }
     }
@@ -288,8 +288,8 @@ fn thin_line_diag_execute<const HDOMINANT: bool>(
 
 fn thin_line_diag<const HDOMINANT: bool>(
     thin_line_state: &mut ThinLineState<'_, RBS>,
-    xdim: usize,
-    ydim: usize,
+    xdim: i32,
+    ydim: i32,
     vdelta: u32,
 ) {
     for y in 1..ydim {
@@ -301,8 +301,8 @@ fn thin_line_diag<const HDOMINANT: bool>(
 }
 
 fn thin_line_detect(input: &Vec<egui::Color32>, size: [usize; 2]) -> Vec<egui::Color32> {
-    let xdim = size[0];
-    let ydim = size[1];
+    let xdim = size[0] as i32;
+    let ydim = size[1] as i32;
     let min_pixels = 4;
 
     let mut output: Vec<u32> = vec![0; input.len()];
