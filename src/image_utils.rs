@@ -185,7 +185,7 @@ pub fn hot_spots_from_heat_map(heat_map: &LoadedImage) -> Vec<HotSpot> {
 
 struct ThinLineState<'a, const N: usize> {
     input: &'a Vec<egui::Color32>,
-    output: &'a mut Vec<egui::Color32>,
+    output: &'a mut Vec<u32>,
     last_pixels: [usize; N],
     ring_index: usize,
     current_pixels: usize,
@@ -193,11 +193,7 @@ struct ThinLineState<'a, const N: usize> {
 }
 
 impl<'a, const N: usize> ThinLineState<'a, N> {
-    fn new(
-        input: &'a Vec<egui::Color32>,
-        output: &'a mut Vec<egui::Color32>,
-        max_pixels: usize,
-    ) -> Self {
+    fn new(input: &'a Vec<egui::Color32>, output: &'a mut Vec<u32>, max_pixels: usize) -> Self {
         Self {
             input,
             output,
@@ -212,13 +208,7 @@ impl<'a, const N: usize> ThinLineState<'a, N> {
         if self.current_pixels > 0 && self.current_pixels <= self.max_pixels {
             for c in 0..self.current_pixels {
                 let index = self.last_pixels[(N - c + self.ring_index) % N];
-                let in_pixel = self.input[index];
-                self.output[index] = egui::Color32::from_rgba_premultiplied(
-                    255 - in_pixel.r(),
-                    255 - in_pixel.g(),
-                    255 - in_pixel.b(),
-                    255,
-                );
+                self.output[index] += 1
             }
         }
         self.current_pixels = 0;
@@ -246,7 +236,7 @@ impl<'a, const N: usize> ThinLineState<'a, N> {
 const RBS: usize = 32;
 
 fn thin_line_vertical(
-    output: &mut Vec<egui::Color32>,
+    output: &mut Vec<u32>,
     input: &Vec<egui::Color32>,
     xdim: usize,
     ydim: usize,
@@ -263,7 +253,7 @@ fn thin_line_vertical(
 }
 
 fn thin_line_horizontal(
-    output: &mut Vec<egui::Color32>,
+    output: &mut Vec<u32>,
     input: &Vec<egui::Color32>,
     xdim: usize,
     ydim: usize,
@@ -280,7 +270,7 @@ fn thin_line_horizontal(
 
 #[allow(clippy::too_many_arguments)]
 fn thin_line_diag_vdominant_execute(
-    output: &mut Vec<egui::Color32>,
+    output: &mut Vec<u32>,
     input: &Vec<egui::Color32>,
     xdim: usize,
     ydim: usize,
@@ -306,7 +296,7 @@ fn thin_line_diag_vdominant_execute(
 }
 
 fn thin_line_diag_vdominant(
-    output: &mut Vec<egui::Color32>,
+    output: &mut Vec<u32>,
     input: &Vec<egui::Color32>,
     xdim: usize,
     ydim: usize,
@@ -323,7 +313,7 @@ fn thin_line_diag_vdominant(
 
 #[allow(clippy::too_many_arguments)]
 fn thin_line_diag_hdominant_execute(
-    output: &mut Vec<egui::Color32>,
+    output: &mut Vec<u32>,
     input: &Vec<egui::Color32>,
     xdim: usize,
     ydim: usize,
@@ -349,7 +339,7 @@ fn thin_line_diag_hdominant_execute(
 }
 
 fn thin_line_diag_hdominant(
-    output: &mut Vec<egui::Color32>,
+    output: &mut Vec<u32>,
     input: &Vec<egui::Color32>,
     xdim: usize,
     ydim: usize,
@@ -364,21 +354,34 @@ fn thin_line_diag_hdominant(
     }
 }
 
-fn thin_line_detect(output: &mut Vec<egui::Color32>, input: &Vec<egui::Color32>, size: [usize; 2]) {
+fn thin_line_detect(input: &Vec<egui::Color32>, size: [usize; 2]) -> Vec<egui::Color32> {
     let xdim = size[0];
     let ydim = size[1];
     let min_pixels = 4;
 
-    thin_line_vertical(output, input, xdim, ydim, min_pixels);
-    thin_line_horizontal(output, input, xdim, ydim, min_pixels);
-    thin_line_diag_hdominant(output, input, xdim, ydim, min_pixels, 256);
-    thin_line_diag_hdominant(output, input, xdim, ydim, min_pixels, 128);
-    thin_line_diag_vdominant(output, input, xdim, ydim, min_pixels, 128);
+    let mut output: Vec<u32> = vec![0; input.len()];
+
+    thin_line_vertical(&mut output, input, xdim, ydim, min_pixels);
+    thin_line_horizontal(&mut output, input, xdim, ydim, min_pixels);
+    thin_line_diag_hdominant(&mut output, input, xdim, ydim, min_pixels, 256);
+    thin_line_diag_hdominant(&mut output, input, xdim, ydim, min_pixels, 128);
+    thin_line_diag_vdominant(&mut output, input, xdim, ydim, min_pixels, 128);
+
+    input
+        .iter()
+        .zip(output)
+        .map(|(a, b)| {
+            if b < 3 {
+                *a
+            } else {
+                egui::Color32::from_rgb(255 - a.r(), 255 - a.g(), 255 - a.b())
+            }
+        })
+        .collect()
 }
 
 pub fn flag_thin_lines(input: &LoadedImage, ctx: &egui::Context) -> LoadedImage {
-    let mut output = input.pixels().clone();
-    thin_line_detect(&mut output, input.pixels(), *input.size_as_array());
+    let output = thin_line_detect(input.pixels(), *input.size_as_array());
     return load_image_from_pixels(output, *input.size_as_array(), "thin_lines", ctx);
 }
 
@@ -397,7 +400,7 @@ pub fn compute_percent_diff(in0: &LoadedImage, in1: &LoadedImage) -> u32 {
     let thin_line_pixels: u32 = count_diffs(in0, in1).try_into().unwrap();
     let total_pixels: u32 = (in0.size()[0] * in0.size()[1]) as u32;
     let percent_thin_line: u32 = thin_line_pixels / total_pixels;
-    if percent_thin_line == 0 && total_pixels != 0 {
+    if percent_thin_line == 0 && thin_line_pixels != 0 {
         1
     } else {
         percent_thin_line
