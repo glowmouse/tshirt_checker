@@ -253,50 +253,46 @@ fn thin_line_horizontal(thin_line_state: &mut ThinLineState<'_, RBS>, xdim: i32,
     }
 }
 
-fn thin_line_diag_execute<const HDOMINANT: bool>(
+fn thin_line_diag_execute<const XINC: i32, const YINC: i32>(
     thin_line_state: &mut ThinLineState<'_, RBS>,
     xdim: i32,
     ydim: i32,
-    vdelta: u32,
+    xdelta: i32,
+    ydelta: i32,
     xin: i32,
     yin: i32,
 ) {
-    let mut fraction = vdelta / 2;
-    let mut secondary = if HDOMINANT { yin } else { xin };
-    let secondary_end = if HDOMINANT { ydim } else { xdim };
+    let mut xfixed = (xin << 8) + xdelta / 2;
+    let mut yfixed = (yin << 8) + ydelta / 2;
 
-    let start = if HDOMINANT { xin } else { yin };
-    let end = if HDOMINANT { xdim } else { ydim };
+    let xend = if XINC == 1 { xdim } else { -1 };
+    let yend = if YINC == 1 { ydim } else { -1 };
 
-    for dominant in start..end {
-        if secondary == secondary_end {
+    loop {
+        let x = xfixed >> 8;
+        let y = yfixed >> 8;
+        if x == xend || y == yend {
             break;
         }
-        let x = if HDOMINANT { dominant } else { secondary };
-        let y = if HDOMINANT { secondary } else { dominant };
         thin_line_state.pixel(x + y * xdim);
-
-        fraction += vdelta;
-        if fraction > 256 {
-            fraction -= 256;
-            secondary += 1;
-        }
+        xfixed += xdelta * XINC;
+        yfixed += ydelta * YINC;
     }
-
     thin_line_state.transparent();
 }
 
-fn thin_line_diag<const HDOMINANT: bool>(
+fn thin_line_diag<const XINC: i32, const YINC: i32>(
     thin_line_state: &mut ThinLineState<'_, RBS>,
     xdim: i32,
     ydim: i32,
-    vdelta: u32,
+    xdelta: i32,
+    ydelta: i32,
 ) {
     for y in 1..ydim {
-        thin_line_diag_execute::<HDOMINANT>(thin_line_state, xdim, ydim, vdelta, 0, y);
+        thin_line_diag_execute::<XINC, YINC>(thin_line_state, xdim, ydim, xdelta, ydelta, 0, y);
     }
     for x in 0..xdim {
-        thin_line_diag_execute::<HDOMINANT>(thin_line_state, xdim, ydim, vdelta, x, 0);
+        thin_line_diag_execute::<XINC, YINC>(thin_line_state, xdim, ydim, xdelta, ydelta, x, 0);
     }
 }
 
@@ -312,9 +308,9 @@ fn thin_line_detect(input: &Vec<egui::Color32>, size: [usize; 2]) -> Vec<egui::C
 
     thin_line_vertical(&mut thin_line_state, xdim, ydim);
     thin_line_horizontal(&mut thin_line_state, xdim, ydim);
-    thin_line_diag::<true>(&mut thin_line_state, xdim, ydim, 256);
-    thin_line_diag::<true>(&mut thin_line_state, xdim, ydim, 128);
-    thin_line_diag::<false>(&mut thin_line_state, xdim, ydim, 128);
+    thin_line_diag::<1, 1>(&mut thin_line_state, xdim, ydim, 256, 256);
+    thin_line_diag::<1, 1>(&mut thin_line_state, xdim, ydim, 256, 128);
+    thin_line_diag::<1, 1>(&mut thin_line_state, xdim, ydim, 128, 256);
 
     input
         .iter()
