@@ -415,14 +415,14 @@ pub fn count_diffs(in0: &LoadedImage, in1: &LoadedImage) -> usize {
     in0_pixels
         .iter()
         .zip(in1_pixels)
-        .filter(|&(a, b)| a == b)
+        .filter(|&(a, b)| a != b)
         .count()
 }
 
 pub fn compute_percent_diff(in0: &LoadedImage, in1: &LoadedImage) -> u32 {
     let thin_line_pixels: u32 = count_diffs(in0, in1).try_into().unwrap();
     let total_pixels: u32 = (in0.size()[0] * in0.size()[1]) as u32;
-    let percent_thin_line: u32 = thin_line_pixels / total_pixels;
+    let percent_thin_line: u32 = 100 * thin_line_pixels / total_pixels;
     if percent_thin_line == 0 && thin_line_pixels != 0 {
         1
     } else {
