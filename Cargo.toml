@@ -4,7 +4,7 @@ version = "0.1.1"
 authors = ["Andrew Brownbill <andrew.brownbill@gmail.com>", "Emil Ernerfeldt <emil.ernerfeldt@gmail.com>"]
 edition = "2021"
 include = ["LICENSE-APACHE", "LICENSE-MIT", "**/*.rs", "Cargo.toml"]
-rust-version = "1.76"
+rust-version = "1.79"
 
 [package.metadata.docs.rs]
 all-features = true
@@ -23,7 +23,7 @@ eframe = { version = "0.28", features = [
 ] }
 egui = { version = "0.28.0" }
 egui_extras = { version = "0.28.0", features = ["default", "all_loaders"] }
-image = { version = "0.24", features = ["jpeg", "png" ] }
+image = { version = "0.25", features = ["jpeg", "png" ] }
 log = "0.4"
 nalgebra = "0.32.6"
 
