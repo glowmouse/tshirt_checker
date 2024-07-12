@@ -13,7 +13,7 @@ targets = ["x86_64-unknown-linux-gnu", "wasm32-unknown-unknown"]
 [dependencies]
 arr_macro = { version = "0.2.1" }
 async-std = "1.12"
-eframe = { version = "0.27.2", features = [
+eframe = { version = "0.28", features = [
     "default",
     "__screenshot",
 #    "accesskit",     # Make egui comptaible with screen readers. NOTE: adds a lot of dependencies.
@@ -21,8 +21,8 @@ eframe = { version = "0.27.2", features = [
     "glow",          # Use the glow rendering backend. Alternative: "wgpu".
     "persistence",   # Enable restoring app state when restarting the app.
 ] }
-egui = { version = "0.27.2" } # "0.27.0"
-egui_extras = { version = "0.27.2", features = ["default", "all_loaders"] }
+egui = { version = "0.28.0" }
+egui_extras = { version = "0.28.0", features = ["default", "all_loaders"] }
 image = { version = "0.24", features = ["jpeg", "png" ] }
 log = "0.4"
 nalgebra = "0.32.6"

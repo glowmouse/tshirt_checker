@@ -56,9 +56,9 @@ pub fn load_image_from_untrusted_source(
     name: impl Into<String>,
     ctx: &egui::Context,
 ) -> Result<LoadedImage, String> {
-    // 3300 = 11 inches x 300 DPI
+    // 3300 = 11 inches x 300 DPI.  Cut in half for now to avoid the 2048 hard cap
     let maybe_svg =
-        egui_extras::image::load_svg_bytes_with_size(bytes, Some(egui::SizeHint::Width(3300)));
+        egui_extras::image::load_svg_bytes_with_size(bytes, Some(egui::SizeHint::Width(1650)));
     let raw_uncompressed_image = {
         if maybe_svg.is_ok() {
             // TODO, if it's an SVG, fix partial transparency
