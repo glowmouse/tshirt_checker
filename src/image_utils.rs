@@ -314,11 +314,16 @@ pub enum ThinLineCategory {
 // Most of the time here is spent searching for OpaqueProblems.
 //
 pub fn expand_good(input: &[ThinLineCategory], xdim: i32, ydim: i32) -> Vec<ThinLineCategory> {
-    let mut output: Vec<ThinLineCategory> = Vec::new();
-    for y in 0..ydim {
-        for x in 0..xdim {
-            let mut current = input[(x + y * xdim) as usize];
-            if current == ThinLineCategory::OpaqueProblem {
+    let mut index = 0;
+
+    input
+        .iter()
+        .map(|c| {
+            if *c == ThinLineCategory::OpaqueProblem {
+                let mut new = ThinLineCategory::OpaqueProblem;
+                let x = index % xdim;
+                let y = index / xdim;
+                index += 1;
                 for xd in -1..=1 {
                     for yd in -1..=1 {
                         if xd != 0 && yd != 0 {
@@ -331,15 +336,17 @@ pub fn expand_good(input: &[ThinLineCategory], xdim: i32, ydim: i32) -> Vec<Thin
                         }
                         let sample = input[(xs + ys * xdim) as usize];
                         if sample == ThinLineCategory::OpaqueOk {
-                            current = ThinLineCategory::OpaqueOk
+                            new = ThinLineCategory::OpaqueOk
                         }
                     }
                 }
+                new
+            } else {
+                index += 1;
+                *c
             }
-            output.push(current);
-        }
-    }
-    output
+        })
+        .collect()
 }
 
 fn thin_line_detect(
