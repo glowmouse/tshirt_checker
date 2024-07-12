@@ -302,10 +302,44 @@ fn thin_line_diag<const DX: i32, const DY: i32>(
     }
 }
 
+#[derive(PartialEq, Copy, Clone)]
 pub enum ThinLineCategory {
     OpaqueOk,
     OpaqueProblem,
     Transparent,
+}
+
+// Kind of inefficient, but, meh
+//
+// Most of the time here is spent searching for OpaqueProblems.
+//
+pub fn expand_good(input: &[ThinLineCategory], xdim: i32, ydim: i32) -> Vec<ThinLineCategory> {
+    let mut output: Vec<ThinLineCategory> = Vec::new();
+    for y in 0..ydim {
+        for x in 0..xdim {
+            let mut current = input[(x + y * xdim) as usize];
+            if current == ThinLineCategory::OpaqueProblem {
+                for xd in -1..=1 {
+                    for yd in -1..=1 {
+                        if xd != 0 && yd != 0 {
+                            continue;
+                        }
+                        let xs = x + xd;
+                        let ys = y + yd;
+                        if xs < 0 || ys < 0 || xs >= xdim || ys >= ydim {
+                            continue;
+                        }
+                        let sample = input[(xs + ys * xdim) as usize];
+                        if sample == ThinLineCategory::OpaqueOk {
+                            current = ThinLineCategory::OpaqueOk
+                        }
+                    }
+                }
+            }
+            output.push(current);
+        }
+    }
+    output
 }
 
 fn thin_line_detect(
@@ -330,7 +364,7 @@ fn thin_line_detect(
     thin_line_diag::<128, 256>(&mut thin_line_state, xdim, ydim);
     thin_line_diag::<-128, 256>(&mut thin_line_state, xdim, ydim);
 
-    let thin_line_state: Vec<_> = input
+    let mut thin_line_state: Vec<_> = input
         .iter()
         .zip(output)
         .map(|(a, b)| {
@@ -343,6 +377,11 @@ fn thin_line_detect(
             }
         })
         .collect();
+
+    let num_expansions = min_pixels * 2;
+    for _ in 0..num_expansions {
+        thin_line_state = expand_good(&thin_line_state, xdim, ydim);
+    }
 
     input
         .iter()
