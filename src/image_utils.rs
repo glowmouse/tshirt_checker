@@ -349,13 +349,14 @@ pub fn expand_good(input: &[ThinLineCategory], xdim: i32, ydim: i32) -> Vec<Thin
         .collect()
 }
 
-fn thin_line_detect(
+async fn thin_line_detect(
     input: &Vec<egui::Color32>,
     size: [usize; 2],
     min_pixels: usize,
 ) -> Vec<egui::Color32> {
     let xdim = size[0] as i32;
     let ydim = size[1] as i32;
+    let one_milli = std::time::Duration::from_millis(1);
 
     let mut output: Vec<u32> = vec![0; input.len()];
 
@@ -363,13 +364,21 @@ fn thin_line_detect(
         ThinLineState::new(input, &mut output, min_pixels, xdim);
 
     thin_line_vertical(&mut thin_line_state, xdim, ydim);
+    async_std::task::sleep(one_milli).await;
     thin_line_horizontal(&mut thin_line_state, xdim, ydim);
+    async_std::task::sleep(one_milli).await;
     thin_line_diag::<256, 256>(&mut thin_line_state, xdim, ydim);
+    async_std::task::sleep(one_milli).await;
     thin_line_diag::<256, -256>(&mut thin_line_state, xdim, ydim);
+    async_std::task::sleep(one_milli).await;
     thin_line_diag::<256, 128>(&mut thin_line_state, xdim, ydim);
+    async_std::task::sleep(one_milli).await;
     thin_line_diag::<256, -128>(&mut thin_line_state, xdim, ydim);
+    async_std::task::sleep(one_milli).await;
     thin_line_diag::<128, 256>(&mut thin_line_state, xdim, ydim);
+    async_std::task::sleep(one_milli).await;
     thin_line_diag::<-128, 256>(&mut thin_line_state, xdim, ydim);
+    async_std::task::sleep(one_milli).await;
 
     let mut thin_line_state: Vec<_> = input
         .iter()
@@ -384,10 +393,12 @@ fn thin_line_detect(
             }
         })
         .collect();
+    async_std::task::sleep(one_milli).await;
 
     let num_expansions = min_pixels * 2;
     for _ in 0..num_expansions {
         thin_line_state = expand_good(&thin_line_state, xdim, ydim);
+        async_std::task::sleep(one_milli).await;
     }
 
     input
@@ -403,8 +414,12 @@ fn thin_line_detect(
         .collect()
 }
 
-pub fn flag_thin_lines(input: &LoadedImage, ctx: &egui::Context, min_pixels: usize) -> LoadedImage {
-    let output = thin_line_detect(input.pixels(), *input.size_as_array(), min_pixels);
+pub async fn flag_thin_lines(
+    input: &LoadedImage,
+    ctx: &egui::Context,
+    min_pixels: usize,
+) -> LoadedImage {
+    let output = thin_line_detect(input.pixels(), *input.size_as_array(), min_pixels).await;
     return load_image_from_pixels(output, *input.size_as_array(), "thin_lines", ctx);
 }
 

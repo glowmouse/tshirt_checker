@@ -56,7 +56,7 @@ impl ArtworkDependentData {
         // going to say that 1/64 inches is too thin for now
         let dots = (dpi * (1.0 / 64.0)).ceil() as usize;
 
-        let thin_lines = flag_thin_lines(artwork, ctx, dots);
+        let thin_lines = flag_thin_lines(artwork, ctx, dots).await;
         async_std::task::sleep(one_milli).await;
         let thin_line_percent = compute_percent_diff(&thin_lines, artwork);
         async_std::task::sleep(one_milli).await;
