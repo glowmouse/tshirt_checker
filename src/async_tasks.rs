@@ -5,7 +5,7 @@ use crate::loaded_image::*;
 pub struct ImageLoad {
     pub artwork: Artwork,
     pub image: LoadedImage,
-    pub dependent_data: ArtworkDependentData,
+    pub dependent_data: Option<ArtworkDependentData>,
 }
 
 //
@@ -42,15 +42,24 @@ pub fn do_load(
         let data: Vec<u8> = file.unwrap().read().await;
 
         let image = load_image_from_untrusted_source(&data, "loaded_data", &thread_ctx).unwrap();
-        let dependent_data = ArtworkDependentData::new(&thread_ctx, &image).await;
 
         let send_image = Ok(ImageLoad {
             artwork: art_slot,
+            image: image.clone(),
+            dependent_data: None,
+        });
+        thread_sender.send(send_image).unwrap();
+        thread_ctx.request_repaint();
+
+        let dependent_data = ArtworkDependentData::new(&thread_ctx, &image).await;
+
+        let send_image_and_dep_data = Ok(ImageLoad {
+            artwork: art_slot,
             image,
-            dependent_data,
+            dependent_data: Some(dependent_data),
         });
 
-        thread_sender.send(send_image).unwrap();
+        thread_sender.send(send_image_and_dep_data).unwrap();
         thread_ctx.request_repaint();
     });
 }
@@ -77,7 +86,7 @@ pub fn partialt_fix(
         let image_to_send = Ok(ImageLoad {
             artwork: art_id,
             image: fixed_art,
-            dependent_data,
+            dependent_data: Some(dependent_data),
         });
         thread_sender.send(image_to_send).unwrap();
         thread_ctx.request_repaint();
@@ -101,7 +110,7 @@ pub fn cache_in_dependent_data(
         let image_to_send = Ok(ImageLoad {
             artwork: art_id,
             image: thread_art,
-            dependent_data,
+            dependent_data: Some(dependent_data),
         });
         thread_sender.send(image_to_send).unwrap();
         thread_ctx.request_repaint();

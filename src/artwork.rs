@@ -121,20 +121,20 @@ impl ArtStorage {
         &mut self,
         slot: Artwork,
         image: LoadedImage,
-        dependent_data: ArtworkDependentData,
+        dependent_data: Option<ArtworkDependentData>,
     ) {
         match slot {
             Artwork::Artwork0 => {
                 self.artwork_0 = image;
-                self.art_dependent_data_0 = Some(dependent_data);
+                self.art_dependent_data_0 = dependent_data;
             }
             Artwork::Artwork1 => {
                 self.artwork_1 = image;
-                self.art_dependent_data_1 = Some(dependent_data);
+                self.art_dependent_data_1 = dependent_data;
             }
             Artwork::Artwork2 => {
                 self.artwork_2 = image;
-                self.art_dependent_data_2 = Some(dependent_data);
+                self.art_dependent_data_2 = dependent_data;
             }
         }
     }
