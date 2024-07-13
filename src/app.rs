@@ -28,6 +28,7 @@ pub struct TShirtCheckerApp {
     receiver: std::sync::mpsc::Receiver<Result<ImageLoad, String>>,
     sender: std::sync::mpsc::Sender<Result<ImageLoad, String>>,
     selected_tool: ToolSelection,
+    animate_loading: bool,
 }
 
 pub type AppEvent = Box<dyn Fn(&mut TShirtCheckerApp)>;
@@ -349,6 +350,11 @@ impl TShirtCheckerApp {
                     let report = self.report_templates.report_type_to_template(report_type);
                     let metric = (report.generate_metric)(art, art_dependent_data);
                     let status = (report.metric_to_status)(metric);
+                    if status == ReportStatus::Unknown {
+                        new_events += Box::new(move |app: &mut Self| {
+                            app.animate_loading = true;
+                        })
+                    }
                     let status_icon = self.icons.status_icon(status);
                     let tool_tip = report.tool_tip.clone();
                     let report_tip = report.report_tip.clone();
@@ -518,6 +524,7 @@ impl TShirtCheckerApp {
             selected_tool: ToolSelection::new(),
             receiver,
             sender,
+            animate_loading: false,
         }
     }
 }
@@ -549,8 +556,16 @@ impl eframe::App for TShirtCheckerApp {
         self.do_right_panel(&mut new_events, ctx);
         self.do_central_panel(&mut new_events, ctx);
 
+        self.animate_loading = false;
         for closure in new_events.events.iter() {
             closure(self);
+        }
+        self.icons.advance_cycle();
+
+        if self.animate_loading {
+            ctx.request_repaint_after(std::time::Duration::from_millis(
+                ICON_LOAD_ANIMATION_IN_MILLIS,
+            ))
         }
 
         if self
