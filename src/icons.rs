@@ -108,7 +108,6 @@ impl IconStorage {
             ReportStatus::Warn => self.texture_handle(Icon::Warn),
             ReportStatus::Pass => self.texture_handle(Icon::Pass),
         })
-        .max_width(25.0)
     }
 
     fn image(&self, icon: Icon, width: f32) -> egui::Image<'_> {

@@ -286,10 +286,12 @@ impl TShirtCheckerApp {
         &self,
         mut new_events: &mut AppEvents,
         ui: &mut egui::Ui,
+        small: bool,
         color: TShirtColors,
     ) {
+        let width = if small { 40.0 } else { 80.0 };
         let image: &LoadedImage = self.tshirt_storage.tshirt_enum_to_image(color);
-        let egui_image = egui::Image::from_texture(image.texture_handle()).max_width(80.0);
+        let egui_image = egui::Image::from_texture(image.texture_handle()).max_width(width);
         let is_selected = self.tshirt_selected_for == color;
         if ui
             .add(egui::widgets::ImageButton::new(egui_image).selected(is_selected))
@@ -306,10 +308,12 @@ impl TShirtCheckerApp {
         mut new_events: &mut AppEvents,
         ui: &mut egui::Ui,
         ctx: &egui::Context,
+        small: bool,
         artwork: Artwork,
     ) {
+        let width = if small { 40.0 } else { 80.0 };
         let image: &LoadedImage = self.art_storage.get_art(artwork);
-        let egui_image = egui::Image::from_texture(image.texture_handle()).max_width(80.0);
+        let egui_image = egui::Image::from_texture(image.texture_handle()).max_width(width);
         let is_selected = self.selected_art == artwork;
         if ui
             .add(egui::widgets::ImageButton::new(egui_image).selected(is_selected))
@@ -334,15 +338,17 @@ impl TShirtCheckerApp {
         &self,
         mut new_events: &mut AppEvents,
         ui: &mut egui::Ui,
+        small: bool,
         report_type: ReportTypes,
     ) {
+        let m = if small { 0.5 } else { 1.0 };
         ui.horizontal(|ui| {
             StripBuilder::new(ui)
-                .size(Size::exact(25.0))
-                .size(Size::exact(140.0))
-                .size(Size::exact(40.0))
-                .size(Size::exact(15.0))
-                .size(Size::exact(TOOL_WIDTH))
+                .size(Size::exact(25.0 * m))
+                .size(Size::exact(140.0 * m))
+                .size(Size::exact(40.0 * m))
+                .size(Size::exact(15.0 * m))
+                .size(Size::exact(TOOL_WIDTH * m))
                 .horizontal(|mut strip| {
                     let art = self.get_selected_art();
                     let art_dependent_data = self.art_storage.get_dependent_data(self.selected_art);
@@ -355,7 +361,7 @@ impl TShirtCheckerApp {
                             app.animate_loading = true;
                         })
                     }
-                    let status_icon = self.icons.status_icon(status);
+                    let status_icon = self.icons.status_icon(status).max_width(25.0 * m);
                     let tool_tip = report.tool_tip.clone();
                     let report_tip = report.report_tip.clone();
 
@@ -363,7 +369,7 @@ impl TShirtCheckerApp {
                         ui.add(status_icon).on_hover_text(&report_tip);
                     });
                     strip.cell(|ui| {
-                        ui.label(mtexts(&report.label.to_string()))
+                        ui.label(mtexts(&report.label.to_string(), small))
                             .on_hover_text(&report_tip);
                     });
                     strip.cell(|ui| {
@@ -372,12 +378,12 @@ impl TShirtCheckerApp {
                                 Some(n) => format!("{}", n),
                                 None => "???".to_string(),
                             };
-                            ui.label(mtexts(&text)).on_hover_text(&report_tip);
+                            ui.label(mtexts(&text, small)).on_hover_text(&report_tip);
                         });
                     });
                     let cell_string = (if report.display_percent { "%" } else { "" }).to_string();
                     strip.cell(|ui| {
-                        ui.label(mtexts(&cell_string));
+                        ui.label(mtexts(&cell_string, small));
                     });
                     strip.cell(|ui| {
                         if status != ReportStatus::Pass && status != ReportStatus::Unknown {
@@ -385,7 +391,7 @@ impl TShirtCheckerApp {
                             if ui
                                 .add(
                                     self.icons
-                                        .button(Icon::Tool, TOOL_WIDTH)
+                                        .button(Icon::Tool, TOOL_WIDTH * m)
                                         .selected(is_selected),
                                 )
                                 .on_hover_text(tool_tip)
@@ -407,34 +413,35 @@ impl TShirtCheckerApp {
         ui.add_space(5.0);
     }
 
-    fn display_title(ui: &mut egui::Ui) {
+    fn display_title(ui: &mut egui::Ui, small: bool) {
         Self::panel_separator(ui);
+        let width = if small { 15.0 } else { 30.0 };
         ui.vertical_centered(|ui| {
-            ui.heading(egui::widget_text::RichText::from("T-Shirt Art Checker").size(30.0))
+            ui.heading(egui::widget_text::RichText::from("T-Shirt Art Checker").size(width))
         });
         Self::panel_separator(ui);
     }
 
-    fn report_metrics(&self, new_events: &mut AppEvents, ui: &mut egui::Ui) {
-        self.report_metric(new_events, ui, ReportTypes::Dpi);
-        self.report_metric(new_events, ui, ReportTypes::AreaUsed);
-        self.report_metric(new_events, ui, ReportTypes::Bib);
-        self.report_metric(new_events, ui, ReportTypes::ThinLines);
-        self.report_metric(new_events, ui, ReportTypes::PartialTransparency);
+    fn report_metrics(&self, new_events: &mut AppEvents, ui: &mut egui::Ui, small: bool) {
+        self.report_metric(new_events, ui, small, ReportTypes::Dpi);
+        self.report_metric(new_events, ui, small, ReportTypes::AreaUsed);
+        self.report_metric(new_events, ui, small, ReportTypes::Bib);
+        self.report_metric(new_events, ui, small, ReportTypes::ThinLines);
+        self.report_metric(new_events, ui, small, ReportTypes::PartialTransparency);
 
         Self::panel_separator(ui);
     }
 
-    fn tshirt_selection_panel(&self, new_events: &mut AppEvents, ui: &mut egui::Ui) {
+    fn tshirt_selection_panel(&self, new_events: &mut AppEvents, ui: &mut egui::Ui, small: bool) {
         ui.horizontal(|ui| {
-            self.handle_tshirt_button(new_events, ui, TShirtColors::Red);
-            self.handle_tshirt_button(new_events, ui, TShirtColors::Green);
-            self.handle_tshirt_button(new_events, ui, TShirtColors::Blue);
+            self.handle_tshirt_button(new_events, ui, small, TShirtColors::Red);
+            self.handle_tshirt_button(new_events, ui, small, TShirtColors::Green);
+            self.handle_tshirt_button(new_events, ui, small, TShirtColors::Blue);
         });
         ui.horizontal(|ui| {
-            self.handle_tshirt_button(new_events, ui, TShirtColors::DRed);
-            self.handle_tshirt_button(new_events, ui, TShirtColors::DGreen);
-            self.handle_tshirt_button(new_events, ui, TShirtColors::DBlue);
+            self.handle_tshirt_button(new_events, ui, small, TShirtColors::DRed);
+            self.handle_tshirt_button(new_events, ui, small, TShirtColors::DGreen);
+            self.handle_tshirt_button(new_events, ui, small, TShirtColors::DBlue);
         });
         Self::panel_separator(ui);
     }
@@ -444,18 +451,20 @@ impl TShirtCheckerApp {
         new_events: &mut AppEvents,
         ui: &mut egui::Ui,
         ctx: &egui::Context,
+        small: bool,
     ) {
         ui.horizontal(|ui| {
-            self.handle_art_button(new_events, ui, ctx, Artwork::Artwork0);
-            self.handle_art_button(new_events, ui, ctx, Artwork::Artwork1);
-            self.handle_art_button(new_events, ui, ctx, Artwork::Artwork2);
+            self.handle_art_button(new_events, ui, ctx, small, Artwork::Artwork0);
+            self.handle_art_button(new_events, ui, ctx, small, Artwork::Artwork1);
+            self.handle_art_button(new_events, ui, ctx, small, Artwork::Artwork2);
         });
         Self::panel_separator(ui);
     }
 
-    fn import_button(&self, ui: &mut egui::Ui, ctx: &egui::Context) {
+    fn import_button(&self, ui: &mut egui::Ui, ctx: &egui::Context, small: bool) {
+        let width = if small { 40.0 } else { 80.0 };
         if ui
-            .add(self.icons.button(Icon::Import, 80.0))
+            .add(self.icons.button(Icon::Import, width))
             .on_hover_text("Import an image to the selected artwork slot.")
             .clicked()
         {
@@ -463,9 +472,10 @@ impl TShirtCheckerApp {
         }
     }
 
-    fn partial_transparency_fix_button(&self, ui: &mut egui::Ui, ctx: &egui::Context) {
+    fn partial_transparency_fix_button(&self, ui: &mut egui::Ui, ctx: &egui::Context, small: bool) {
+        let width = if small { 40.0 } else { 80.0 };
         if ui
-            .add(self.icons.button(Icon::FixPT, 80.0))
+            .add(self.icons.button(Icon::FixPT, width))
             .on_hover_text(
                 "Fix partial transparency problems by mapping all alpha values to 0 or 1.",
             )
@@ -481,19 +491,25 @@ impl TShirtCheckerApp {
     }
 
     fn do_right_panel(&self, new_events: &mut AppEvents, ctx: &egui::Context) {
+        let screen = ctx.screen_rect();
+        let size = screen.max - screen.min;
+        let small = size.x < 600.0 || size.y < 750.0;
+        let targetx = if small { 200.0 } else { 350.0 };
+
         egui::SidePanel::right("stuff")
             .resizable(true)
-            .min_width(200.0)
+            .min_width(targetx)
+            .max_width(targetx)
             .show(ctx, |ui| {
                 ui.vertical(|ui| {
-                    Self::display_title(ui);
-                    self.report_metrics(new_events, ui);
-                    self.tshirt_selection_panel(new_events, ui);
-                    self.artwork_selection_panel(new_events, ui, ctx);
+                    Self::display_title(ui, small);
+                    self.report_metrics(new_events, ui, small);
+                    self.tshirt_selection_panel(new_events, ui, small);
+                    self.artwork_selection_panel(new_events, ui, ctx, small);
 
                     ui.horizontal(|ui| {
-                        self.import_button(ui, ctx);
-                        self.partial_transparency_fix_button(ui, ctx);
+                        self.import_button(ui, ctx, small);
+                        self.partial_transparency_fix_button(ui, ctx, small);
                     });
                 })
             });
@@ -529,8 +545,9 @@ impl TShirtCheckerApp {
     }
 }
 
-fn mtexts(text: &String) -> egui::widget_text::RichText {
-    egui::widget_text::RichText::from(text).size(25.0)
+fn mtexts(text: &String, small: bool) -> egui::widget_text::RichText {
+    let m = if small { 0.5 } else { 1.0 };
+    egui::widget_text::RichText::from(text).size(25.0 * m)
 }
 
 impl eframe::App for TShirtCheckerApp {
