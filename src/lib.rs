@@ -13,6 +13,7 @@ mod tshirt_storage;
 pub use tshirt_storage::TShirtStorage;
 mod artwork;
 mod async_tasks;
+mod error;
 mod icons;
 mod math;
 mod movement_state;

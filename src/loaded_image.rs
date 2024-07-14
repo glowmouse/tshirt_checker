@@ -12,6 +12,7 @@
 //! colors).  For the sake of convenience, I'm always storing the underlying egui::ColorImage
 //!
 
+use crate::error::*;
 use std::sync::Arc;
 
 /// My image abstraction
@@ -55,11 +56,11 @@ pub fn load_image_from_untrusted_source(
     bytes: &[u8],
     name: impl Into<String>,
     ctx: &egui::Context,
-) -> Result<LoadedImage, String> {
+) -> Result<LoadedImage, Error> {
     // 3300 = 11 inches x 300 DPI.  Cut in half for now to avoid the 2048 hard cap
     let maybe_svg =
         egui_extras::image::load_svg_bytes_with_size(bytes, Some(egui::SizeHint::Width(1650)));
-    let raw_uncompressed_image = {
+    let raw_uncompressed_image_maybe = {
         if maybe_svg.is_ok() {
             // TODO, if it's an SVG, fix partial transparency
             maybe_svg
@@ -67,7 +68,13 @@ pub fn load_image_from_untrusted_source(
             egui_extras::image::load_image_bytes(bytes)
         }
     };
-    let uncompressed_image = Arc::new(raw_uncompressed_image?);
+    if raw_uncompressed_image_maybe.is_err() {
+        return Err(Error::new(
+            ErrorTypes::ImageLoadError,
+            raw_uncompressed_image_maybe.err().unwrap(),
+        ));
+    }
+    let uncompressed_image = Arc::new(raw_uncompressed_image_maybe.unwrap());
     let texture: egui::TextureHandle =
         ctx.load_texture(name, uncompressed_image.clone(), Default::default());
     Ok(LoadedImage {

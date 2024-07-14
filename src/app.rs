@@ -1,6 +1,7 @@
 extern crate nalgebra as na;
 use crate::artwork::*;
 use crate::async_tasks::*;
+use crate::error::*;
 use crate::icons::*;
 use crate::loaded_image::*;
 use crate::math::*;
@@ -11,7 +12,7 @@ use crate::tshirt_storage::*;
 use egui_extras::{Size, StripBuilder};
 use na::{dvector, vector};
 
-const DEBUG: bool = false;
+const DEBUG: bool = true;
 const TOOL_WIDTH: f32 = 20.0;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
@@ -25,8 +26,8 @@ pub struct TShirtCheckerApp {
     tshirt_storage: TShirtStorage,
     tshirt_selected_for: TShirtColors,
     report_templates: ReportTemplates,
-    receiver: std::sync::mpsc::Receiver<Result<ImageLoad, String>>,
-    sender: std::sync::mpsc::Sender<Result<ImageLoad, String>>,
+    receiver: Receiver,
+    sender: Sender,
     selected_tool: ToolSelection,
     animate_loading: bool,
 }
@@ -517,7 +518,7 @@ impl TShirtCheckerApp {
 
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let (sender, receiver) = std::sync::mpsc::channel::<Result<ImageLoad, String>>();
+        let (sender, receiver) = std::sync::mpsc::channel::<Payload>();
         let art_storage = ArtStorage::new(&cc.egui_ctx);
         let selected_art = Artwork::Artwork0;
         cache_in_dependent_data(
@@ -560,7 +561,9 @@ impl eframe::App for TShirtCheckerApp {
             let loaded_result = data_attempt.unwrap();
             match loaded_result {
                 Err(e) => {
-                    self.footer_debug_1 = format!("Error: {}", e);
+                    if e.id != ErrorTypes::FileImportAborted {
+                        self.footer_debug_1 = format!("Error: {}", e.msg());
+                    }
                 }
                 Ok(f) => {
                     self.art_storage

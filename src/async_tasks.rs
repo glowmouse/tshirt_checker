@@ -1,6 +1,11 @@
 use crate::artwork::*;
+use crate::error::*;
 use crate::image_utils::*;
 use crate::loaded_image::*;
+
+pub type Payload = Result<ImageLoad, Error>;
+pub type Sender = std::sync::mpsc::Sender<Payload>;
+pub type Receiver = std::sync::mpsc::Receiver<Payload>;
 
 pub struct ImageLoad {
     pub artwork: Artwork,
@@ -28,20 +33,31 @@ fn app_execute<F: Future<Output = ()> + 'static>(f: F) {
     wasm_bindgen_futures::spawn_local(f);
 }
 
-pub fn do_load(
-    ctx: &egui::Context,
-    art_slot: Artwork,
-    sender: &std::sync::mpsc::Sender<Result<ImageLoad, String>>,
-) {
+pub async fn load_image(ctx: &egui::Context) -> Result<LoadedImage, Error> {
+    let file = rfd::AsyncFileDialog::new().pick_file().await;
+    if file.is_none() {
+        return Err(Error::new(
+            ErrorTypes::FileImportAborted,
+            "Image Import cancelled by user",
+        ));
+    }
+    let data: Vec<u8> = file.unwrap().read().await;
+    let image = load_image_from_untrusted_source(&data, "loaded_data", ctx)?;
+    Ok(image)
+}
+
+pub fn do_load(ctx: &egui::Context, art_slot: Artwork, sender: &Sender) {
     let thread_ctx = ctx.clone();
     let thread_sender = sender.clone();
 
     // Execute in another thread
     app_execute(async move {
-        let file = rfd::AsyncFileDialog::new().pick_file().await;
-        let data: Vec<u8> = file.unwrap().read().await;
-
-        let image = load_image_from_untrusted_source(&data, "loaded_data", &thread_ctx).unwrap();
+        let image_maybe = load_image(&thread_ctx).await;
+        if image_maybe.is_err() {
+            thread_sender.send(Err(image_maybe.err().unwrap())).unwrap();
+            return;
+        }
+        let image = image_maybe.unwrap();
 
         let send_image = Ok(ImageLoad {
             artwork: art_slot,
@@ -64,12 +80,7 @@ pub fn do_load(
     });
 }
 
-pub fn partialt_fix(
-    ctx: &egui::Context,
-    art: &LoadedImage,
-    art_id: Artwork,
-    sender: &std::sync::mpsc::Sender<Result<ImageLoad, String>>,
-) {
+pub fn partialt_fix(ctx: &egui::Context, art: &LoadedImage, art_id: Artwork, sender: &Sender) {
     // Execute in another thread
     let thread_art = art.clone();
     let thread_ctx = ctx.clone();
@@ -97,7 +108,7 @@ pub fn cache_in_dependent_data(
     ctx: &egui::Context,
     art: &LoadedImage,
     art_id: Artwork,
-    sender: &std::sync::mpsc::Sender<Result<ImageLoad, String>>,
+    sender: &Sender,
 ) {
     let thread_art = art.clone();
     let thread_ctx = ctx.clone();
