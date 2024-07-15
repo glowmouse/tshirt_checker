@@ -6,13 +6,13 @@ use crate::icons::*;
 use crate::loaded_image::*;
 use crate::math::*;
 use crate::movement_state::MovementState;
+use crate::notice_panel::*;
 use crate::report_templates::*;
 use crate::tool_select::*;
 use crate::tshirt_storage::*;
 use egui_extras::{Size, StripBuilder};
 use na::{dvector, vector};
 
-const DEBUG: bool = false;
 const TOOL_WIDTH: f32 = 20.0;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
@@ -20,8 +20,6 @@ pub struct TShirtCheckerApp {
     art_storage: ArtStorage,
     selected_art: Artwork,
     icons: IconStorage,
-    footer_debug_0: String,
-    footer_debug_1: String,
     move_state: MovementState,
     tshirt_storage: TShirtStorage,
     tshirt_selected_for: TShirtColors,
@@ -30,6 +28,7 @@ pub struct TShirtCheckerApp {
     sender: Sender,
     selected_tool: ToolSelection,
     animate_loading: bool,
+    notice_panel: NoticePanel,
 }
 
 pub type AppEvent = Box<dyn Fn(&mut TShirtCheckerApp)>;
@@ -45,20 +44,16 @@ impl std::ops::AddAssign<AppEvent> for &mut AppEvents {
     }
 }
 
+impl std::ops::AddAssign<AppEvent> for AppEvents {
+    fn add_assign(&mut self, rhs: AppEvent) {
+        self.events.push(rhs);
+    }
+}
+
 impl TShirtCheckerApp {
     fn do_bottom_panel(&self, ctx: &egui::Context) {
         egui::TopBottomPanel::bottom("bot_panel").show(ctx, |ui| {
-            if DEBUG {
-                ui.horizontal(|ui| {
-                    ui.label("footer_debug_0: ");
-                    ui.label(&self.footer_debug_0);
-                });
-                ui.horizontal(|ui| {
-                    ui.label("footer_debug_1: ");
-                    ui.label(&self.footer_debug_1);
-                });
-                egui::warn_if_debug_build(ui);
-            }
+            self.notice_panel.display(ui);
             powered_by_egui_and_eframe(ui);
         });
     }
@@ -533,8 +528,6 @@ impl TShirtCheckerApp {
         Self {
             art_storage,
             selected_art,
-            footer_debug_0: String::new(),
-            footer_debug_1: String::new(),
             tshirt_storage: TShirtStorage::new(&cc.egui_ctx),
             move_state: MovementState::new(),
             icons: IconStorage::new(&cc.egui_ctx),
@@ -544,6 +537,7 @@ impl TShirtCheckerApp {
             receiver,
             sender,
             animate_loading: false,
+            notice_panel: NoticePanel::default(),
         }
     }
 }
@@ -556,14 +550,15 @@ impl eframe::App for TShirtCheckerApp {
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let mut new_events: AppEvents = Default::default();
-        self.footer_debug_0 = format!("time {}", self.selected_tool.time_since_selection());
         let data_attempt = self.receiver.try_recv();
         if data_attempt.is_ok() {
             let loaded_result = data_attempt.unwrap();
             match loaded_result {
                 Err(e) => {
                     if e.id != ErrorTypes::FileImportAborted {
-                        self.footer_debug_1 = format!("Error: {}", e.msg());
+                        new_events += Box::new(move |app: &mut Self| {
+                            app.notice_panel.add_notice(e.msg());
+                        });
                     }
                 }
                 Ok(f) => {
@@ -582,11 +577,13 @@ impl eframe::App for TShirtCheckerApp {
             closure(self);
         }
         self.icons.advance_cycle();
+        self.notice_panel.update();
+
+        let mut time_to_repaint: u32 = u32::MAX;
+        time_to_repaint = time_to_repaint.min(self.notice_panel.time_to_update());
 
         if self.animate_loading {
-            ctx.request_repaint_after(std::time::Duration::from_millis(
-                ICON_LOAD_ANIMATION_IN_MILLIS,
-            ))
+            time_to_repaint = time_to_repaint.min(ICON_LOAD_ANIMATION_IN_MILLIS);
         }
 
         if self
@@ -596,9 +593,11 @@ impl eframe::App for TShirtCheckerApp {
             || self.selected_tool.is_active(ReportTypes::ThinLines)
             || self.selected_tool.is_active(ReportTypes::Dpi)
         {
-            let time_to_wait = self.selected_tool.time_to_next_epoch();
+            time_to_repaint = time_to_repaint.min(self.selected_tool.time_to_next_epoch());
+        }
 
-            ctx.request_repaint_after(std::time::Duration::from_millis(time_to_wait.into()))
+        if time_to_repaint != u32::MAX {
+            ctx.request_repaint_after(std::time::Duration::from_millis(time_to_repaint.into()))
         }
     }
 }

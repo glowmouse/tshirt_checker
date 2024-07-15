@@ -55,6 +55,7 @@ pub fn do_load(ctx: &egui::Context, art_slot: Artwork, sender: &Sender) {
         let image_maybe = load_image(&thread_ctx).await;
         if image_maybe.is_err() {
             thread_sender.send(Err(image_maybe.err().unwrap())).unwrap();
+            thread_ctx.request_repaint();
             return;
         }
         let image = image_maybe.unwrap();

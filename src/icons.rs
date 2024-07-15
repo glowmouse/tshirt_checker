@@ -1,4 +1,4 @@
-pub const ICON_LOAD_ANIMATION_IN_MILLIS: u64 = 200;
+pub const ICON_LOAD_ANIMATION_IN_MILLIS: u32 = 200;
 
 use crate::loaded_image::*;
 use crate::report_templates::*;
@@ -119,7 +119,7 @@ impl IconStorage {
     }
 
     pub fn advance_cycle(&mut self) {
-        let time_since_last_cycle: u64 = self
+        let time_since_last_cycle: u32 = self
             .icon_last_cycle
             .elapsed()
             .unwrap()
