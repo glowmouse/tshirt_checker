@@ -14,6 +14,11 @@ use egui_extras::{Size, StripBuilder};
 use na::{dvector, vector};
 
 const TOOL_WIDTH: f32 = 20.0;
+const STATUS_ICON_WIDTH: f32 = 25.0;
+const REPORT_TEXT_WIDTH: f32 = 150.0;
+const REPORT_METRIC_WIDTH: f32 = 40.0;
+const REPORT_PERCENT_WIDTH: f32 = 25.0;
+const BUTTON_WIDTH: f32 = 80.0;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 pub struct TShirtCheckerApp {
@@ -211,14 +216,12 @@ impl TShirtCheckerApp {
             art_space_to_tshirt(self.tshirt_storage.size()) * art_to_art_space(art.size());
         let display_location = art_to_tshirt * art_location;
 
-        // need to make modifications to self after dependent_data borrow is done.
         if !movement_happened {
             new_events += Box::new(move |app: &mut Self| {
                 app.move_state.zoom = 10.0;
                 app.move_state.target = display_location;
             });
         } else {
-            // deselect tool if the user is trying to move or zoom.
             new_events += Box::new(move |app: &mut Self| {
                 app.selected_tool.reset();
             });
@@ -285,7 +288,7 @@ impl TShirtCheckerApp {
         scale: f32,
         color: TShirtColors,
     ) {
-        let width = 80.0 * scale;
+        let width = BUTTON_WIDTH * scale;
         let image: &LoadedImage = self.tshirt_storage.tshirt_enum_to_image(color);
         let egui_image = egui::Image::from_texture(image.texture_handle()).max_width(width);
         let is_selected = self.tshirt_selected_for == color;
@@ -307,7 +310,7 @@ impl TShirtCheckerApp {
         scale: f32,
         artwork: Artwork,
     ) {
-        let width = 80.0 * scale;
+        let width = BUTTON_WIDTH * scale;
         let image: &LoadedImage = self.art_storage.get_art(artwork);
         let egui_image = egui::Image::from_texture(image.texture_handle()).max_width(width);
         let is_selected = self.selected_art == artwork;
@@ -339,10 +342,10 @@ impl TShirtCheckerApp {
     ) {
         ui.horizontal(|ui| {
             StripBuilder::new(ui)
-                .size(Size::exact(25.0 * scale))
-                .size(Size::exact(150.0 * scale))
-                .size(Size::exact(40.0 * scale))
-                .size(Size::exact(20.0 * scale))
+                .size(Size::exact(STATUS_ICON_WIDTH * scale))
+                .size(Size::exact(REPORT_TEXT_WIDTH * scale))
+                .size(Size::exact(REPORT_METRIC_WIDTH * scale))
+                .size(Size::exact(REPORT_PERCENT_WIDTH * scale))
                 .size(Size::exact(TOOL_WIDTH * scale))
                 .horizontal(|mut strip| {
                     let art = self.get_selected_art();
@@ -356,7 +359,10 @@ impl TShirtCheckerApp {
                             app.animate_loading = true;
                         })
                     }
-                    let status_icon = self.icons.status_icon(status).max_width(25.0 * scale);
+                    let status_icon = self
+                        .icons
+                        .status_icon(status)
+                        .max_width(STATUS_ICON_WIDTH * scale);
                     let tool_tip = report.tool_tip.clone();
                     let report_tip = report.report_tip.clone();
 
@@ -457,7 +463,7 @@ impl TShirtCheckerApp {
     }
 
     fn import_button(&self, ui: &mut egui::Ui, ctx: &egui::Context, scale: f32) {
-        let width = 80.0 * scale;
+        let width = BUTTON_WIDTH * scale;
         if ui
             .add(self.icons.button(Icon::Import, width))
             .on_hover_text("Import an image to the selected artwork slot.")
@@ -468,7 +474,7 @@ impl TShirtCheckerApp {
     }
 
     fn partial_transparency_fix_button(&self, ui: &mut egui::Ui, ctx: &egui::Context, scale: f32) {
-        let width = 80.0 * scale;
+        let width = BUTTON_WIDTH * scale;
         if ui
             .add(self.icons.button(Icon::FixPT, width))
             .on_hover_text(

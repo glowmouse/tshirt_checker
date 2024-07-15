@@ -16,10 +16,6 @@ pub struct ImageLoad {
 //
 // Copied from https://github.com/PolyMeilex/rfd/blob/master/examples/async.rs
 //
-// My current understanding (new to this) is that nothing executed in web
-// assembly can block the main thread...  and the thread mechanism used by
-// web assembly won't return the thread's output.
-//
 
 use std::future::Future;
 

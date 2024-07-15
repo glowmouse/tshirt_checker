@@ -17,7 +17,6 @@ pub struct ArtworkDependentData {
     pub fixed_artwork: LoadedImage,
     pub flagged_artwork: LoadedImage,
     pub thin_lines: LoadedImage,
-    //_heat_map: LoadedImage,
     pub top_hot_spots: Vec<HotSpot>,
 }
 
@@ -69,7 +68,6 @@ impl ArtworkDependentData {
             top_hot_spots,
             thin_lines,
             thin_line_percent,
-            //_heat_map: heat_map_from_image(artwork, "heatmap", ctx),
         }
     }
 }
