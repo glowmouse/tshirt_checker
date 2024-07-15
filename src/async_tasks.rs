@@ -34,7 +34,14 @@ fn app_execute<F: Future<Output = ()> + 'static>(f: F) {
 }
 
 pub async fn load_image(ctx: &egui::Context) -> Result<LoadedImage, Error> {
-    let file = rfd::AsyncFileDialog::new().pick_file().await;
+    let file = rfd::AsyncFileDialog::new()
+        .add_filter("All", &["png", "jpg", "jpeg", "jpe", "jif", "jtif", "svg"])
+        .add_filter("Png Images", &["png"])
+        .add_filter("Jpeg Images", &["jpg", "jpeg", "jpe", "jif", "jtif"])
+        .add_filter("SVG Images", &["svg"])
+        .pick_file()
+        .await;
+
     if file.is_none() {
         return Err(Error::new(
             ErrorTypes::FileImportAborted,
