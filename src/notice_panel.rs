@@ -1,5 +1,7 @@
 use web_time::SystemTime;
 const NOTICE_TIME: u32 = 10000;
+const FADE_TIME: u32 = 1024;
+const FADE_AT: u32 = NOTICE_TIME - FADE_TIME;
 
 #[derive(Default)]
 pub struct NoticePanel {
@@ -13,6 +15,22 @@ impl NoticePanel {
         self.notifications.push(notice);
     }
 
+    fn compute_alpha(&self) -> u8 {
+        if self.display_start.is_none() {
+            255
+        } else {
+            let time_since_start = self.time_since_start().min(NOTICE_TIME);
+            let time_to_end = NOTICE_TIME - time_since_start;
+            if time_since_start < FADE_TIME {
+                (time_since_start * 255 / FADE_TIME).try_into().unwrap()
+            } else if time_to_end < FADE_TIME {
+                (time_to_end * 255 / FADE_TIME).try_into().unwrap()
+            } else {
+                255
+            }
+        }
+    }
+
     pub fn display(&self, ui: &mut egui::Ui) {
         let label_text = if !self.notifications.is_empty() {
             &self.notifications[0]
@@ -20,7 +38,8 @@ impl NoticePanel {
             ""
         };
         ui.horizontal(|ui| {
-            ui.label(egui::widget_text::RichText::from(label_text).color(egui::Color32::RED));
+            let color = egui::Color32::from_rgba_premultiplied(255, 0, 0, self.compute_alpha());
+            ui.label(egui::widget_text::RichText::from(label_text).color(color));
         });
     }
 
@@ -37,12 +56,17 @@ impl NoticePanel {
 
     pub fn time_to_update(&self) -> u32 {
         if self.recent_state_change {
-            200
+            100
         } else if self.display_start.is_none() {
             u32::MAX
         } else {
-            let clamped_time_since_start = self.time_since_start().min(NOTICE_TIME);
-            NOTICE_TIME - clamped_time_since_start + 200
+            let alpha = self.compute_alpha();
+            if alpha != 255 {
+                100
+            } else {
+                let clamped_time_since_start = self.time_since_start().min(FADE_AT);
+                FADE_AT - clamped_time_since_start
+            }
         }
     }
 
