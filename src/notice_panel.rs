@@ -1,25 +1,36 @@
-use web_time::SystemTime;
+use crate::time::Time;
+
 const NOTICE_TIME: u32 = 10000;
 const FADE_TIME: u32 = 1024;
 const FADE_AT: u32 = NOTICE_TIME - FADE_TIME;
 
-#[derive(Default)]
 pub struct NoticePanel {
     notifications: Vec<String>,
-    display_start: Option<SystemTime>,
+    display_timer: Box<dyn Time>,
     recent_state_change: bool,
+    currently_displaying: bool,
 }
 
 impl NoticePanel {
+    pub fn new(timer: Box<dyn Time>) -> Self {
+        let notifications = Vec::new();
+        Self {
+            notifications,
+            display_timer: timer,
+            recent_state_change: false,
+            currently_displaying: false,
+        }
+    }
+
     pub fn add_notice(&mut self, notice: String) {
         self.notifications.push(notice);
     }
 
     fn compute_alpha(&self) -> u8 {
-        if self.display_start.is_none() {
+        if !self.currently_displaying {
             255
         } else {
-            let time_since_start = self.time_since_start().min(NOTICE_TIME);
+            let time_since_start = self.display_timer.ms_since_reset().min(NOTICE_TIME);
             let time_to_end = NOTICE_TIME - time_since_start;
             if time_since_start < FADE_TIME {
                 (time_since_start * 255 / FADE_TIME).try_into().unwrap()
@@ -43,28 +54,17 @@ impl NoticePanel {
         });
     }
 
-    fn time_since_start(&self) -> u32 {
-        let display_start = self.display_start.unwrap();
-        let time_since_start: u32 = display_start
-            .elapsed()
-            .unwrap()
-            .as_millis()
-            .try_into()
-            .unwrap();
-        time_since_start
-    }
-
     pub fn time_to_update(&self) -> u32 {
         if self.recent_state_change {
             100
-        } else if self.display_start.is_none() {
+        } else if !self.currently_displaying {
             u32::MAX
         } else {
             let alpha = self.compute_alpha();
             if alpha != 255 {
                 100
             } else {
-                let clamped_time_since_start = self.time_since_start().min(FADE_AT);
+                let clamped_time_since_start = self.display_timer.ms_since_reset().min(FADE_AT);
                 FADE_AT - clamped_time_since_start
             }
         }
@@ -72,16 +72,17 @@ impl NoticePanel {
 
     pub fn update(&mut self) {
         self.recent_state_change = false;
-        if !self.notifications.is_empty() && self.display_start.is_none() {
-            self.display_start = Some(SystemTime::now());
+        if !self.notifications.is_empty() && !self.currently_displaying {
+            self.display_timer.reset();
             self.recent_state_change = true;
+            self.currently_displaying = true;
         }
-        if self.display_start.is_some() {
-            let time_since_start = self.time_since_start();
+        if self.currently_displaying {
+            let time_since_start = self.display_timer.ms_since_reset();
             if time_since_start > NOTICE_TIME {
-                self.display_start = None;
                 self.notifications.remove(0);
                 self.recent_state_change = true;
+                self.currently_displaying = false;
             }
         }
     }

@@ -18,4 +18,5 @@ mod icons;
 mod math;
 mod movement_state;
 mod notice_panel;
+mod time;
 mod tool_select;

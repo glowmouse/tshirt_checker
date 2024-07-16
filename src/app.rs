@@ -8,6 +8,7 @@ use crate::math::*;
 use crate::movement_state::MovementState;
 use crate::notice_panel::*;
 use crate::report_templates::*;
+use crate::time::*;
 use crate::tool_select::*;
 use crate::tshirt_storage::*;
 use egui_extras::{Size, StripBuilder};
@@ -530,6 +531,7 @@ impl TShirtCheckerApp {
             selected_art,
             &sender,
         );
+        let notice_timer = RealTime::default();
 
         Self {
             art_storage,
@@ -543,7 +545,7 @@ impl TShirtCheckerApp {
             receiver,
             sender,
             animate_loading: false,
-            notice_panel: NoticePanel::default(),
+            notice_panel: NoticePanel::new(Box::new(notice_timer)),
         }
     }
 }
