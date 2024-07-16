@@ -1,4 +1,7 @@
-use crate::time::Time;
+use crate::time::*;
+//use std::rc::Rc;
+
+pub type DisplayTimerPtr = Box<dyn Time>;
 
 const NOTICE_TIME: u32 = 10000;
 const FADE_TIME: u32 = 1024;
@@ -6,13 +9,13 @@ const FADE_AT: u32 = NOTICE_TIME - FADE_TIME;
 
 pub struct NoticePanel {
     notifications: Vec<String>,
-    display_timer: Box<dyn Time>,
+    display_timer: DisplayTimerPtr,
     recent_state_change: bool,
     currently_displaying: bool,
 }
 
 impl NoticePanel {
-    pub fn new(timer: Box<dyn Time>) -> Self {
+    pub fn new(timer: DisplayTimerPtr) -> Self {
         let notifications = Vec::new();
         Self {
             notifications,
@@ -22,8 +25,8 @@ impl NoticePanel {
         }
     }
 
-    pub fn add_notice(&mut self, notice: String) {
-        self.notifications.push(notice);
+    pub fn add_notice(&mut self, notice: impl Into<String>) {
+        self.notifications.push(notice.into());
     }
 
     fn compute_alpha(&self) -> u8 {
@@ -85,5 +88,20 @@ impl NoticePanel {
                 self.currently_displaying = false;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod notice_panel_should {
+    use super::*;
+
+    #[test]
+    fn fade_in_when_notification_occurs() {
+        let fake_time = Box::new(FakeTime::default());
+        let mut notice_panel: NoticePanel = NoticePanel::new(fake_time);
+        notice_panel.add_notice("Testing");
+        notice_panel.update();
+        // Yeah, smart pointers are a learning project.
+        //fake_time.advance(10);
     }
 }

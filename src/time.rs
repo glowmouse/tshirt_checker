@@ -30,3 +30,24 @@ impl Default for RealTime {
         }
     }
 }
+
+#[derive(Default)]
+pub struct FakeTime {
+    time: u32,
+}
+
+impl Time for FakeTime {
+    fn reset(&mut self) {
+        self.time = 0;
+    }
+    fn ms_since_reset(&self) -> u32 {
+        self.time
+    }
+}
+
+impl FakeTime {
+    #[cfg(test)]
+    pub fn _advance(&mut self, time_to_advance: u32) {
+        self.time += time_to_advance;
+    }
+}
