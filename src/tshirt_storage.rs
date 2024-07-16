@@ -22,8 +22,11 @@ pub struct TShirtStorage {
 
 impl TShirtStorage {
     pub fn new(ctx: &egui::Context) -> Self {
-        let blue_shirt: LoadedImage =
-            load_image_from_trusted_source(include_bytes!("blue_tshirt.png"), "blue_shirt", ctx);
+        let blue_shirt: LoadedImage = load_image_from_trusted_source(
+            include_bytes!("../assets/blue_tshirt.png"),
+            "blue_shirt",
+            ctx,
+        );
         let red_shirt: LoadedImage =
             load_image_from_existing_image(&blue_shirt, blue_to_red, "red_shirt", ctx);
         let dgreen_shirt: LoadedImage =

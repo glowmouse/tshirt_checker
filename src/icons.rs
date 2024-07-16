@@ -29,43 +29,85 @@ pub struct IconStorage {
 impl IconStorage {
     pub fn new(ctx: &egui::Context) -> Self {
         let pass: LoadedImage =
-            load_image_from_trusted_source(include_bytes!("pass.png"), "pass", ctx);
+            load_image_from_trusted_source(include_bytes!("../assets/pass.png"), "pass", ctx);
         let warn: LoadedImage =
-            load_image_from_trusted_source(include_bytes!("warn.png"), "warn", ctx);
+            load_image_from_trusted_source(include_bytes!("../assets/warn.png"), "warn", ctx);
         let fail: LoadedImage =
-            load_image_from_trusted_source(include_bytes!("fail.png"), "fail", ctx);
+            load_image_from_trusted_source(include_bytes!("../assets/fail.png"), "fail", ctx);
         let tool: LoadedImage =
-            load_image_from_trusted_source(include_bytes!("tool.png"), "tool", ctx);
+            load_image_from_trusted_source(include_bytes!("../assets/tool.png"), "tool", ctx);
 
         // TODO, right way to do this in Rust.
-        let loading_01: LoadedImage =
-            load_image_from_trusted_source(include_bytes!("spinner_01.png"), "loading", ctx);
-        let loading_02: LoadedImage =
-            load_image_from_trusted_source(include_bytes!("spinner_02.png"), "loading", ctx);
-        let loading_03: LoadedImage =
-            load_image_from_trusted_source(include_bytes!("spinner_03.png"), "loading", ctx);
-        let loading_04: LoadedImage =
-            load_image_from_trusted_source(include_bytes!("spinner_04.png"), "loading", ctx);
-        let loading_05: LoadedImage =
-            load_image_from_trusted_source(include_bytes!("spinner_05.png"), "loading", ctx);
-        let loading_06: LoadedImage =
-            load_image_from_trusted_source(include_bytes!("spinner_06.png"), "loading", ctx);
-        let loading_07: LoadedImage =
-            load_image_from_trusted_source(include_bytes!("spinner_07.png"), "loading", ctx);
-        let loading_08: LoadedImage =
-            load_image_from_trusted_source(include_bytes!("spinner_08.png"), "loading", ctx);
-        let loading_09: LoadedImage =
-            load_image_from_trusted_source(include_bytes!("spinner_09.png"), "loading", ctx);
-        let loading_10: LoadedImage =
-            load_image_from_trusted_source(include_bytes!("spinner_10.png"), "loading", ctx);
-        let loading_11: LoadedImage =
-            load_image_from_trusted_source(include_bytes!("spinner_11.png"), "loading", ctx);
-        let loading_12: LoadedImage =
-            load_image_from_trusted_source(include_bytes!("spinner_12.png"), "loading", ctx);
-        let import: LoadedImage =
-            load_image_from_trusted_source(include_bytes!("import_80x80.png"), "import", ctx);
-        let partial_transparency_fix: LoadedImage =
-            load_image_from_trusted_source(include_bytes!("partialt_80x80.png"), "partialt", ctx);
+        let loading_01: LoadedImage = load_image_from_trusted_source(
+            include_bytes!("../assets/spinner_01.png"),
+            "loading",
+            ctx,
+        );
+        let loading_02: LoadedImage = load_image_from_trusted_source(
+            include_bytes!("../assets/spinner_02.png"),
+            "loading",
+            ctx,
+        );
+        let loading_03: LoadedImage = load_image_from_trusted_source(
+            include_bytes!("../assets/spinner_03.png"),
+            "loading",
+            ctx,
+        );
+        let loading_04: LoadedImage = load_image_from_trusted_source(
+            include_bytes!("../assets/spinner_04.png"),
+            "loading",
+            ctx,
+        );
+        let loading_05: LoadedImage = load_image_from_trusted_source(
+            include_bytes!("../assets/spinner_05.png"),
+            "loading",
+            ctx,
+        );
+        let loading_06: LoadedImage = load_image_from_trusted_source(
+            include_bytes!("../assets/spinner_06.png"),
+            "loading",
+            ctx,
+        );
+        let loading_07: LoadedImage = load_image_from_trusted_source(
+            include_bytes!("../assets/spinner_07.png"),
+            "loading",
+            ctx,
+        );
+        let loading_08: LoadedImage = load_image_from_trusted_source(
+            include_bytes!("../assets/spinner_08.png"),
+            "loading",
+            ctx,
+        );
+        let loading_09: LoadedImage = load_image_from_trusted_source(
+            include_bytes!("../assets/spinner_09.png"),
+            "loading",
+            ctx,
+        );
+        let loading_10: LoadedImage = load_image_from_trusted_source(
+            include_bytes!("../assets/spinner_10.png"),
+            "loading",
+            ctx,
+        );
+        let loading_11: LoadedImage = load_image_from_trusted_source(
+            include_bytes!("../assets/spinner_11.png"),
+            "loading",
+            ctx,
+        );
+        let loading_12: LoadedImage = load_image_from_trusted_source(
+            include_bytes!("../assets/spinner_12.png"),
+            "loading",
+            ctx,
+        );
+        let import: LoadedImage = load_image_from_trusted_source(
+            include_bytes!("../assets/import_80x80.png"),
+            "import",
+            ctx,
+        );
+        let partial_transparency_fix: LoadedImage = load_image_from_trusted_source(
+            include_bytes!("../assets/partialt_80x80.png"),
+            "partialt",
+            ctx,
+        );
 
         Self {
             pass,
