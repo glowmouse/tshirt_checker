@@ -12,16 +12,19 @@ pub struct NoticePanel {
     display_timer: DisplayTimerPtr,
     recent_state_change: bool,
     currently_displaying: bool,
+    reset_time: u64,
 }
 
 impl NoticePanel {
     pub fn new(timer: DisplayTimerPtr) -> Self {
         let notifications = Vec::new();
+        let current_time = timer.ms_since_start();
         Self {
             notifications,
             display_timer: timer,
             recent_state_change: false,
             currently_displaying: false,
+            reset_time: current_time,
         }
     }
 
@@ -33,7 +36,7 @@ impl NoticePanel {
         if !self.currently_displaying {
             255
         } else {
-            let time_since_start = self.display_timer.ms_since_reset().min(NOTICE_TIME);
+            let time_since_start = self.time_since_reset().min(NOTICE_TIME);
             let time_to_end = NOTICE_TIME - time_since_start;
             if time_since_start < FADE_TIME {
                 (time_since_start * 255 / FADE_TIME).try_into().unwrap()
@@ -67,26 +70,33 @@ impl NoticePanel {
             if alpha != 255 {
                 100
             } else {
-                let clamped_time_since_start = self.display_timer.ms_since_reset().min(FADE_AT);
+                let clamped_time_since_start = self.time_since_reset().min(FADE_AT);
                 FADE_AT - clamped_time_since_start
             }
         }
     }
 
+    fn reset_timer(&mut self) {
+        self.reset_time = self.display_timer.ms_since_start();
+    }
+
+    fn time_since_reset(&self) -> u32 {
+        (self.display_timer.ms_since_start() - self.reset_time)
+            .try_into()
+            .unwrap()
+    }
+
     pub fn update(&mut self) {
         self.recent_state_change = false;
         if !self.notifications.is_empty() && !self.currently_displaying {
-            self.display_timer.reset();
+            self.reset_timer();
             self.recent_state_change = true;
             self.currently_displaying = true;
         }
-        if self.currently_displaying {
-            let time_since_start = self.display_timer.ms_since_reset();
-            if time_since_start > NOTICE_TIME {
-                self.notifications.remove(0);
-                self.recent_state_change = true;
-                self.currently_displaying = false;
-            }
+        if self.currently_displaying && self.time_since_reset() > NOTICE_TIME {
+            self.notifications.remove(0);
+            self.recent_state_change = true;
+            self.currently_displaying = false;
         }
     }
 }

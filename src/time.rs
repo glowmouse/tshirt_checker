@@ -1,8 +1,7 @@
 use web_time::SystemTime;
 
 pub trait Time {
-    fn reset(&mut self);
-    fn ms_since_reset(&self) -> u32;
+    fn ms_since_start(&self) -> u64;
 }
 
 pub struct RealTime {
@@ -10,10 +9,7 @@ pub struct RealTime {
 }
 
 impl Time for RealTime {
-    fn reset(&mut self) {
-        self.time_at_reset = SystemTime::now();
-    }
-    fn ms_since_reset(&self) -> u32 {
+    fn ms_since_start(&self) -> u64 {
         self.time_at_reset
             .elapsed()
             .unwrap()
@@ -33,21 +29,18 @@ impl Default for RealTime {
 
 #[derive(Default)]
 pub struct FakeTime {
-    time: u32,
+    time: u64,
 }
 
 impl Time for FakeTime {
-    fn reset(&mut self) {
-        self.time = 0;
-    }
-    fn ms_since_reset(&self) -> u32 {
+    fn ms_since_start(&self) -> u64 {
         self.time
     }
 }
 
 impl FakeTime {
     #[cfg(test)]
-    pub fn _advance(&mut self, time_to_advance: u32) {
+    pub fn _advance(&mut self, time_to_advance: u64) {
         self.time += time_to_advance;
     }
 }
