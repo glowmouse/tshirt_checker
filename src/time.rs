@@ -1,3 +1,4 @@
+use core::cell::RefCell;
 use web_time::SystemTime;
 
 pub trait Time {
@@ -29,18 +30,18 @@ impl Default for RealTime {
 
 #[derive(Default)]
 pub struct FakeTime {
-    time: u64,
+    time: RefCell<u64>,
 }
 
 impl Time for FakeTime {
     fn ms_since_start(&self) -> u64 {
-        self.time
+        *self.time.borrow()
     }
 }
 
 impl FakeTime {
     #[cfg(test)]
-    pub fn _advance(&mut self, time_to_advance: u64) {
-        self.time += time_to_advance;
+    pub fn advance(&self, time_to_advance: u64) {
+        *self.time.borrow_mut() += time_to_advance;
     }
 }

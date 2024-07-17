@@ -111,7 +111,7 @@ mod notice_panel_should {
         let mut notice_panel: NoticePanel = NoticePanel::new(fake_time.clone());
         notice_panel.add_notice("Testing");
         notice_panel.update();
-        // Still a work in progress
-        // fake_time.advance(10);
+        fake_time.advance(10);
+        assert_eq!(10, fake_time.ms_since_start());
     }
 }
