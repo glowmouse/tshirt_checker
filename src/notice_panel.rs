@@ -105,13 +105,49 @@ impl NoticePanel {
 mod notice_panel_should {
     use super::*;
 
+    pub fn _create_test_context() -> egui::Context {
+        let ctx = egui::Context::default();
+        ctx.set_fonts(egui::FontDefinitions::empty()); // prevent fonts from being loaded (save CPU time)
+        ctx
+    }
+
+    pub fn _run_code_with_context(
+        ctx: &mut egui::Context,
+        mut add_contents: impl FnMut(&mut egui::Ui),
+    ) {
+        let _ = ctx.run(Default::default(), |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                add_contents(ui);
+            });
+        });
+    }
+
     #[test]
     fn fade_in_when_notification_occurs() {
+        // Test Setup
+        let mut ctx = _create_test_context();
         let fake_time = Rc::new(FakeTime::default());
         let mut notice_panel: NoticePanel = NoticePanel::new(fake_time.clone());
-        notice_panel.add_notice("Testing");
-        notice_panel.update();
+
+        // Run display with initial state
+        _run_code_with_context(&mut ctx, |ui| notice_panel.display(ui));
+        // TODO - test ctx to see if display performed as expected
+
+        // Advance time then add a notice.  Run display again
         fake_time.advance(10);
-        assert_eq!(10, fake_time.ms_since_start());
+        _run_code_with_context(&mut ctx, |ui| {
+            notice_panel.add_notice("Testing");
+            notice_panel.update();
+            notice_panel.display(ui);
+        });
+        // TODO - test ctx to see if display performed as expected
+
+        // Advance time a bit more and do update/ display again
+        fake_time.advance(10);
+        _run_code_with_context(&mut ctx, |ui| {
+            notice_panel.update();
+            notice_panel.display(ui);
+        });
+        // TODO - test ctx to see if display performed as expected
     }
 }
