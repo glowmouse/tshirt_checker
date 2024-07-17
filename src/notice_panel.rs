@@ -1,7 +1,7 @@
 use crate::time::*;
-//use std::rc::Rc;
+use std::rc::Rc;
 
-pub type DisplayTimerPtr = Box<dyn Time>;
+pub type DisplayTimerPtr = Rc<dyn Time>;
 
 const NOTICE_TIME: u32 = 10000;
 const FADE_TIME: u32 = 1024;
@@ -107,11 +107,11 @@ mod notice_panel_should {
 
     #[test]
     fn fade_in_when_notification_occurs() {
-        let fake_time = Box::new(FakeTime::default());
-        let mut notice_panel: NoticePanel = NoticePanel::new(fake_time);
+        let fake_time = Rc::new(FakeTime::default());
+        let mut notice_panel: NoticePanel = NoticePanel::new(fake_time.clone());
         notice_panel.add_notice("Testing");
         notice_panel.update();
-        // Yeah, smart pointers are a learning project.
-        //fake_time.advance(10);
+        // Still a work in progress
+        // fake_time.advance(10);
     }
 }

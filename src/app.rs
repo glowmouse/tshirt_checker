@@ -13,7 +13,7 @@ use crate::tool_select::*;
 use crate::tshirt_storage::*;
 use egui_extras::{Size, StripBuilder};
 use na::{dvector, vector};
-//use std::rc::Rc;
+use std::rc::Rc;
 
 const TOOL_WIDTH: f32 = 20.0;
 const STATUS_ICON_WIDTH: f32 = 25.0;
@@ -546,7 +546,7 @@ impl TShirtCheckerApp {
             receiver,
             sender,
             animate_loading: false,
-            notice_panel: NoticePanel::new(Box::<RealTime>::new(notice_timer)),
+            notice_panel: NoticePanel::new(Rc::<RealTime>::new(notice_timer)),
         }
     }
 }
