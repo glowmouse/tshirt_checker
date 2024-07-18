@@ -138,6 +138,7 @@ mod notice_panel_should {
 
         // Run display with initial state
         _run_code_with_context(&mut ctx, |ui| notice_panel.display(ui));
+        assert_eq!(u32::MAX, notice_panel.time_to_update());
 
         // Advance time then add a notice.  Run display again
         fake_time.advance(10);
@@ -145,6 +146,7 @@ mod notice_panel_should {
             notice_panel.add_notice("T0");
             notice_panel.add_notice("T1");
             notice_panel.update();
+            assert_eq!(100, notice_panel.time_to_update());
             notice_panel.display(ui);
         });
 
@@ -152,44 +154,52 @@ mod notice_panel_should {
         fake_time.advance(512);
         _run_code_with_context(&mut ctx, |ui| {
             notice_panel.update();
+            assert_eq!(100, notice_panel.time_to_update());
             notice_panel.display(ui);
         });
         // Advance time a bit more and do update/ display again
         fake_time.advance(512);
+        let fade_in_should_start_at: u32 = 10000 - 1024 - 1024;
         _run_code_with_context(&mut ctx, |ui| {
             notice_panel.update();
+            assert_eq!(fade_in_should_start_at, notice_panel.time_to_update());
             notice_panel.display(ui);
         });
-        let fade_in_should_start_at = 10000 - 1024 - 1024;
-        fake_time.advance(fade_in_should_start_at);
+        fake_time.advance(fade_in_should_start_at.into());
         _run_code_with_context(&mut ctx, |ui| {
             notice_panel.update();
             notice_panel.display(ui);
-        });
-        fake_time.advance(512);
-        _run_code_with_context(&mut ctx, |ui| {
-            notice_panel.update();
-            notice_panel.display(ui);
+            assert_eq!(0, notice_panel.time_to_update());
         });
         fake_time.advance(512);
         _run_code_with_context(&mut ctx, |ui| {
             notice_panel.update();
             notice_panel.display(ui);
+            assert_eq!(100, notice_panel.time_to_update());
+        });
+        fake_time.advance(512);
+        _run_code_with_context(&mut ctx, |ui| {
+            notice_panel.update();
+            notice_panel.display(ui);
+            assert_eq!(100, notice_panel.time_to_update());
         });
         fake_time.advance(1);
         _run_code_with_context(&mut ctx, |ui| {
             notice_panel.update();
             notice_panel.display(ui);
+            assert_eq!(100, notice_panel.time_to_update());
         });
         fake_time.advance(1);
         _run_code_with_context(&mut ctx, |ui| {
             notice_panel.update();
             notice_panel.display(ui);
+            assert_eq!(100, notice_panel.time_to_update());
         });
         fake_time.advance(512);
         _run_code_with_context(&mut ctx, |ui| {
             notice_panel.update();
             notice_panel.display(ui);
+            assert_eq!(100, notice_panel.time_to_update());
         });
         assert_eq!("(NP) (NP T0 0) (NP T0 127) (NP T0 255) (NP T0 255) (NP T0 127) (NP T0 0) (NP) (NP T1 0) (NP T1 127) ", string_log._get_all());
     }
