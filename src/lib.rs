@@ -15,6 +15,7 @@ mod artwork;
 mod async_tasks;
 mod error;
 mod icons;
+mod log;
 mod math;
 mod movement_state;
 mod notice_panel;

@@ -1,7 +1,9 @@
+use crate::log::*;
 use crate::time::*;
 use std::rc::Rc;
 
 pub type DisplayTimerPtr = Rc<dyn Time>;
+pub type LogPtr = Rc<dyn AppLog>;
 
 const NOTICE_TIME: u32 = 10000;
 const FADE_TIME: u32 = 1024;
@@ -13,10 +15,11 @@ pub struct NoticePanel {
     recent_state_change: bool,
     currently_displaying: bool,
     reset_time: u64,
+    log: LogPtr,
 }
 
 impl NoticePanel {
-    pub fn new(timer: DisplayTimerPtr) -> Self {
+    pub fn new(timer: DisplayTimerPtr, log: LogPtr) -> Self {
         let notifications = Vec::new();
         let current_time = timer.ms_since_start();
         Self {
@@ -25,6 +28,7 @@ impl NoticePanel {
             recent_state_change: false,
             currently_displaying: false,
             reset_time: current_time,
+            log,
         }
     }
 
@@ -49,15 +53,17 @@ impl NoticePanel {
     }
 
     pub fn display(&self, ui: &mut egui::Ui) {
-        let label_text = if !self.notifications.is_empty() {
-            &self.notifications[0]
+        if self.currently_displaying {
+            let label_text = &self.notifications[0];
+            let alpha = self.compute_alpha();
+            ui.horizontal(|ui| {
+                let color = egui::Color32::from_rgba_premultiplied(255, 0, 0, alpha);
+                ui.label(egui::widget_text::RichText::from(label_text).color(color));
+            });
+            self.log.log(format!("(NP {} {})", label_text, alpha))
         } else {
-            ""
-        };
-        ui.horizontal(|ui| {
-            let color = egui::Color32::from_rgba_premultiplied(255, 0, 0, self.compute_alpha());
-            ui.label(egui::widget_text::RichText::from(label_text).color(color));
-        });
+            self.log.log("(NP)".to_string());
+        }
     }
 
     pub fn time_to_update(&self) -> u32 {
@@ -127,27 +133,64 @@ mod notice_panel_should {
         // Test Setup
         let mut ctx = _create_test_context();
         let fake_time = Rc::new(FakeTime::default());
-        let mut notice_panel: NoticePanel = NoticePanel::new(fake_time.clone());
+        let string_log = Rc::new(StringLog::default());
+        let mut notice_panel: NoticePanel = NoticePanel::new(fake_time.clone(), string_log.clone());
 
         // Run display with initial state
         _run_code_with_context(&mut ctx, |ui| notice_panel.display(ui));
-        // TODO - test ctx to see if display performed as expected
 
         // Advance time then add a notice.  Run display again
         fake_time.advance(10);
         _run_code_with_context(&mut ctx, |ui| {
-            notice_panel.add_notice("Testing");
+            notice_panel.add_notice("T0");
+            notice_panel.add_notice("T1");
             notice_panel.update();
             notice_panel.display(ui);
         });
-        // TODO - test ctx to see if display performed as expected
 
         // Advance time a bit more and do update/ display again
-        fake_time.advance(10);
+        fake_time.advance(512);
         _run_code_with_context(&mut ctx, |ui| {
             notice_panel.update();
             notice_panel.display(ui);
         });
-        // TODO - test ctx to see if display performed as expected
+        // Advance time a bit more and do update/ display again
+        fake_time.advance(512);
+        _run_code_with_context(&mut ctx, |ui| {
+            notice_panel.update();
+            notice_panel.display(ui);
+        });
+        let fade_in_should_start_at = 10000 - 1024 - 1024;
+        fake_time.advance(fade_in_should_start_at);
+        _run_code_with_context(&mut ctx, |ui| {
+            notice_panel.update();
+            notice_panel.display(ui);
+        });
+        fake_time.advance(512);
+        _run_code_with_context(&mut ctx, |ui| {
+            notice_panel.update();
+            notice_panel.display(ui);
+        });
+        fake_time.advance(512);
+        _run_code_with_context(&mut ctx, |ui| {
+            notice_panel.update();
+            notice_panel.display(ui);
+        });
+        fake_time.advance(1);
+        _run_code_with_context(&mut ctx, |ui| {
+            notice_panel.update();
+            notice_panel.display(ui);
+        });
+        fake_time.advance(1);
+        _run_code_with_context(&mut ctx, |ui| {
+            notice_panel.update();
+            notice_panel.display(ui);
+        });
+        fake_time.advance(512);
+        _run_code_with_context(&mut ctx, |ui| {
+            notice_panel.update();
+            notice_panel.display(ui);
+        });
+        assert_eq!("(NP) (NP T0 0) (NP T0 127) (NP T0 255) (NP T0 255) (NP T0 127) (NP T0 0) (NP) (NP T1 0) (NP T1 127) ", string_log._get_all());
     }
 }

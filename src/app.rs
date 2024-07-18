@@ -4,6 +4,7 @@ use crate::async_tasks::*;
 use crate::error::*;
 use crate::icons::*;
 use crate::loaded_image::*;
+use crate::log::*;
 use crate::math::*;
 use crate::movement_state::MovementState;
 use crate::notice_panel::*;
@@ -533,6 +534,9 @@ impl TShirtCheckerApp {
             &sender,
         );
         let notice_timer = RealTime::default();
+        let notice_timer_ptr = Rc::<RealTime>::new(notice_timer);
+        let null_log = NullLog::default();
+        let null_log_ptr = Rc::<NullLog>::new(null_log);
 
         Self {
             art_storage,
@@ -546,7 +550,7 @@ impl TShirtCheckerApp {
             receiver,
             sender,
             animate_loading: false,
-            notice_panel: NoticePanel::new(Rc::<RealTime>::new(notice_timer)),
+            notice_panel: NoticePanel::new(notice_timer_ptr, null_log_ptr),
         }
     }
 }
