@@ -6,12 +6,12 @@ parser.add_argument('--gamma', dest='gamma', action='store', required=True );
 args = parser.parse_args()
 gamma = float(args.gamma);
 
-print("const gamma : [u16; 257 ] = [", end='')
+print("const gamma : [u16; 1025] = [", end='')
 
-for number in range(257):
-  out = int(pow( float(number)/256.0, gamma ) * 256.0)
+for number in range(1025):
+  out = int(pow( float(number)/1024.0, gamma ) * 1024.0)
   print(str(out), end='')
-  if number != 256:
+  if number != 1024:
     print(",", end='')
 print("];")
 
