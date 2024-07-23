@@ -1,10 +1,10 @@
-const HSLA_ONE: i32 = 256;
+const HSLA_ONE: i32 = 1024;
 const HSLA_HALF: i32 = HSLA_ONE / 2;
 const HSLA_TWO: i32 = HSLA_ONE * 2;
 const HSLA_THREE: i32 = HSLA_ONE * 3;
 const HSLA_FOUR: i32 = HSLA_ONE * 4;
 const HSLA_SIX: i32 = HSLA_ONE * 6;
-const ONE_U16: u16 = 256;
+const ONE_U32: u32 = 1024;
 
 /// A color represented in HSLA space
 ///
@@ -27,7 +27,7 @@ pub struct Hsla {
 ///   // S: 256 = 1.0 * 256 (full green color saturation)
 ///   // L: 128 = 0.5 * 256
 ///   // A: 255 = 1.0 * 255
-///   let expected_green_hsla = Hsla::new(512, 256, 128, 255);
+///   let expected_green_hsla = Hsla::new(2048, 1024, 512, 255);
 ///   assert_eq!( expected_green_hsla, (&green_rgba).into());
 ///
 ///   let pink_rgba = egui::Color32::from_rgba_premultiplied(255, 128, 128, 255);
@@ -35,15 +35,15 @@ pub struct Hsla {
 ///   // S: 256 = 1.0 * 256 (full color saturation)
 ///   // L: 192 = 0.5 * 256 (~half way between red and white)
 ///   // A: 255 = 1.0 * 255
-///   let expected_pink_hsla = Hsla::new(0, 256, 192, 255);
+///   let expected_pink_hsla = Hsla::new(0, 1024, 769, 255);
 ///   assert_eq!( expected_pink_hsla, Hsla::from(&pink_rgba));
 ///
 ///   let grey_rgba = egui::Color32::from_rgba_premultiplied(192,192,192,255);
 ///   // H: 0   = 0.0 * 256 (doesn't really matter because of S
 ///   // S: 0   = 0.0 * 256 (no color at all)
-///   // L: 192 = 0.5 * 256 (3/4 between black and white)
+///   // L: 193 = 0.5 * 256 (3/4 between black and white)
 ///   // A: 255 = 1.0 * 255
-///   let expected_grey_hsla = Hsla::new(0, 0, 192, 255);
+///   let expected_grey_hsla = Hsla::new(0, 0, 771, 255);
 ///   assert_eq!( expected_grey_hsla, (&grey_rgba).into());
 /// # }
 /// ```
@@ -104,7 +104,7 @@ impl From<&egui::Color32> for Hsla {
 ///   // S: 256 = 1.0 * 256 (full green color saturation)
 ///   // L: 128 = 0.5 * 256
 ///   // A: 255 = 1.0 * 255
-///   let expected_green_hsla = Hsla::new(512, 256, 128, 255);
+///   let expected_green_hsla = Hsla::new(2048, 1024, 512, 255);
 ///   assert_eq!( expected_green_hsla, green_rgba.into());
 ///
 ///   let pink_rgba = egui::Color32::from_rgba_premultiplied(255, 128, 128, 255);
@@ -112,7 +112,7 @@ impl From<&egui::Color32> for Hsla {
 ///   // S: 256 = 1.0 * 256 (full color saturation)
 ///   // L: 192 = 0.5 * 256 (~half way between red and white)
 ///   // A: 255 = 1.0 * 255
-///   let expected_pink_hsla = Hsla::new(0, 256, 192, 255);
+///   let expected_pink_hsla = Hsla::new(0, 1024, 769, 255);
 ///   assert_eq!( expected_pink_hsla, Hsla::from(pink_rgba));
 ///
 ///   let grey_rgba = egui::Color32::from_rgba_premultiplied(192,192,192,255);
@@ -120,7 +120,7 @@ impl From<&egui::Color32> for Hsla {
 ///   // S: 0   = 0.0 * 256 (no color at all)
 ///   // L: 192 = 0.5 * 256 (3/4 between black and white)
 ///   // A: 255 = 1.0 * 255
-///   let expected_grey_hsla = Hsla::new(0, 0, 192, 255);
+///   let expected_grey_hsla = Hsla::new(0, 0, 771, 255);
 ///   assert_eq!( expected_grey_hsla, grey_rgba.into());
 /// # }
 /// ```
@@ -135,8 +135,8 @@ impl From<&Hsla> for egui::Color32 {
 
     fn from(val: &Hsla) -> Self {
         if val.s == 0 {
-            let grey_u16 = val.l * 255 / ONE_U16;
-            let grey_u8 = grey_u16.try_into().unwrap();
+            let grey_u32 = u32::from(val.l) * 255 / ONE_U32;
+            let grey_u8 = grey_u32.try_into().unwrap();
             return egui::Color32::from_rgba_premultiplied(grey_u8, grey_u8, grey_u8, val.a);
         }
         let h: i32 = i32::from(val.h);
@@ -192,6 +192,11 @@ impl Hsla {
 mod tests {
     use super::*;
 
+    const ONE_U16: u16 = 1024;
+    const TWO_U16: u16 = ONE_U16 * 2;
+    const FOUR_U16: u16 = ONE_U16 * 4;
+    const HALF_U16: u16 = ONE_U16 / 2;
+
     // helper
     fn rgba(r: u8, g: u8, b: u8, a: u8) -> egui::Color32 {
         egui::Color32::from_rgba_premultiplied(r, g, b, a)
@@ -202,29 +207,29 @@ mod tests {
         let gd = ((expected.g() as i32) - (actual.g() as i32)).abs();
         let bd = ((expected.b() as i32) - (actual.b() as i32)).abs();
         let ad = ((expected.a() as i32) - (actual.a() as i32)).abs();
-        rd <= 4 && gd <= 4 && bd <= 4 && ad == 0
+        rd <= 1 && gd <= 1 && bd <= 1 && ad == 0
     }
 
     #[test]
     fn test_primaries() {
         let red_hsla = Hsla {
             h: 0,
-            s: 256,
-            l: 128,
+            s: ONE_U16,
+            l: HALF_U16,
             a: 255,
         };
         assert_eq!(rgba(255, 0, 0, 255), red_hsla.into());
         let green_hsla = Hsla {
-            h: 512,
-            s: 256,
-            l: 128,
+            h: TWO_U16,
+            s: ONE_U16,
+            l: HALF_U16,
             a: 255,
         };
         assert_eq!(rgba(0, 255, 0, 255), green_hsla.into());
         let blue_hsla = Hsla {
-            h: 1024,
-            s: 256,
-            l: 128,
+            h: FOUR_U16,
+            s: ONE_U16,
+            l: HALF_U16,
             a: 255,
         };
         assert_eq!(rgba(0, 0, 255, 255), blue_hsla.into());

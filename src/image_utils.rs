@@ -8,7 +8,7 @@ pub fn blue_to_red(input: &egui::Color32) -> egui::Color32 {
     // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
     // 1024 to adjust the primary color to red.
     let red_adjust = Hsla {
-        h: (hsla.h + 6 * 256 - 324 + 1024) % (6 * 256),
+        h: (hsla.h + 6 * 256 * 4 - 324 * 4 + 1024 * 4) % (6 * 256 * 4),
         s: hsla.s,
         l: hsla.l,
         a: hsla.a,
@@ -22,7 +22,7 @@ pub fn blue_to_dgreen(input: &egui::Color32) -> egui::Color32 {
     // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
     // 38 to adjust the primary color to dark green
     let dgreen_adjust = Hsla {
-        h: (hsla.h + 6 * 256 - 324 + 38) % (6 * 256),
+        h: (hsla.h + 6 * 256 * 4 - 324 * 4 + 38 * 4) % (6 * 256 * 4),
         s: hsla.s,
         l: crate::gamma_tables::GAMMA_17[hsla.l as usize],
         a: hsla.a,
@@ -36,7 +36,7 @@ pub fn blue_to_ddgreen(input: &egui::Color32) -> egui::Color32 {
     // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
     // 38 to adjust the primary color to green, then gamma down saturation.
     let ddgreen_adjust = Hsla {
-        h: (hsla.h + 6 * 256 - 324 + 38) % (6 * 256),
+        h: (hsla.h + 6 * 256 * 4 - 324 * 4 + 38 * 4) % (6 * 256 * 4),
         s: crate::gamma_tables::GAMMA_30[hsla.s as usize],
         l: crate::gamma_tables::GAMMA_22[hsla.l as usize],
         a: hsla.a,
@@ -50,7 +50,7 @@ pub fn blue_to_dblue(input: &egui::Color32) -> egui::Color32 {
     // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
     // 350 to adjust the primary color to dark blue
     let dblue_adjust = Hsla {
-        h: (hsla.h + 6 * 256 - 324 + 350) % (6 * 256),
+        h: (hsla.h + 6 * 256 * 4 - 324 * 4 + 350 * 4) % (6 * 256 * 4),
         s: crate::gamma_tables::GAMMA_30[hsla.s as usize],
         l: crate::gamma_tables::GAMMA_17[hsla.l as usize],
         a: hsla.a,
@@ -64,7 +64,7 @@ pub fn blue_to_burg(input: &egui::Color32) -> egui::Color32 {
     // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
     // 1024 to adjust the primary color to red.
     let burg_adjust = Hsla {
-        h: (hsla.h + 6 * 256 - 324 + 439 + 512) % (6 * 256),
+        h: (hsla.h + 6 * 256 * 4 - 324 * 4 + 439 * 4 + 512 * 4) % (6 * 256 * 4),
         s: hsla.s,
         l: crate::gamma_tables::GAMMA_17[hsla.l as usize],
         a: hsla.a,
