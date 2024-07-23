@@ -24,7 +24,7 @@ pub fn blue_to_dgreen(input: &egui::Color32) -> egui::Color32 {
     let dgreen_adjust = Hsla {
         h: (hsla.h + 6 * 256 - 324 + 38) % (6 * 256),
         s: hsla.s,
-        l: crate::gamma_tables::GAMMA_17[hsla.l as usize],
+        l: crate::gamma_tables::GAMMA_17[hsla.l as usize].into(),
         a: hsla.a,
     };
     dgreen_adjust.into()
@@ -37,8 +37,8 @@ pub fn blue_to_ddgreen(input: &egui::Color32) -> egui::Color32 {
     // 38 to adjust the primary color to green, then gamma down saturation.
     let ddgreen_adjust = Hsla {
         h: (hsla.h + 6 * 256 - 324 + 38) % (6 * 256),
-        s: crate::gamma_tables::GAMMA_30[hsla.s as usize],
-        l: crate::gamma_tables::GAMMA_22[hsla.l as usize],
+        s: crate::gamma_tables::GAMMA_30[hsla.s as usize].into(),
+        l: crate::gamma_tables::GAMMA_22[hsla.l as usize].into(),
         a: hsla.a,
     };
     ddgreen_adjust.into()
@@ -51,8 +51,8 @@ pub fn blue_to_dblue(input: &egui::Color32) -> egui::Color32 {
     // 350 to adjust the primary color to dark blue
     let dblue_adjust = Hsla {
         h: (hsla.h + 6 * 256 - 324 + 350) % (6 * 256),
-        s: crate::gamma_tables::GAMMA_30[hsla.s as usize],
-        l: crate::gamma_tables::GAMMA_17[hsla.l as usize],
+        s: crate::gamma_tables::GAMMA_30[hsla.s as usize].into(),
+        l: crate::gamma_tables::GAMMA_17[hsla.l as usize].into(),
         a: hsla.a,
     };
     dblue_adjust.into()
@@ -66,7 +66,7 @@ pub fn blue_to_burg(input: &egui::Color32) -> egui::Color32 {
     let burg_adjust = Hsla {
         h: (hsla.h + 6 * 256 - 324 + 439 + 512) % (6 * 256),
         s: hsla.s,
-        l: crate::gamma_tables::GAMMA_17[hsla.l as usize],
+        l: crate::gamma_tables::GAMMA_17[hsla.l as usize].into(),
         a: hsla.a,
     };
     burg_adjust.into()

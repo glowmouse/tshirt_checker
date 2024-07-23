@@ -1,10 +1,12 @@
-/// Color in integer HSLA space
+const L_ONE: u16 = 255;
+
+/// A color represented in HSLA space
 ///
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Hsla {
     pub h: u16,
-    pub s: u8,
-    pub l: u8,
+    pub s: u16,
+    pub l: u16,
     pub a: u8,
 }
 
@@ -55,7 +57,7 @@ impl From<&egui::Color32> for Hsla {
             return Hsla {
                 h: 0,
                 s: 0,
-                l: u8::try_from(l).unwrap(),
+                l: u16::try_from(l).unwrap(),
                 a: item.a(),
             };
         }
@@ -88,8 +90,8 @@ impl From<&egui::Color32> for Hsla {
 
         Hsla::new(
             u16::try_from(h).unwrap(),
-            u8::try_from(s).unwrap(),
-            u8::try_from(l).unwrap(),
+            u16::try_from(s).unwrap(),
+            u16::try_from(l).unwrap(),
             item.a(),
         )
     }
@@ -137,7 +139,9 @@ impl From<&Hsla> for egui::Color32 {
 
     fn from(val: &Hsla) -> Self {
         if val.s == 0 {
-            return egui::Color32::from_rgba_premultiplied(val.l, val.l, val.l, val.a);
+            let grey_u16 = val.l * 255 / L_ONE;
+            let grey_u8 = grey_u16.try_into().unwrap();
+            return egui::Color32::from_rgba_premultiplied(grey_u8, grey_u8, grey_u8, val.a);
         }
         let half_u8: i32 = 128;
         let one_u8: i32 = 255;
@@ -189,7 +193,7 @@ impl From<Hsla> for egui::Color32 {
 }
 
 impl Hsla {
-    pub fn new(h: u16, s: u8, l: u8, a: u8) -> Self {
+    pub fn new(h: u16, s: u16, l: u16, a: u8) -> Self {
         Self { h, s, l, a }
     }
 }
