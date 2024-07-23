@@ -1,4 +1,5 @@
-const L_ONE: u16 = 256;
+const ONE_I32: i32 = 256;
+const ONE_U16: u16 = 256;
 
 /// A color represented in HSLA space
 ///
@@ -44,9 +45,9 @@ pub struct Hsla {
 ///
 impl From<&egui::Color32> for Hsla {
     fn from(item: &egui::Color32) -> Self {
-        let r: i32 = i32::from(item.r()) * 256 / 255;
-        let g: i32 = i32::from(item.g()) * 256 / 255;
-        let b: i32 = i32::from(item.b()) * 256 / 255;
+        let r: i32 = i32::from(item.r()) * ONE_I32 / 255;
+        let g: i32 = i32::from(item.g()) * ONE_I32 / 255;
+        let b: i32 = i32::from(item.b()) * ONE_I32 / 255;
 
         let min: i32 = core::cmp::min(core::cmp::min(r, g), b);
         let max: i32 = core::cmp::max(core::cmp::max(r, g), b);
@@ -62,28 +63,28 @@ impl From<&egui::Color32> for Hsla {
             };
         }
 
-        let half: i32 = 128;
-        let two: i32 = 512;
-        let four: i32 = 1024;
+        let half: i32 = ONE_I32 / 2;
+        let two: i32 = ONE_I32 * 2;
+        let four: i32 = ONE_I32 * 4;
+        let six: i32 = ONE_I32 * 6;
 
         let s: i32 = if l <= half {
-            ((max - min) * 256) / (max + min)
+            ((max - min) * ONE_I32) / (max + min)
         } else {
-            ((max - min) * 256) / (two - max - min)
+            ((max - min) * ONE_I32) / (two - max - min)
         };
 
         let ht: i32 = if r == max {
-            ((g - b) << 8) / (max - min)
+            ((g - b) * ONE_I32) / (max - min)
         } else if g == max {
-            two + ((b - r) << 8) / (max - min)
+            two + ((b - r) * ONE_I32) / (max - min)
         } else {
-            four + ((r - g) << 8) / (max - min)
+            four + ((r - g) * ONE_I32) / (max - min)
         };
 
-        let h = (ht + 256 * 6) % (256 * 6);
+        let h = (ht + six) % (six);
 
         std::assert!(h >= 0);
-        std::assert!(h < 256 * 6);
 
         Hsla::new(
             u16::try_from(h).unwrap(),
@@ -136,7 +137,7 @@ impl From<&Hsla> for egui::Color32 {
 
     fn from(val: &Hsla) -> Self {
         if val.s == 0 {
-            let grey_u16 = val.l * 255 / L_ONE;
+            let grey_u16 = val.l * 255 / ONE_U16;
             let grey_u8 = grey_u16.try_into().unwrap();
             return egui::Color32::from_rgba_premultiplied(grey_u8, grey_u8, grey_u8, val.a);
         }
