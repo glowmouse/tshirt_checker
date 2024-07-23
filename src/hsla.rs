@@ -1,4 +1,9 @@
-const ONE_I32: i32 = 256;
+const HSLA_ONE: i32 = 256;
+const HSLA_HALF: i32 = HSLA_ONE / 2;
+const HSLA_TWO: i32 = HSLA_ONE * 2;
+const HSLA_THREE: i32 = HSLA_ONE * 3;
+const HSLA_FOUR: i32 = HSLA_ONE * 4;
+const HSLA_SIX: i32 = HSLA_ONE * 6;
 const ONE_U16: u16 = 256;
 
 /// A color represented in HSLA space
@@ -45,9 +50,9 @@ pub struct Hsla {
 ///
 impl From<&egui::Color32> for Hsla {
     fn from(item: &egui::Color32) -> Self {
-        let r: i32 = i32::from(item.r()) * ONE_I32 / 255;
-        let g: i32 = i32::from(item.g()) * ONE_I32 / 255;
-        let b: i32 = i32::from(item.b()) * ONE_I32 / 255;
+        let r: i32 = i32::from(item.r()) * HSLA_ONE / 255;
+        let g: i32 = i32::from(item.g()) * HSLA_ONE / 255;
+        let b: i32 = i32::from(item.b()) * HSLA_ONE / 255;
 
         let min: i32 = core::cmp::min(core::cmp::min(r, g), b);
         let max: i32 = core::cmp::max(core::cmp::max(r, g), b);
@@ -63,28 +68,21 @@ impl From<&egui::Color32> for Hsla {
             };
         }
 
-        let half: i32 = ONE_I32 / 2;
-        let two: i32 = ONE_I32 * 2;
-        let four: i32 = ONE_I32 * 4;
-        let six: i32 = ONE_I32 * 6;
-
-        let s: i32 = if l <= half {
-            ((max - min) * ONE_I32) / (max + min)
+        let s: i32 = if l <= HSLA_HALF {
+            ((max - min) * HSLA_ONE) / (max + min)
         } else {
-            ((max - min) * ONE_I32) / (two - max - min)
+            ((max - min) * HSLA_ONE) / (HSLA_TWO - max - min)
         };
 
         let ht: i32 = if r == max {
-            ((g - b) * ONE_I32) / (max - min)
+            ((g - b) * HSLA_ONE) / (max - min)
         } else if g == max {
-            two + ((b - r) * ONE_I32) / (max - min)
+            HSLA_TWO + ((b - r) * HSLA_ONE) / (max - min)
         } else {
-            four + ((r - g) * ONE_I32) / (max - min)
+            HSLA_FOUR + ((r - g) * HSLA_ONE) / (max - min)
         };
 
-        let h = (ht + six) % (six);
-
-        std::assert!(h >= 0);
+        let h = (ht + HSLA_SIX) % (HSLA_SIX);
 
         Hsla::new(
             u16::try_from(h).unwrap(),
@@ -145,37 +143,34 @@ impl From<&Hsla> for egui::Color32 {
         let s: i32 = i32::from(val.s);
         let l: i32 = i32::from(val.l);
 
-        let temp1: i32 = if l <= 128 {
-            (l * (256 + s)) / 256
+        let temp1: i32 = if l <= HSLA_HALF {
+            (l * (HSLA_ONE + s)) / HSLA_ONE
         } else {
-            l + s - ((l * s) / 256)
+            l + s - ((l * s) / HSLA_ONE)
         };
         let temp2: i32 = 2 * l - temp1;
 
         fn hue_to_rgb_2(t1: i32, t2: i32, harg: i32) -> i32 {
-            let h = harg % (6 * 256);
-            let one: i32 = 256;
-            let three: i32 = 256 * 3;
-            let four: i32 = 256 * 4;
-            if h < one {
-                t2 + (t1 - t2) * h / 256
-            } else if h < three {
+            let h = harg % HSLA_SIX;
+            if h < HSLA_ONE {
+                t2 + (t1 - t2) * h / HSLA_ONE
+            } else if h < HSLA_THREE {
                 t1
-            } else if h < four {
-                t2 + (t1 - t2) * (four - h) / 256
+            } else if h < HSLA_FOUR {
+                t2 + (t1 - t2) * (HSLA_FOUR - h) / HSLA_ONE
             } else {
                 t2
             }
         }
 
         fn hue_to_rgb(t1: i32, t2: i32, h: i32) -> u8 {
-            let tmp = hue_to_rgb_2(t1, t2, h) * 255 / 256;
+            let tmp = hue_to_rgb_2(t1, t2, h) * 255 / HSLA_ONE;
             u8::try_from(tmp).unwrap()
         }
 
-        let r = hue_to_rgb(temp1, temp2, h + 512);
+        let r = hue_to_rgb(temp1, temp2, h + HSLA_TWO);
         let g = hue_to_rgb(temp1, temp2, h);
-        let b = hue_to_rgb(temp1, temp2, h + 1024);
+        let b = hue_to_rgb(temp1, temp2, h + HSLA_FOUR);
 
         egui::Color32::from_rgba_premultiplied(r, g, b, val.a)
     }
