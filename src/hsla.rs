@@ -1,6 +1,5 @@
-pub const HSLA_ONE: u16 = 1024;
-
 const HSLA_ONE_I: i32 = 1024;
+const HSLA_ONE_F: f32 = 1024.0;
 const HSLA_HALF_I: i32 = HSLA_ONE_I / 2;
 const HSLA_TWO_I: i32 = HSLA_ONE_I * 2;
 const HSLA_THREE_I: i32 = HSLA_ONE_I * 3;
@@ -22,31 +21,30 @@ pub struct Hsla {
 ///
 /// ```
 /// use tshirt_checker::Hsla;
-/// use tshirt_checker::HSLA_ONE;
 ///
 /// # fn main() {
 ///   let green_rgba = egui::Color32::from_rgba_premultiplied(0,255,0,255);
 ///   // H: 2   (green hue)
 ///   // S: 1   (full green color saturation)
 ///   // L: 1/2
-///   // A: 255
-///   let expected_green_hsla = Hsla::new(2*HSLA_ONE, HSLA_ONE, HSLA_ONE/2, 255);
+///   // A: 1
+///   let expected_green_hsla = Hsla::newf(2.0, 1.0, 0.5, 1.0);
 ///   assert_eq!( expected_green_hsla, (&green_rgba).into());
 ///
 ///   let pink_rgba = egui::Color32::from_rgba_premultiplied(255, 128, 128, 255);
 ///   // H: 0    (red hue)
 ///   // S: 1    (full color saturation)
 ///   // L: ~.75 (half way between red and white)
-///   // A: 255
-///   let expected_pink_hsla = Hsla::new(0, HSLA_ONE, 769, 255);
+///   // A: 1
+///   let expected_pink_hsla = Hsla::newf(0.0, 1.0, 0.5+0.5*(128.0/255.0), 1.0);
 ///   assert_eq!( expected_pink_hsla, Hsla::from(&pink_rgba));
 ///
 ///   let grey_rgba = egui::Color32::from_rgba_premultiplied(192,192,192,255);
 ///   // H: 0   (doesn't really matter because of S)
 ///   // S: 0   (no color at all)
 ///   // L: ~.75
-///   // A: 255
-///   let expected_grey_hsla = Hsla::new(0, 0, 771, 255);
+///   // A: 1
+///   let expected_grey_hsla = Hsla::newf(0.0, 0.0, 192.0/255.0, 1.0);
 ///   assert_eq!( expected_grey_hsla, (&grey_rgba).into());
 /// # }
 /// ```
@@ -100,31 +98,30 @@ impl From<&egui::Color32> for Hsla {
 ///
 /// ```
 /// use tshirt_checker::Hsla;
-/// use tshirt_checker::HSLA_ONE;
 ///
 /// # fn main() {
 ///   let green_rgba = egui::Color32::from_rgba_premultiplied(0,255,0,255);
 ///   // H: 2   (green hue)
 ///   // S: 1   (full green color saturation)
 ///   // L: 1/2
-///   // A: 255
-///   let expected_green_hsla = Hsla::new(2*HSLA_ONE, HSLA_ONE, HSLA_ONE/2, 255);
+///   // A: 1
+///   let expected_green_hsla = Hsla::newf(2.0, 1.0, 0.5, 1.0);
 ///   assert_eq!( expected_green_hsla, green_rgba.into());
 ///
 ///   let pink_rgba = egui::Color32::from_rgba_premultiplied(255, 128, 128, 255);
 ///   // H: 0    (red hue)
 ///   // S: 1    (full color saturation)
 ///   // L: ~.75 (half way between red and white)
-///   // A: 255
-///   let expected_pink_hsla = Hsla::new(0, HSLA_ONE, 769, 255);
+///   // A: 1
+///   let expected_pink_hsla = Hsla::newf(0.0, 1.0, 0.5+0.5*(128.0/255.0), 1.0);
 ///   assert_eq!( expected_pink_hsla, Hsla::from(pink_rgba));
 ///
 ///   let grey_rgba = egui::Color32::from_rgba_premultiplied(192,192,192,255);
 ///   // H: 0   (doesn't really matter because of S)
 ///   // S: 0   (no color at all)
 ///   // L: ~.75
-///   // A: 255
-///   let expected_grey_hsla = Hsla::new(0, 0, 771, 255);
+///   // A: 1
+///   let expected_grey_hsla = Hsla::newf(0.0, 0.0, 192.0/255.0, 1.0);
 ///   assert_eq!( expected_grey_hsla, grey_rgba.into());
 /// # }
 /// ```
@@ -188,6 +185,13 @@ impl From<Hsla> for egui::Color32 {
 
 impl Hsla {
     pub fn new(h: u16, s: u16, l: u16, a: u8) -> Self {
+        Self { h, s, l, a }
+    }
+    pub fn newf(hf: f32, sf: f32, lf: f32, af: f32) -> Self {
+        let h = (hf * HSLA_ONE_F) as u16;
+        let s = (sf * HSLA_ONE_F) as u16;
+        let l = (lf * HSLA_ONE_F) as u16;
+        let a = (af * 255.0) as u8;
         Self { h, s, l, a }
     }
 }

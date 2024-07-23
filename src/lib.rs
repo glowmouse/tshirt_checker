@@ -4,7 +4,6 @@ mod app;
 pub use app::TShirtCheckerApp;
 mod hsla;
 pub use hsla::Hsla;
-pub use hsla::HSLA_ONE;
 mod gamma_tables;
 mod loaded_image;
 pub use loaded_image::LoadedImage;
