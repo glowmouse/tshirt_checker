@@ -18,24 +18,24 @@ pub struct Hsla {
 /// # fn main() {
 ///   let green_rgba = egui::Color32::from_rgba_premultiplied(0,255,0,255);
 ///   // H: 512 = 2.0 * 256 (green hue)
-///   // S: 255 = 1.0 * 256 (full green color saturation)
-///   // L: 127 = 0.5 * 256
+///   // S: 256 = 1.0 * 256 (full green color saturation)
+///   // L: 128 = 0.5 * 256
 ///   // A: 255 = 1.0 * 255
 ///   let expected_green_hsla = Hsla::new(512, 256, 128, 255);
 ///   assert_eq!( expected_green_hsla, (&green_rgba).into());
 ///
 ///   let pink_rgba = egui::Color32::from_rgba_premultiplied(255, 128, 128, 255);
 ///   // H: 0   = 0.0 * 256 (red hue)
-///   // S: 255 = 1.0 * 255 (full color saturation)
-///   // L: 192 = 0.5 * 255 (~half way between red and white)
+///   // S: 256 = 1.0 * 256 (full color saturation)
+///   // L: 192 = 0.5 * 256 (~half way between red and white)
 ///   // A: 255 = 1.0 * 255
 ///   let expected_pink_hsla = Hsla::new(0, 256, 192, 255);
 ///   assert_eq!( expected_pink_hsla, Hsla::from(&pink_rgba));
 ///
 ///   let grey_rgba = egui::Color32::from_rgba_premultiplied(192,192,192,255);
 ///   // H: 0   = 0.0 * 256 (doesn't really matter because of S
-///   // S: 0   = 0.0 * 255 (no color at all)
-///   // L: 192 = 0.5 * 255 (3/4 between black and white)
+///   // S: 0   = 0.0 * 256 (no color at all)
+///   // L: 192 = 0.5 * 256 (3/4 between black and white)
 ///   // A: 255 = 1.0 * 255
 ///   let expected_grey_hsla = Hsla::new(0, 0, 192, 255);
 ///   assert_eq!( expected_grey_hsla, (&grey_rgba).into());
@@ -102,24 +102,24 @@ impl From<&egui::Color32> for Hsla {
 /// # fn main() {
 ///   let green_rgba = egui::Color32::from_rgba_premultiplied(0,255,0,255);
 ///   // H: 512 = 2.0 * 256 (green hue)
-///   // S: 255 = 1.0 * 255 (full green color saturation)
-///   // L: 127 = 0.5 * 255
+///   // S: 256 = 1.0 * 256 (full green color saturation)
+///   // L: 128 = 0.5 * 256
 ///   // A: 255 = 1.0 * 255
 ///   let expected_green_hsla = Hsla::new(512, 256, 128, 255);
 ///   assert_eq!( expected_green_hsla, green_rgba.into());
 ///
 ///   let pink_rgba = egui::Color32::from_rgba_premultiplied(255, 128, 128, 255);
 ///   // H: 0   = 0.0 * 256 (red hue)
-///   // S: 255 = 1.0 * 255 (full color saturation)
-///   // L: 192 = 0.5 * 255 (~half way between red and white)
+///   // S: 256 = 1.0 * 256 (full color saturation)
+///   // L: 192 = 0.5 * 256 (~half way between red and white)
 ///   // A: 255 = 1.0 * 255
 ///   let expected_pink_hsla = Hsla::new(0, 256, 192, 255);
 ///   assert_eq!( expected_pink_hsla, Hsla::from(pink_rgba));
 ///
 ///   let grey_rgba = egui::Color32::from_rgba_premultiplied(192,192,192,255);
 ///   // H: 0   = 0.0 * 256 (doesn't really matter because of S
-///   // S: 0   = 0.0 * 255 (no color at all)
-///   // L: 192 = 0.5 * 255 (3/4 between black and white)
+///   // S: 0   = 0.0 * 256 (no color at all)
+///   // L: 192 = 0.5 * 256 (3/4 between black and white)
 ///   // A: 255 = 1.0 * 255
 ///   let expected_grey_hsla = Hsla::new(0, 0, 192, 255);
 ///   assert_eq!( expected_grey_hsla, grey_rgba.into());
