@@ -4,11 +4,14 @@ use std::cmp::Ordering;
 
 pub fn blue_to_red(input: &egui::Color32) -> egui::Color32 {
     let hsla = Hsla::from(input);
-    // -324 adjusts the original blue green shirt to a primary color
-    // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
-    // 1024 to adjust the primary color to red.
+
+    let hue_shift = Hsla::calc_hue_shift(
+        egui::Color32::from_rgb(0, 143, 190),
+        egui::Color32::from_rgb(255, 0, 0),
+    );
+
     let red_adjust = Hsla {
-        h: (hsla.h + 6 * 256 * 4 - 324 * 4 + 1024 * 4) % (6 * 256 * 4),
+        h: (hsla.h + hue_shift) % (6 * 256 * 4),
         s: hsla.s,
         l: hsla.l,
         a: hsla.a,
@@ -18,11 +21,14 @@ pub fn blue_to_red(input: &egui::Color32) -> egui::Color32 {
 
 pub fn blue_to_dgreen(input: &egui::Color32) -> egui::Color32 {
     let hsla = Hsla::from(input);
-    // -324 adjusts the original blue green shirt to a primary color
-    // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
-    // 38 to adjust the primary color to dark green
+
+    let hue_shift = Hsla::calc_hue_shift(
+        egui::Color32::from_rgb(0, 143, 190),
+        egui::Color32::from_rgb(0, 255, 0),
+    );
+
     let dgreen_adjust = Hsla {
-        h: (hsla.h + 6 * 256 * 4 - 324 * 4 + 38 * 4) % (6 * 256 * 4),
+        h: (hsla.h + hue_shift) % (6 * 256 * 4),
         s: hsla.s,
         l: crate::gamma_tables::GAMMA_17[hsla.l as usize],
         a: hsla.a,
@@ -32,11 +38,14 @@ pub fn blue_to_dgreen(input: &egui::Color32) -> egui::Color32 {
 
 pub fn blue_to_ddgreen(input: &egui::Color32) -> egui::Color32 {
     let hsla = Hsla::from(input);
-    // -324 adjusts the original blue green shirt to a primary color
-    // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
-    // 38 to adjust the primary color to green, then gamma down saturation.
+
+    let hue_shift = Hsla::calc_hue_shift(
+        egui::Color32::from_rgb(0, 143, 190),
+        egui::Color32::from_rgb(0, 255, 0),
+    );
+
     let ddgreen_adjust = Hsla {
-        h: (hsla.h + 6 * 256 * 4 - 324 * 4 + 38 * 4) % (6 * 256 * 4),
+        h: (hsla.h + hue_shift) % (6 * 256 * 4),
         s: crate::gamma_tables::GAMMA_30[hsla.s as usize],
         l: crate::gamma_tables::GAMMA_22[hsla.l as usize],
         a: hsla.a,
@@ -46,11 +55,9 @@ pub fn blue_to_ddgreen(input: &egui::Color32) -> egui::Color32 {
 
 pub fn blue_to_dblue(input: &egui::Color32) -> egui::Color32 {
     let hsla = Hsla::from(input);
-    // -324 adjusts the original blue green shirt to a primary color
-    // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
-    // 350 to adjust the primary color to dark blue
+
     let dblue_adjust = Hsla {
-        h: (hsla.h + 6 * 256 * 4 - 324 * 4 + 350 * 4) % (6 * 256 * 4),
+        h: hsla.h,
         s: crate::gamma_tables::GAMMA_30[hsla.s as usize],
         l: crate::gamma_tables::GAMMA_17[hsla.l as usize],
         a: hsla.a,
@@ -60,11 +67,14 @@ pub fn blue_to_dblue(input: &egui::Color32) -> egui::Color32 {
 
 pub fn blue_to_burg(input: &egui::Color32) -> egui::Color32 {
     let hsla = Hsla::from(input);
-    // -324 adjusts the original blue green shirt to a primary color
-    // 6 * 256 so the -324 won't cause the unsigned to go negative and panic the main thread
-    // 1024 to adjust the primary color to red.
+
+    let hue_shift = Hsla::calc_hue_shift(
+        egui::Color32::from_rgb(0, 143, 190),
+        egui::Color32::from_rgb(255, 0, 0),
+    );
+
     let burg_adjust = Hsla {
-        h: (hsla.h + 6 * 256 * 4 - 324 * 4 + 439 * 4 + 512 * 4) % (6 * 256 * 4),
+        h: (hsla.h + hue_shift) % (6 * 256 * 4),
         s: hsla.s,
         l: crate::gamma_tables::GAMMA_17[hsla.l as usize],
         a: hsla.a,

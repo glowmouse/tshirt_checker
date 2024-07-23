@@ -194,6 +194,12 @@ impl Hsla {
         let a = (af * 255.0) as u8;
         Self { h, s, l, a }
     }
+    pub fn calc_hue_shift(orig: egui::Color32, target: egui::Color32) -> u16 {
+        let orig_hsla: Hsla = orig.into();
+        let target_hsla: Hsla = target.into();
+        let shift = (ONE_U32 * 6 + (target_hsla.h as u32) - (orig_hsla.h as u32)) % (ONE_U32 * 6);
+        shift.try_into().unwrap()
+    }
 }
 
 #[cfg(test)]
