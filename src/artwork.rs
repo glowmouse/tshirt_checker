@@ -31,14 +31,14 @@ impl ArtworkDependentData {
         async_std::task::sleep(one_milli).await;
         let default_fixed_art: LoadedImage = load_image_from_existing_image(
             artwork,
-            correct_alpha_for_tshirt,
+            &correct_alpha_for_tshirt,
             "fixed default art",
             ctx,
         );
         async_std::task::sleep(one_milli).await;
         let default_flagged_art: LoadedImage = load_image_from_existing_image(
             artwork,
-            flag_alpha_for_shirt,
+            &flag_alpha_for_shirt,
             "flagged default art",
             ctx,
         );

@@ -93,7 +93,7 @@ pub fn load_image_from_trusted_source(
 
 pub fn load_image_from_existing_image(
     existing: &LoadedImage,
-    mutator: fn(&egui::Color32) -> egui::Color32,
+    mutator: &dyn Fn(&egui::Color32) -> egui::Color32,
     name: impl Into<String>,
     ctx: &egui::Context,
 ) -> LoadedImage {

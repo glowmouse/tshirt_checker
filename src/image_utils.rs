@@ -2,84 +2,94 @@ use crate::loaded_image::*;
 use crate::Hsla;
 use std::cmp::Ordering;
 
-pub fn blue_to_red(input: &egui::Color32) -> egui::Color32 {
-    let hsla = Hsla::from(input);
+pub type PixelMutator = Box<dyn Fn(&egui::Color32) -> egui::Color32>;
 
+pub fn blue_to_red() -> PixelMutator {
     let hue_shift = Hsla::calc_hue_shift(
         egui::Color32::from_rgb(0, 143, 190),
         egui::Color32::from_rgb(255, 0, 0),
     );
 
-    let red_adjust = Hsla {
-        h: (hsla.h + hue_shift) % (6 * 256 * 4),
-        s: hsla.s,
-        l: hsla.l,
-        a: hsla.a,
-    };
-    red_adjust.into()
+    Box::new(move |input: &egui::Color32| -> egui::Color32 {
+        let hsla = Hsla::from(input);
+
+        let red_adjust = Hsla {
+            h: (hsla.h + hue_shift) % (6 * 256 * 4),
+            s: hsla.s,
+            l: hsla.l,
+            a: hsla.a,
+        };
+        red_adjust.into()
+    })
 }
 
-pub fn blue_to_dgreen(input: &egui::Color32) -> egui::Color32 {
-    let hsla = Hsla::from(input);
-
+pub fn blue_to_dgreen() -> PixelMutator {
     let hue_shift = Hsla::calc_hue_shift(
         egui::Color32::from_rgb(0, 143, 190),
         egui::Color32::from_rgb(0, 255, 0),
     );
 
-    let dgreen_adjust = Hsla {
-        h: (hsla.h + hue_shift) % (6 * 256 * 4),
-        s: hsla.s,
-        l: crate::gamma_tables::GAMMA_17[hsla.l as usize],
-        a: hsla.a,
-    };
-    dgreen_adjust.into()
+    Box::new(move |input: &egui::Color32| -> egui::Color32 {
+        let hsla = Hsla::from(input);
+
+        let dgreen_adjust = Hsla {
+            h: (hsla.h + hue_shift) % (6 * 256 * 4),
+            s: hsla.s,
+            l: crate::gamma_tables::GAMMA_17[hsla.l as usize],
+            a: hsla.a,
+        };
+        dgreen_adjust.into()
+    })
 }
 
-pub fn blue_to_ddgreen(input: &egui::Color32) -> egui::Color32 {
-    let hsla = Hsla::from(input);
-
+pub fn blue_to_ddgreen() -> PixelMutator {
     let hue_shift = Hsla::calc_hue_shift(
         egui::Color32::from_rgb(0, 143, 190),
         egui::Color32::from_rgb(0, 255, 0),
     );
 
-    let ddgreen_adjust = Hsla {
-        h: (hsla.h + hue_shift) % (6 * 256 * 4),
-        s: crate::gamma_tables::GAMMA_30[hsla.s as usize],
-        l: crate::gamma_tables::GAMMA_22[hsla.l as usize],
-        a: hsla.a,
-    };
-    ddgreen_adjust.into()
+    Box::new(move |input: &egui::Color32| -> egui::Color32 {
+        let hsla = Hsla::from(input);
+
+        let ddgreen_adjust = Hsla {
+            h: (hsla.h + hue_shift) % (6 * 256 * 4),
+            s: crate::gamma_tables::GAMMA_30[hsla.s as usize],
+            l: crate::gamma_tables::GAMMA_22[hsla.l as usize],
+            a: hsla.a,
+        };
+        ddgreen_adjust.into()
+    })
 }
 
-pub fn blue_to_dblue(input: &egui::Color32) -> egui::Color32 {
-    let hsla = Hsla::from(input);
-
-    let dblue_adjust = Hsla {
-        h: hsla.h,
-        s: crate::gamma_tables::GAMMA_30[hsla.s as usize],
-        l: crate::gamma_tables::GAMMA_17[hsla.l as usize],
-        a: hsla.a,
-    };
-    dblue_adjust.into()
+pub fn blue_to_dblue() -> PixelMutator {
+    Box::new(move |input: &egui::Color32| -> egui::Color32 {
+        let hsla = Hsla::from(input);
+        let dblue_adjust = Hsla {
+            h: hsla.h,
+            s: crate::gamma_tables::GAMMA_30[hsla.s as usize],
+            l: crate::gamma_tables::GAMMA_17[hsla.l as usize],
+            a: hsla.a,
+        };
+        dblue_adjust.into()
+    })
 }
 
-pub fn blue_to_burg(input: &egui::Color32) -> egui::Color32 {
-    let hsla = Hsla::from(input);
-
+pub fn blue_to_burg() -> PixelMutator {
     let hue_shift = Hsla::calc_hue_shift(
         egui::Color32::from_rgb(0, 143, 190),
         egui::Color32::from_rgb(255, 0, 0),
     );
 
-    let burg_adjust = Hsla {
-        h: (hsla.h + hue_shift) % (6 * 256 * 4),
-        s: hsla.s,
-        l: crate::gamma_tables::GAMMA_17[hsla.l as usize],
-        a: hsla.a,
-    };
-    burg_adjust.into()
+    Box::new(move |input: &egui::Color32| -> egui::Color32 {
+        let hsla = Hsla::from(input);
+        let burg_adjust = Hsla {
+            h: (hsla.h + hue_shift) % (6 * 256 * 4),
+            s: hsla.s,
+            l: crate::gamma_tables::GAMMA_17[hsla.l as usize],
+            a: hsla.a,
+        };
+        burg_adjust.into()
+    })
 }
 
 pub fn correct_alpha_for_tshirt(input: &egui::Color32) -> egui::Color32 {

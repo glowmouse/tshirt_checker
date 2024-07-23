@@ -27,17 +27,22 @@ impl TShirtStorage {
             "blue_shirt",
             ctx,
         );
+        let red_mutator = blue_to_red();
         let red_shirt: LoadedImage =
-            load_image_from_existing_image(&blue_shirt, blue_to_red, "red_shirt", ctx);
+            load_image_from_existing_image(&blue_shirt, &red_mutator, "red_shirt", ctx);
+        let dgreen_mutator = blue_to_dgreen();
         let dgreen_shirt: LoadedImage =
-            load_image_from_existing_image(&blue_shirt, blue_to_dgreen, "dgreen_shirt", ctx);
+            load_image_from_existing_image(&blue_shirt, &dgreen_mutator, "dgreen_shirt", ctx);
+        let ddgreen_mutator = blue_to_ddgreen();
         let ddgreen_shirt: LoadedImage =
-            load_image_from_existing_image(&blue_shirt, blue_to_ddgreen, "ddgreen_shirt", ctx);
+            load_image_from_existing_image(&blue_shirt, &ddgreen_mutator, "ddgreen_shirt", ctx);
+        let dblue_mutator = blue_to_dblue();
         let dblue_shirt: LoadedImage =
-            load_image_from_existing_image(&blue_shirt, blue_to_dblue, "dblue_shirt", ctx);
+            load_image_from_existing_image(&blue_shirt, &dblue_mutator, "dblue_shirt", ctx);
 
+        let burg_mutator = blue_to_burg();
         let burg_shirt: LoadedImage =
-            load_image_from_existing_image(&blue_shirt, blue_to_burg, "burg_shirt", ctx);
+            load_image_from_existing_image(&blue_shirt, &burg_mutator, "burg_shirt", ctx);
 
         Self {
             blue_t_shirt: blue_shirt,

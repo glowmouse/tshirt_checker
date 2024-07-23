@@ -93,7 +93,7 @@ pub fn partialt_fix(ctx: &egui::Context, art: &LoadedImage, art_id: Artwork, sen
     app_execute(async move {
         let fixed_art = load_image_from_existing_image(
             &thread_art,
-            correct_alpha_for_tshirt,
+            &correct_alpha_for_tshirt,
             "blah_blah_fixed_art", // todo, better name...
             &thread_ctx,
         );
