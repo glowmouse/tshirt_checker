@@ -1,8 +1,12 @@
+//! Tools for creating and managing artwork analysis data (dependant data)
+//! given the t-shirt artwork as input.
+
 use crate::image_utils::*;
 use crate::loaded_image::*;
 use crate::math::*;
 use nalgebra::dvector;
 
+/// Artwork slot - one of three.
 #[derive(PartialEq, Copy, Clone)]
 pub enum Artwork {
     Artwork0,
@@ -10,6 +14,7 @@ pub enum Artwork {
     Artwork2,
 }
 
+/// Analysis data that depends on the t-shirt artwork
 pub struct ArtworkDependentData {
     pub partial_transparency_percent: u32,
     pub opaque_percent: u32,
