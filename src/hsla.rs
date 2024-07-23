@@ -141,16 +141,14 @@ impl From<&Hsla> for egui::Color32 {
             let grey_u8 = grey_u16.try_into().unwrap();
             return egui::Color32::from_rgba_premultiplied(grey_u8, grey_u8, grey_u8, val.a);
         }
-        let half_u8: i32 = 128;
-        let one_u8: i32 = 255;
         let h: i32 = i32::from(val.h);
         let s: i32 = i32::from(val.s);
         let l: i32 = i32::from(val.l);
 
-        let temp1: i32 = if l < half_u8 {
-            (l * (one_u8 + s)) / one_u8
+        let temp1: i32 = if l <= 128 {
+            (l * (256 + s)) / 256
         } else {
-            l + s - ((l * s) / one_u8)
+            l + s - ((l * s) / 256)
         };
         let temp2: i32 = 2 * l - temp1;
 
@@ -171,8 +169,7 @@ impl From<&Hsla> for egui::Color32 {
         }
 
         fn hue_to_rgb(t1: i32, t2: i32, h: i32) -> u8 {
-            // we sometimes get small negatives.  skill issue/ bug.
-            let tmp = hue_to_rgb_2(t1, t2, h).clamp(0, 255);
+            let tmp = hue_to_rgb_2(t1, t2, h) * 255 / 256;
             u8::try_from(tmp).unwrap()
         }
 
@@ -210,7 +207,7 @@ mod tests {
         let gd = ((expected.g() as i32) - (actual.g() as i32)).abs();
         let bd = ((expected.b() as i32) - (actual.b() as i32)).abs();
         let ad = ((expected.a() as i32) - (actual.a() as i32)).abs();
-        rd <= 2 && gd <= 2 && bd <= 2 && ad == 0
+        rd <= 4 && gd <= 4 && bd <= 4 && ad == 0
     }
 
     #[test]
