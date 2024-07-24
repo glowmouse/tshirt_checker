@@ -131,6 +131,30 @@ impl From<egui::Color32> for Hsla {
     }
 }
 
+/// Convert from an Hsla color to an egui::Color32
+///
+/// ```
+/// use tshirt_checker::Hsla;
+/// use egui::Color32;
+///
+/// # fn main() {
+/// // h = 0 (red), s = 1.0 (full red)
+/// let red_hsla = Hsla::newf(0.0, 1.0, 0.5, 1.0 );
+/// assert_eq!(Color32::from_rgb(255, 0, 0), red_hsla.into());
+///
+/// // h = 2 (green), s = 1.0 (full green)
+/// let green_hsla = Hsla::newf(2.0, 1.0, 0.5, 1.0 );
+/// assert_eq!(Color32::from_rgb(0, 255, 0), green_hsla.into());
+///
+/// // h = 4 (blue), s = 1.0 (full blue)
+/// let blue_hsla = Hsla::newf(4.0, 1.0, 0.5, 1.0 );
+/// assert_eq!(Color32::from_rgb(0, 0, 255), blue_hsla.into());
+///
+/// // h = 1 (yellow), s = 1.0, l=.75 (toward white)
+/// let yellow_hsla = Hsla::newf(1.0, 1.0, 0.75, 1.0 );
+/// assert_eq!(Color32::from_rgb(255, 255, 127), yellow_hsla.into());
+/// # }
+/// ```
 impl From<&Hsla> for egui::Color32 {
     // https://www.niwa.nu/2013/05/math-behind-colorspace-conversions-rgb-hsl/
 
@@ -194,6 +218,38 @@ impl Hsla {
         let a = (af * 255.0) as u8;
         Self { h, s, l, a }
     }
+
+    /// What needs to be added to an HSLA hue to shift from one RGB color to another
+    ///
+    /// ```
+    /// use tshirt_checker::Hsla;
+    /// use egui::Color32;
+    ///
+    /// # fn main() {
+    /// // Original artwork is mostly green, but we want to make it mostly blue
+    /// let original_green = Color32::from_rgb(0, 255, 0);
+    /// let target_blue = Color32::from_rgb(0, 0, 255);
+    ///
+    /// // Convert the shift needed to do that in HSLA space
+    /// let shift = Hsla::calc_hue_shift( original_green.clone(), target_blue.clone() );
+    ///
+    /// // Test: Convert a red tinged green with white saturation
+    /// let input_green = egui::Color32::from_rgb(152, 255, 127);
+    /// let hsla_green: Hsla = input_green.into();
+    ///
+    /// // Do the shift in HSLA space
+    /// let green_shifted = Hsla {
+    ///     h: (hsla_green.h + shift) % (1024*6),
+    ///     s: hsla_green.s,
+    ///     l: hsla_green.l,
+    ///     a: hsla_green.a
+    /// };
+    ///
+    /// // Expected - a green tinged blue with white saturation
+    /// let expected_blue = Color32::from_rgb(126, 151, 255);
+    /// assert_eq!(expected_blue, green_shifted.into());
+    /// # }
+    /// ```
     pub fn calc_hue_shift(orig: egui::Color32, target: egui::Color32) -> u16 {
         let orig_hsla: Hsla = orig.into();
         let target_hsla: Hsla = target.into();
@@ -206,16 +262,6 @@ impl Hsla {
 mod tests {
     use super::*;
 
-    const ONE_U16: u16 = 1024;
-    const TWO_U16: u16 = ONE_U16 * 2;
-    const FOUR_U16: u16 = ONE_U16 * 4;
-    const HALF_U16: u16 = ONE_U16 / 2;
-
-    // helper
-    fn rgba(r: u8, g: u8, b: u8, a: u8) -> egui::Color32 {
-        egui::Color32::from_rgba_premultiplied(r, g, b, a)
-    }
-
     fn is_close(expected: &egui::Color32, actual: &egui::Color32) -> bool {
         let rd = ((expected.r() as i32) - (actual.r() as i32)).abs();
         let gd = ((expected.g() as i32) - (actual.g() as i32)).abs();
@@ -225,36 +271,11 @@ mod tests {
     }
 
     #[test]
-    fn test_primaries() {
-        let red_hsla = Hsla {
-            h: 0,
-            s: ONE_U16,
-            l: HALF_U16,
-            a: 255,
-        };
-        assert_eq!(rgba(255, 0, 0, 255), red_hsla.into());
-        let green_hsla = Hsla {
-            h: TWO_U16,
-            s: ONE_U16,
-            l: HALF_U16,
-            a: 255,
-        };
-        assert_eq!(rgba(0, 255, 0, 255), green_hsla.into());
-        let blue_hsla = Hsla {
-            h: FOUR_U16,
-            s: ONE_U16,
-            l: HALF_U16,
-            a: 255,
-        };
-        assert_eq!(rgba(0, 0, 255, 255), blue_hsla.into());
-    }
-
-    #[test]
     fn test_identities() {
         for r in 0..16 {
             for g in 0..16 {
                 for b in 0..16 {
-                    let original = rgba(r * 17, g * 17, b * 17, 255);
+                    let original = egui::Color32::from_rgb(r * 17, g * 17, b * 17);
                     let hsla: Hsla = (&original).into();
                     let converted: egui::Color32 = (&hsla).into();
                     assert!(
