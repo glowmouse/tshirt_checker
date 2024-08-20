@@ -6,6 +6,7 @@ use web_time::SystemTime;
 
 #[derive(PartialEq, Copy, Clone)]
 pub enum Icon {
+    Logo,
     Pass,
     Warn,
     Fail,
@@ -15,6 +16,7 @@ pub enum Icon {
 }
 
 pub struct IconStorage {
+    logo: LoadedImage,
     pass: LoadedImage,
     warn: LoadedImage,
     fail: LoadedImage,
@@ -28,6 +30,11 @@ pub struct IconStorage {
 
 impl IconStorage {
     pub fn new(ctx: &egui::Context) -> Self {
+        let logo: LoadedImage = load_image_from_trusted_source(
+            include_bytes!("../assets/tsquared.png"),
+            "tsquared",
+            ctx,
+        );
         let pass: LoadedImage =
             load_image_from_trusted_source(include_bytes!("../assets/pass.png"), "pass", ctx);
         let warn: LoadedImage =
@@ -110,6 +117,7 @@ impl IconStorage {
         );
 
         Self {
+            logo,
             pass,
             warn,
             fail,
@@ -127,6 +135,7 @@ impl IconStorage {
 
     pub fn get_loaded_image(&self, icon: Icon) -> &LoadedImage {
         match icon {
+            Icon::Logo => &self.logo,
             Icon::Pass => &self.pass,
             Icon::Warn => &self.warn,
             Icon::Fail => &self.fail,
@@ -152,7 +161,7 @@ impl IconStorage {
         })
     }
 
-    fn image(&self, icon: Icon, width: f32) -> egui::Image<'_> {
+    pub fn image(&self, icon: Icon, width: f32) -> egui::Image<'_> {
         egui::Image::from_texture(self.texture_handle(icon)).max_width(width)
     }
 

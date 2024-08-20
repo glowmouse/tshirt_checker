@@ -417,11 +417,19 @@ impl TShirtCheckerApp {
         ui.add_space(5.0 * scale);
     }
 
-    fn display_title(ui: &mut egui::Ui, scale: f32) {
+    fn display_title(&self, ui: &mut egui::Ui, scale: f32) {
         Self::panel_separator(ui, scale);
-        let width = 30.0 * scale;
+        let width = 35.0 * scale;
+        let logo = self.icons.image(Icon::Logo, 85.0 * scale);
         ui.vertical_centered(|ui| {
-            ui.heading(egui::widget_text::RichText::from("T-Shirt Art Checker").size(width))
+            ui.horizontal(|ui| {
+                ui.add(logo);
+                ui.add_space(10.0 * scale);
+                ui.vertical(|ui| {
+                    ui.heading(egui::widget_text::RichText::from("T-Shirt").size(width));
+                    ui.heading(egui::widget_text::RichText::from("Art Checker").size(width))
+                });
+            });
         });
         Self::panel_separator(ui, scale);
     }
@@ -509,7 +517,7 @@ impl TShirtCheckerApp {
             .max_width(targetx)
             .show(ctx, |ui| {
                 ui.vertical(|ui| {
-                    Self::display_title(ui, scale);
+                    self.display_title(ui, scale);
                     self.report_metrics(new_events, ui, scale);
                     self.tshirt_selection_panel(new_events, ui, scale);
                     self.artwork_selection_panel(new_events, ui, ctx, scale);
