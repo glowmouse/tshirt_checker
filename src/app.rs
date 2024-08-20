@@ -426,8 +426,8 @@ impl TShirtCheckerApp {
                 ui.add(logo);
                 ui.add_space(10.0 * scale);
                 ui.vertical(|ui| {
-                    ui.heading(egui::widget_text::RichText::from("T-Shirt").size(width));
-                    ui.heading(egui::widget_text::RichText::from("Art Checker").size(width))
+                    ui.heading(egui::widget_text::RichText::from("T-Shirt Art").size(width));
+                    ui.heading(egui::widget_text::RichText::from("Checker").size(width))
                 });
             });
         });
@@ -506,7 +506,7 @@ impl TShirtCheckerApp {
         let screen = ctx.screen_rect();
         let size = screen.max - screen.min;
         let scale_x = (size.x * 0.33) / 260.0;
-        let scale_y = (size.y - 150.0) / 650.0;
+        let scale_y = (size.y - 150.0) / 700.0;
         let scale = scale_x.min(scale_y).clamp(0.20, 1.0);
 
         let targetx = 50.0 + 260.0 * scale;
