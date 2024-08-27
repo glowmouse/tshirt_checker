@@ -13,7 +13,7 @@ targets = ["x86_64-unknown-linux-gnu", "wasm32-unknown-unknown"]
 [dependencies]
 arr_macro = { version = "0.2.1" }
 async-std = "1.12"
-eframe = { version = "0.28", features = [
+eframe = { version = "0.28.0", features = [
     "default",
     "__screenshot",
 #    "accesskit",     # Make egui comptaible with screen readers. NOTE: adds a lot of dependencies.
