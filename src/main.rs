@@ -12,13 +12,13 @@ fn main() -> eframe::Result {
             .with_min_inner_size([400.0, 400.0])
             .with_icon(
                 // NOTE: Adding an icon is optional
-                eframe::icon_data::from_png_bytes(&include_bytes!("../assets/icon-256.png")[..])
+                eframe::icon_data::from_png_bytes(&include_bytes!("../assets/tsquared.png")[..])
                     .expect("Failed to load icon"),
             ),
         ..Default::default()
     };
     eframe::run_native(
-        "eframe template",
+        "T-Squared",
         native_options,
         Box::new(|cc| {
             let style = egui::Style {

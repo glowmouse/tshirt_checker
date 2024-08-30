@@ -14,7 +14,7 @@ pub fn blue_to_red() -> PixelMutator {
         let hsla = Hsla::from(input);
 
         let red_adjust = Hsla {
-            h: (hsla.h + hue_shift) % (6 * 256 * 4),
+            h: Hsla::hue_shift(hsla.h, hue_shift),
             s: hsla.s,
             l: hsla.l,
             a: hsla.a,
@@ -33,7 +33,7 @@ pub fn blue_to_dgreen() -> PixelMutator {
         let hsla = Hsla::from(input);
 
         let dgreen_adjust = Hsla {
-            h: (hsla.h + hue_shift) % (6 * 256 * 4),
+            h: Hsla::hue_shift(hsla.h, hue_shift),
             s: hsla.s,
             l: crate::gamma_tables::GAMMA_17[hsla.l as usize],
             a: hsla.a,
@@ -52,7 +52,7 @@ pub fn blue_to_ddgreen() -> PixelMutator {
         let hsla = Hsla::from(input);
 
         let ddgreen_adjust = Hsla {
-            h: (hsla.h + hue_shift) % (6 * 256 * 4),
+            h: Hsla::hue_shift(hsla.h, hue_shift),
             s: crate::gamma_tables::GAMMA_30[hsla.s as usize],
             l: crate::gamma_tables::GAMMA_22[hsla.l as usize],
             a: hsla.a,
@@ -83,7 +83,7 @@ pub fn blue_to_burg() -> PixelMutator {
     Box::new(move |input: &egui::Color32| -> egui::Color32 {
         let hsla = Hsla::from(input);
         let burg_adjust = Hsla {
-            h: (hsla.h + hue_shift) % (6 * 256 * 4),
+            h: Hsla::hue_shift(hsla.h, hue_shift),
             s: hsla.s,
             l: crate::gamma_tables::GAMMA_17[hsla.l as usize],
             a: hsla.a,

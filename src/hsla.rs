@@ -6,6 +6,7 @@ const HSLA_THREE_I: i32 = HSLA_ONE_I * 3;
 const HSLA_FOUR_I: i32 = HSLA_ONE_I * 4;
 const HSLA_SIX_I: i32 = HSLA_ONE_I * 6;
 const ONE_U32: u32 = 1024;
+const ONE_U16: u16 = 1024;
 
 ///
 /// A color represented in HSLA space
@@ -298,6 +299,11 @@ impl Hsla {
         let shift = (ONE_U32 * 6 + (target_hsla.h as u32) - (orig_hsla.h as u32)) % (ONE_U32 * 6);
         shift.try_into().unwrap()
     }
+
+    #[inline(always)]
+    pub fn hue_shift(orig: u16, shift: u16) -> u16 {
+        (orig + shift) % (ONE_U16 * 6)
+    }
 }
 
 #[cfg(test)]
@@ -329,6 +335,47 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_hue_shift_1() {
+        let red: Hsla = egui::Color32::RED.into();
+        let green: Hsla = egui::Color32::GREEN.into();
+        let blue: Hsla = egui::Color32::BLUE.into();
+
+        {
+            let red_to_green_shift = Hsla::calc_hue_shift(egui::Color32::RED, egui::Color32::GREEN);
+            let shifted = Hsla::new(
+                Hsla::hue_shift(red.h, red_to_green_shift),
+                red.s,
+                red.l,
+                red.a,
+            );
+            assert_eq!(green, shifted);
+        }
+
+        {
+            let green_to_blue_shift =
+                Hsla::calc_hue_shift(egui::Color32::GREEN, egui::Color32::BLUE);
+            let shifted = Hsla::new(
+                Hsla::hue_shift(green.h, green_to_blue_shift),
+                green.s,
+                green.l,
+                green.a,
+            );
+            assert_eq!(blue, shifted);
+        }
+
+        {
+            let blue_to_red_shift = Hsla::calc_hue_shift(egui::Color32::BLUE, egui::Color32::RED);
+            let shifted = Hsla::new(
+                Hsla::hue_shift(blue.h, blue_to_red_shift),
+                blue.s,
+                blue.l,
+                blue.a,
+            );
+            assert_eq!(red, shifted);
         }
     }
 }
