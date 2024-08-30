@@ -24,6 +24,15 @@ pub struct Hsla {
     pub a: u8,
 }
 
+///
+/// Transformation between HSLA color spaces
+///
+pub struct HslaTransform {
+    pub ht: u16,
+    pub st: Vec<u16>,
+    pub lt: Vec<u16>,
+}
+
 /// Convert from an egui::Color32 to an Hsla color
 ///
 /// ```
@@ -300,9 +309,45 @@ impl Hsla {
         shift.try_into().unwrap()
     }
 
+    pub fn calc_hsla_transform(orig: egui::Color32, target: egui::Color32) -> HslaTransform {
+        let orig_hsla: Hsla = orig.into();
+        let target_hsla: Hsla = target.into();
+        let shift = (ONE_U32 * 6 + (target_hsla.h as u32) - (orig_hsla.h as u32)) % (ONE_U32 * 6);
+        let ht: u16 = shift.try_into().unwrap();
+        //let orig_s = (orig_hsla.s as f32)/ HSLA_ONE_F;
+        //let target_s = (target_hsla.s as f32)/ HSLA_ONE_F;
+        //let gamma_s = target_s.ln() / orig_s.ln();
+        // saturation is much more problematic to do with gamma.
+        let gamma_s = 1.0;
+        let mut st = Vec::new();
+        for n in 0..=1024 {
+            let input = (n as f32) / 1024.0;
+            let output = input.powf(gamma_s);
+            st.push((output * 1024.0) as u16);
+        }
+        let orig_l = (orig_hsla.l as f32) / HSLA_ONE_F;
+        let target_l = (target_hsla.l as f32) / HSLA_ONE_F;
+        let gamma_l = target_l.ln() / orig_l.ln();
+        let mut lt = Vec::new();
+        for n in 0..=1024 {
+            let input = (n as f32) / 1024.0;
+            let output = input.powf(gamma_l);
+            lt.push((output * 1024.0) as u16);
+        }
+        HslaTransform { ht, st, lt }
+    }
+
     #[inline(always)]
     pub fn hue_shift(orig: u16, shift: u16) -> u16 {
         (orig + shift) % (ONE_U16 * 6)
+    }
+    #[inline(always)]
+    pub fn hsla_transform(input: &Hsla, t: &HslaTransform) -> Hsla {
+        let h = Hsla::hue_shift(input.h, t.ht);
+        let s = t.st[input.s as usize];
+        let l = t.lt[input.l as usize];
+        let a = input.a;
+        Hsla { h, s, l, a }
     }
 }
 

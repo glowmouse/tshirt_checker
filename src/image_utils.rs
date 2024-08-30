@@ -5,21 +5,15 @@ use std::cmp::Ordering;
 pub type PixelMutator = Box<dyn Fn(&egui::Color32) -> egui::Color32>;
 
 pub fn blue_to_red() -> PixelMutator {
-    let hue_shift = Hsla::calc_hue_shift(
+    let transform = Hsla::calc_hsla_transform(
         egui::Color32::from_rgb(0, 143, 190),
-        egui::Color32::from_rgb(255, 0, 0),
+        egui::Color32::from_rgb(192, 16, 16),
     );
 
     Box::new(move |input: &egui::Color32| -> egui::Color32 {
         let hsla = Hsla::from(input);
-
-        let red_adjust = Hsla {
-            h: Hsla::hue_shift(hsla.h, hue_shift),
-            s: hsla.s,
-            l: hsla.l,
-            a: hsla.a,
-        };
-        red_adjust.into()
+        let adjusted_hsla = Hsla::hsla_transform(&hsla, &transform);
+        adjusted_hsla.into()
     })
 }
 
@@ -75,20 +69,15 @@ pub fn blue_to_dblue() -> PixelMutator {
 }
 
 pub fn blue_to_burg() -> PixelMutator {
-    let hue_shift = Hsla::calc_hue_shift(
+    let transform = Hsla::calc_hsla_transform(
         egui::Color32::from_rgb(0, 143, 190),
-        egui::Color32::from_rgb(255, 0, 0),
+        egui::Color32::from_rgb(128, 8, 8),
     );
 
     Box::new(move |input: &egui::Color32| -> egui::Color32 {
         let hsla = Hsla::from(input);
-        let burg_adjust = Hsla {
-            h: Hsla::hue_shift(hsla.h, hue_shift),
-            s: hsla.s,
-            l: crate::gamma_tables::GAMMA_17[hsla.l as usize],
-            a: hsla.a,
-        };
-        burg_adjust.into()
+        let adjusted_hsla = Hsla::hsla_transform(&hsla, &transform);
+        adjusted_hsla.into()
     })
 }
 
