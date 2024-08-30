@@ -309,31 +309,41 @@ impl Hsla {
         shift.try_into().unwrap()
     }
 
+    pub fn calc_gamma_table(target: f32, orig: f32) -> Vec<u16> {
+        if target == 0.0 || target == 1.0 || orig == 0.0 || orig == 1.0 {
+            let mut table = Vec::new();
+            for n in 0..=1024 {
+                table.push(n);
+            }
+            table
+        } else {
+            let gamma = target.ln() / orig.ln();
+            let mut table = Vec::new();
+            for n in 0..=1024 {
+                let input = (n as f32) / 1024.0;
+                let output = input.powf(gamma);
+                let output_u16 = (output * 1024.0) as u16;
+                assert!(output_u16 <= ONE_U16, "output = {} {}", output_u16, output);
+                table.push(output_u16);
+            }
+            table
+        }
+    }
+
     pub fn calc_hsla_transform(orig: egui::Color32, target: egui::Color32) -> HslaTransform {
         let orig_hsla: Hsla = orig.into();
         let target_hsla: Hsla = target.into();
         let shift = (ONE_U32 * 6 + (target_hsla.h as u32) - (orig_hsla.h as u32)) % (ONE_U32 * 6);
         let ht: u16 = shift.try_into().unwrap();
-        //let orig_s = (orig_hsla.s as f32)/ HSLA_ONE_F;
-        //let target_s = (target_hsla.s as f32)/ HSLA_ONE_F;
-        //let gamma_s = target_s.ln() / orig_s.ln();
-        // saturation is much more problematic to do with gamma.
-        let gamma_s = 1.0;
-        let mut st = Vec::new();
-        for n in 0..=1024 {
-            let input = (n as f32) / 1024.0;
-            let output = input.powf(gamma_s);
-            st.push((output * 1024.0) as u16);
-        }
+
+        let orig_s = (orig_hsla.s as f32) / HSLA_ONE_F;
+        let target_s = (target_hsla.s as f32) / HSLA_ONE_F;
+        let st = Hsla::calc_gamma_table(target_s, orig_s);
+
         let orig_l = (orig_hsla.l as f32) / HSLA_ONE_F;
         let target_l = (target_hsla.l as f32) / HSLA_ONE_F;
-        let gamma_l = target_l.ln() / orig_l.ln();
-        let mut lt = Vec::new();
-        for n in 0..=1024 {
-            let input = (n as f32) / 1024.0;
-            let output = input.powf(gamma_l);
-            lt.push((output * 1024.0) as u16);
-        }
+        let lt = Hsla::calc_gamma_table(target_l, orig_l);
+
         HslaTransform { ht, st, lt }
     }
 
