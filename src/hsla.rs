@@ -309,17 +309,44 @@ impl Hsla {
         shift.try_into().unwrap()
     }
 
-    pub fn calc_gamma_table(target: f32, orig: f32) -> Vec<u16> {
-        if target == 0.0 || target == 1.0 || orig == 0.0 || orig == 1.0 {
+    /// Calculate a fixed point gamma table that maps source to target.
+    ///
+    /// In the general case, returns a table of fixed point values that computes
+    /// the gamma function
+    ///
+    /// f(x) = x^gamma
+    ///
+    /// where 0 <= x <= 1, 0 <= f(x) <= 1, and gamma = ln(target) / ln(source),
+    ///
+    /// This has the property that target = f(source) (i.e, source becomes target)
+    ///
+    /// The output is a vector with ONE_U16+1 entries in the range of 0 to ONE_U16.
+    /// The ONE_U16 fixed point value is equaivalent to 1.0 in floating point.
+    ///
+    /// The map allows the code to cleanly adjust values like luminance in an image
+    /// i.e.,  we can say "luminance value" .5 in the source image will be luminance
+    /// value .25 in the new image.  The values 0 and 1 in the source image remains
+    /// values 0 and 1 in the new image.
+    ///
+    /// The function becomes problematic if the source or target is a 0 or a 1.
+    /// ln(0) is infinity, and ln(1) is 0.  For now I'm just returning an identity
+    /// function.
+    ///
+    fn calc_gamma_table(source: f32, target: f32) -> Vec<u16> {
+        assert!((0.0..=1.0).contains(&source));
+        assert!((0.0..=1.0).contains(&target));
+
+        if target == 0.0 || target == 1.0 || source == 0.0 || source == 1.0 {
+            // for now, return identity function.
             let mut table = Vec::new();
-            for n in 0..=1024 {
+            for n in 0..=ONE_U16 {
                 table.push(n);
             }
             table
         } else {
-            let gamma = target.ln() / orig.ln();
+            let gamma = target.ln() / source.ln();
             let mut table = Vec::new();
-            for n in 0..=1024 {
+            for n in 0..=ONE_U16 {
                 let input = (n as f32) / 1024.0;
                 let output = input.powf(gamma);
                 let output_u16 = (output * 1024.0) as u16;
@@ -338,11 +365,11 @@ impl Hsla {
 
         let orig_s = (orig_hsla.s as f32) / HSLA_ONE_F;
         let target_s = (target_hsla.s as f32) / HSLA_ONE_F;
-        let st = Hsla::calc_gamma_table(target_s, orig_s);
+        let st = Hsla::calc_gamma_table(orig_s, target_s);
 
         let orig_l = (orig_hsla.l as f32) / HSLA_ONE_F;
         let target_l = (target_hsla.l as f32) / HSLA_ONE_F;
-        let lt = Hsla::calc_gamma_table(target_l, orig_l);
+        let lt = Hsla::calc_gamma_table(orig_l, target_l);
 
         HslaTransform { ht, st, lt }
     }
@@ -432,5 +459,35 @@ mod tests {
             );
             assert_eq!(red, shifted);
         }
+    }
+
+    #[test]
+    fn calc_gamma_tables_properly() {
+        const ONE_USIZE: usize = ONE_U16 as usize;
+
+        let table_p5_to_p25 = Hsla::calc_gamma_table(0.5, 0.25);
+        assert_eq!(ONE_USIZE + 1, table_p5_to_p25.len());
+        assert_eq!(0, table_p5_to_p25[0]);
+        assert_eq!(ONE_U16, table_p5_to_p25[ONE_USIZE]);
+        assert_eq!(ONE_U16 / 4, table_p5_to_p25[ONE_USIZE / 2]);
+        let mut last: u16 = 0;
+        // All values should be increasing.
+        for value in table_p5_to_p25 {
+            assert!(value >= last);
+            last = value;
+        }
+
+        let table_s0 = Hsla::calc_gamma_table(0.0, 0.5);
+        let table_s1 = Hsla::calc_gamma_table(1.0, 0.5);
+        let table_t0 = Hsla::calc_gamma_table(0.0, 0.0);
+        let table_t1 = Hsla::calc_gamma_table(0.0, 1.0);
+
+        assert_eq!(ONE_USIZE + 1, table_s0.len());
+        for value in 0..=ONE_U16 {
+            assert_eq!(value, table_s0[value as usize]);
+        }
+        assert_eq!(table_s0, table_s1);
+        assert_eq!(table_s0, table_t0);
+        assert_eq!(table_s0, table_t1);
     }
 }
