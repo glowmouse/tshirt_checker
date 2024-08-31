@@ -337,23 +337,15 @@ impl Hsla {
         assert!((0.0..=1.0).contains(&target));
 
         if target == 0.0 || target == 1.0 || source == 0.0 || source == 1.0 {
-            // for now, return identity function.
-            let mut table = Vec::new();
-            for n in 0..=ONE_U16 {
-                table.push(n);
-            }
-            table
+            // Return identity on these corner cases
+            (0..=ONE_U16).collect()
         } else {
             let gamma = target.ln() / source.ln();
-            let mut table = Vec::new();
-            for n in 0..=ONE_U16 {
-                let input = (n as f32) / 1024.0;
-                let output = input.powf(gamma);
-                let output_u16 = (output * 1024.0) as u16;
-                assert!(output_u16 <= ONE_U16, "output = {} {}", output_u16, output);
-                table.push(output_u16);
-            }
-            table
+            (0..=ONE_U16)
+                .map(|n| (n as f32) / HSLA_ONE_F)
+                .map(|n| n.powf(gamma))
+                .map(|n| (n * HSLA_ONE_F) as u16)
+                .collect()
         }
     }
 
