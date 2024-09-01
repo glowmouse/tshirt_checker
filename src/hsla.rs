@@ -351,10 +351,11 @@ impl Hsla {
 
     /// Generate a data structure that transforms HSLA space from source to target
     ///
-    /// TODO - just return a lambda with the function signature
-    /// Box<dyn Fn(&egui::Color32) -> egui::Color32>
     ///
-    pub fn calc_hsla_transform(source: egui::Color32, target: egui::Color32) -> HslaTransform {
+    pub fn calc_hsla_transform(
+        source: egui::Color32,
+        target: egui::Color32,
+    ) -> Box<dyn Fn(&egui::Color32) -> egui::Color32> {
         let source_hsla: Hsla = source.into();
         let target_hsla: Hsla = target.into();
         let shift = (ONE_U32 * 6 + (target_hsla.h as u32) - (source_hsla.h as u32)) % (ONE_U32 * 6);
@@ -368,22 +369,24 @@ impl Hsla {
         let target_l = (target_hsla.l as f32) / HSLA_ONE_F;
         let lt = Hsla::calc_gamma_table(source_l, target_l);
 
-        HslaTransform { ht, st, lt }
+        let transform = HslaTransform { ht, st, lt };
+
+        Box::new(move |input: &egui::Color32| -> egui::Color32 {
+            let input_hsla = Hsla::from(input);
+
+            let h = Hsla::hue_shift(input_hsla.h, transform.ht);
+            let s = transform.st[input_hsla.s as usize];
+            let l = transform.lt[input_hsla.l as usize];
+            let a = input_hsla.a;
+            let adjusted_hsla = Hsla { h, s, l, a };
+
+            adjusted_hsla.into()
+        })
     }
 
     #[inline(always)]
     fn hue_shift(orig: u16, shift: u16) -> u16 {
         (orig + shift) % (ONE_U16 * 6)
-    }
-    #[inline(always)]
-    /// TODO - just merge with calc_hsla_transform
-    ///
-    pub fn hsla_transform(input: &Hsla, t: &HslaTransform) -> Hsla {
-        let h = Hsla::hue_shift(input.h, t.ht);
-        let s = t.st[input.s as usize];
-        let l = t.lt[input.l as usize];
-        let a = input.a;
-        Hsla { h, s, l, a }
     }
 }
 
@@ -493,12 +496,11 @@ mod tests {
     #[test]
     fn do_hsla_transforms_properly() {
         let green = egui::Color32::from_rgb(0, 255, 0);
-        let green_hsla: Hsla = green.into();
         let dblue = egui::Color32::from_rgb(0, 0, 128);
         let green_to_dblue = Hsla::calc_hsla_transform(green, dblue);
 
-        let identity_result_hsla = Hsla::hsla_transform(&green_hsla, &green_to_dblue);
-        let identity_result: egui::Color32 = identity_result_hsla.into();
+        let identity_result = green_to_dblue(&green);
+        let identity_result_hsla: Hsla = identity_result.into();
         assert!(
             is_close(&identity_result, &dblue),
             "expected = {:?} actual = {:?} hsla = {:?}",
@@ -507,16 +509,14 @@ mod tests {
             identity_result_hsla
         );
 
-        let new_candidate: Hsla = egui::Color32::from_rgb(32, 128, 64).into();
-        let new_result_hsla = Hsla::hsla_transform(&new_candidate, &green_to_dblue);
-        let new_result: egui::Color32 = new_result_hsla.into();
+        let new_candidate = egui::Color32::from_rgb(32, 128, 64);
+        let new_result = green_to_dblue(&new_candidate);
+        let new_result_hsla: Hsla = new_result.into();
         // In,  { h: 2390, s: 615, l: 321, a: 255 }
         // Out, { h: 4438, s: 615, l: 101, a: 255 }
-        // In Lum = 31%,  Out Lum = 9.8%,
-
-        let expected = egui::Color32::from_rgb(20, 10, 40);
         // Orig lum = 31%,  New lum = 9.8%,  gamma =~ 2,  .31^2 = 9.6%.  9.8% =~ 9.6
         // It's what's expected - not 100% sure it's what I want wanted.
+        let expected = egui::Color32::from_rgb(20, 10, 40);
 
         assert!(
             is_close(&expected, &new_result),

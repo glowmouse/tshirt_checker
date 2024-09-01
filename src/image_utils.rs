@@ -5,68 +5,38 @@ use std::cmp::Ordering;
 pub type PixelMutator = Box<dyn Fn(&egui::Color32) -> egui::Color32>;
 
 pub fn blue_to_red() -> PixelMutator {
-    let transform = Hsla::calc_hsla_transform(
+    Hsla::calc_hsla_transform(
         egui::Color32::from_rgb(0, 143, 190),
         egui::Color32::from_rgb(192, 0, 0),
-    );
-
-    Box::new(move |input: &egui::Color32| -> egui::Color32 {
-        let hsla = Hsla::from(input);
-        let adjusted_hsla = Hsla::hsla_transform(&hsla, &transform);
-        adjusted_hsla.into()
-    })
+    )
 }
 
 pub fn blue_to_dgreen() -> PixelMutator {
-    let transform = Hsla::calc_hsla_transform(
+    Hsla::calc_hsla_transform(
         egui::Color32::from_rgb(0, 143, 190),
         egui::Color32::from_rgb(0, 128, 64),
-    );
-
-    Box::new(move |input: &egui::Color32| -> egui::Color32 {
-        let hsla = Hsla::from(input);
-        let adjusted_hsla = Hsla::hsla_transform(&hsla, &transform);
-        adjusted_hsla.into()
-    })
+    )
 }
 
 pub fn blue_to_ddgreen() -> PixelMutator {
-    let transform = Hsla::calc_hsla_transform(
+    Hsla::calc_hsla_transform(
         egui::Color32::from_rgb(0, 143, 190),
         egui::Color32::from_rgb(0, 64, 32),
-    );
-
-    Box::new(move |input: &egui::Color32| -> egui::Color32 {
-        let hsla = Hsla::from(input);
-        let adjusted_hsla = Hsla::hsla_transform(&hsla, &transform);
-        adjusted_hsla.into()
-    })
+    )
 }
 
 pub fn blue_to_dblue() -> PixelMutator {
-    let transform = Hsla::calc_hsla_transform(
+    Hsla::calc_hsla_transform(
         egui::Color32::from_rgb(0, 143, 190),
         egui::Color32::from_rgb(0, 143 / 2, 190 / 2),
-    );
-
-    Box::new(move |input: &egui::Color32| -> egui::Color32 {
-        let hsla = Hsla::from(input);
-        let adjusted_hsla = Hsla::hsla_transform(&hsla, &transform);
-        adjusted_hsla.into()
-    })
+    )
 }
 
 pub fn blue_to_burg() -> PixelMutator {
-    let transform = Hsla::calc_hsla_transform(
+    Hsla::calc_hsla_transform(
         egui::Color32::from_rgb(0, 143, 190),
         egui::Color32::from_rgb(96, 0, 0),
-    );
-
-    Box::new(move |input: &egui::Color32| -> egui::Color32 {
-        let hsla = Hsla::from(input);
-        let adjusted_hsla = Hsla::hsla_transform(&hsla, &transform);
-        adjusted_hsla.into()
-    })
+    )
 }
 
 pub fn correct_alpha_for_tshirt(input: &egui::Color32) -> egui::Color32 {
