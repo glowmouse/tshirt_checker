@@ -27,7 +27,7 @@ pub struct Hsla {
 ///
 /// Transformation between HSLA color spaces
 ///
-pub struct HslaTransform {
+struct HslaTransform {
     pub ht: u16,
     pub st: Vec<u16>,
     pub lt: Vec<u16>,
@@ -273,6 +273,8 @@ impl Hsla {
 
     /// What needs to be added to an HSLA hue to shift from one RGB color to another
     ///
+    /// TODO - make private?
+    ///
     /// ```
     /// use tshirt_checker::Hsla;
     /// use egui::Color32;
@@ -302,10 +304,10 @@ impl Hsla {
     /// assert_eq!(expected_blue, green_shifted.into());
     /// # }
     /// ```
-    pub fn calc_hue_shift(orig: egui::Color32, target: egui::Color32) -> u16 {
-        let orig_hsla: Hsla = orig.into();
+    pub fn calc_hue_shift(source: egui::Color32, target: egui::Color32) -> u16 {
+        let source_hsla: Hsla = source.into();
         let target_hsla: Hsla = target.into();
-        let shift = (ONE_U32 * 6 + (target_hsla.h as u32) - (orig_hsla.h as u32)) % (ONE_U32 * 6);
+        let shift = (ONE_U32 * 6 + (target_hsla.h as u32) - (source_hsla.h as u32)) % (ONE_U32 * 6);
         shift.try_into().unwrap()
     }
 
@@ -358,8 +360,8 @@ impl Hsla {
     ) -> Box<dyn Fn(&egui::Color32) -> egui::Color32> {
         let source_hsla: Hsla = source.into();
         let target_hsla: Hsla = target.into();
-        let shift = (ONE_U32 * 6 + (target_hsla.h as u32) - (source_hsla.h as u32)) % (ONE_U32 * 6);
-        let ht: u16 = shift.try_into().unwrap();
+
+        let ht = Self::calc_hue_shift(source, target);
 
         let source_s = (source_hsla.s as f32) / HSLA_ONE_F;
         let target_s = (target_hsla.s as f32) / HSLA_ONE_F;
