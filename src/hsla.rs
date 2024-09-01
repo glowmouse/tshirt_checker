@@ -273,38 +273,9 @@ impl Hsla {
 
     /// What needs to be added to an HSLA hue to shift from one RGB color to another
     ///
-    /// TODO - make private?
+    /// See unit test for more details on usage
     ///
-    /// ```
-    /// use tshirt_checker::Hsla;
-    /// use egui::Color32;
-    ///
-    /// # fn main() {
-    /// // Original artwork is mostly green, but we want to make it mostly blue
-    /// let original_green = Color32::from_rgb(0, 255, 0);
-    /// let target_blue = Color32::from_rgb(0, 0, 255);
-    ///
-    /// // Convert the shift needed to do that in HSLA space
-    /// let shift = Hsla::calc_hue_shift( original_green.clone(), target_blue.clone() );
-    ///
-    /// // Test: Convert a red tinged green with white saturation
-    /// let input_green = egui::Color32::from_rgb(152, 255, 127);
-    /// let hsla_green: Hsla = input_green.into();
-    ///
-    /// // Do the shift in HSLA space
-    /// let green_shifted = Hsla {
-    ///     h: (hsla_green.h + shift) % (1024*6),
-    ///     s: hsla_green.s,
-    ///     l: hsla_green.l,
-    ///     a: hsla_green.a
-    /// };
-    ///
-    /// // Expected - a green tinged blue with white saturation
-    /// let expected_blue = Color32::from_rgb(126, 151, 255);
-    /// assert_eq!(expected_blue, green_shifted.into());
-    /// # }
-    /// ```
-    pub fn calc_hue_shift(source: egui::Color32, target: egui::Color32) -> u16 {
+    fn calc_hue_shift(source: egui::Color32, target: egui::Color32) -> u16 {
         let source_hsla: Hsla = source.into();
         let target_hsla: Hsla = target.into();
         let shift = (ONE_U32 * 6 + (target_hsla.h as u32) - (source_hsla.h as u32)) % (ONE_U32 * 6);
@@ -528,5 +499,32 @@ mod tests {
             new_candidate,
             new_result_hsla
         );
+    }
+
+    #[test]
+    fn calculate_hue_shift_properly() {
+        use egui::Color32;
+        // Original artwork is mostly green, but we want to make it mostly blue
+        let original_green = Color32::from_rgb(0, 255, 0);
+        let target_blue = Color32::from_rgb(0, 0, 255);
+
+        // Convert the shift needed to do that in HSLA space
+        let shift = Hsla::calc_hue_shift(original_green, target_blue);
+
+        // Test: Convert a red tinged green with white saturation
+        let input_green = egui::Color32::from_rgb(152, 255, 127);
+        let hsla_green: Hsla = input_green.into();
+
+        // Do the shift in HSLA space
+        let green_shifted = Hsla {
+            h: (hsla_green.h + shift) % (1024 * 6),
+            s: hsla_green.s,
+            l: hsla_green.l,
+            a: hsla_green.a,
+        };
+
+        // Expected - a green tinged blue with white saturation
+        let expected_blue = Color32::from_rgb(126, 151, 255);
+        assert_eq!(expected_blue, green_shifted.into());
     }
 }
