@@ -81,14 +81,142 @@ impl std::ops::AddAssign<AppEvent> for AppEvents {
     }
 }
 
+// TShirt Checker App entry point for updates
+impl eframe::App for TShirtCheckerApp {
+    ///
+    /// Main (and only) application update function
+    ///
+    /// Called each time the UI needs repainting, which may be many times per second.
+    /// Ideally, any heavy computation should be done asyncronously so we can get in
+    /// and out of this function as quickly as possible.
+    ///
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let mut new_events: AppEvents = Default::default();
+
+        self.recieve_asyncronous_data(&mut new_events);
+        self.paint_all_panels(&mut new_events, ctx);
+
+        // TODO, refactor this.  The variable is set here and then updated in a lambda
+        // it just sucks.
+        self.display_loading_animation_instead_of_tools = false;
+        for closure in new_events.events.iter() {
+            closure(self);
+        }
+        self.icons.advance_cycle();
+        self.notification_panel.update();
+
+        let mut time_to_repaint: u32 = u32::MAX;
+        time_to_repaint = time_to_repaint.min(self.notification_panel.time_to_update());
+
+        if self.display_loading_animation_instead_of_tools {
+            time_to_repaint = time_to_repaint.min(ICON_LOAD_ANIMATION_IN_MILLIS);
+        }
+
+        if self
+            .selected_tool
+            .is_active(ReportTypes::PartialTransparency)
+            || self.selected_tool.is_active(ReportTypes::AreaUsed)
+            || self.selected_tool.is_active(ReportTypes::ThinLines)
+            || self.selected_tool.is_active(ReportTypes::Dpi)
+        {
+            time_to_repaint = time_to_repaint.min(self.selected_tool.time_to_next_epoch());
+        }
+
+        if time_to_repaint != u32::MAX {
+            ctx.request_repaint_after(std::time::Duration::from_millis(time_to_repaint.into()))
+        }
+    }
+}
+
 impl TShirtCheckerApp {
+    // Paint everything in the GUI
+    //
+    fn paint_all_panels(&self, new_events: &mut AppEvents, ctx: &egui::Context) {
+        self.paint_bottom_panel(ctx);
+        self.paint_right_panel(new_events, ctx);
+        self.paint_central_panel(new_events, ctx);
+    }
+
     // Display the bottom panel in the app - notifications & powered by egui and eframe
     //
-    fn do_bottom_panel(&self, ctx: &egui::Context) {
+    fn paint_bottom_panel(&self, ctx: &egui::Context) {
         egui::TopBottomPanel::bottom("bot_panel").show(ctx, |ui| {
             self.notification_panel.display(ui);
             powered_by_egui_and_eframe(ui);
         });
+    }
+
+    // Paint the right panel (tool status, artwork and t-shirt selection
+    //
+    fn paint_right_panel(&self, new_events: &mut AppEvents, ctx: &egui::Context) {
+        let screen = ctx.screen_rect();
+        let size = screen.max - screen.min;
+        let scale_x = (size.x * 0.33) / 260.0;
+        let scale_y = (size.y - 150.0) / 700.0;
+        let scale = scale_x.min(scale_y).clamp(0.20, 1.0);
+
+        let targetx = 50.0 + 260.0 * scale;
+
+        egui::SidePanel::right("stuff")
+            .resizable(true)
+            .min_width(targetx)
+            .max_width(targetx)
+            .show(ctx, |ui| {
+                ui.vertical(|ui| {
+                    self.display_title(ui, scale);
+                    self.report_metrics(new_events, ui, scale);
+                    self.tshirt_selection_panel(new_events, ui, scale);
+                    self.artwork_selection_panel(new_events, ui, ctx, scale);
+
+                    ui.horizontal(|ui| {
+                        self.import_button(ui, ctx, scale);
+                        self.partial_transparency_fix_button(ui, ctx, scale);
+                    });
+                })
+            });
+    }
+
+    // Paint the central panel (active t-shirt, art, and any tool output
+    //
+    fn paint_central_panel(&self, new_events: &mut AppEvents, ctx: &egui::Context) {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            let display_size = ui.available_size_before_wrap();
+            let (response, painter) =
+                ui.allocate_painter(display_size, egui::Sense::click_and_drag());
+
+            let movement_happened =
+                self.handle_central_movement(new_events, ui, response, display_size);
+            self.paint_tshirt(&painter, display_size);
+            self.paint_artwork(&painter, display_size);
+
+            if self.selected_tool.is_active(ReportTypes::Dpi) {
+                self.do_dpi_tool(new_events, movement_happened);
+            }
+            if self.selected_tool.is_active(ReportTypes::AreaUsed) {
+                self.paint_area_used_tool(&painter, display_size);
+            }
+        });
+    }
+
+    fn recieve_asyncronous_data(&mut self, mut new_events: &mut AppEvents) {
+        let data_attempt = self.async_data_to_app_receiver.try_recv();
+        if data_attempt.is_ok() {
+            let loaded_result = data_attempt.unwrap();
+            match loaded_result {
+                Err(e) => {
+                    if e.id != ErrorTypes::FileImportAborted {
+                        new_events += Box::new(move |app: &mut Self| {
+                            app.notification_panel.add_notice(e.msg());
+                        });
+                    }
+                }
+                Ok(f) => {
+                    self.art_storage
+                        .set_art(f.artwork, f.image, f.dependent_data);
+                    self.selected_tool.reset();
+                }
+            }
+        }
     }
 
     fn construct_viewport(&self, display_size: egui::Vec2) -> ViewPort {
@@ -297,26 +425,6 @@ impl TShirtCheckerApp {
             &[gap_length],
             dash_offset,
         ));
-    }
-
-    fn do_central_panel(&self, new_events: &mut AppEvents, ctx: &egui::Context) {
-        egui::CentralPanel::default().show(ctx, |ui| {
-            let display_size = ui.available_size_before_wrap();
-            let (response, painter) =
-                ui.allocate_painter(display_size, egui::Sense::click_and_drag());
-
-            let movement_happened =
-                self.handle_central_movement(new_events, ui, response, display_size);
-            self.paint_tshirt(&painter, display_size);
-            self.paint_artwork(&painter, display_size);
-
-            if self.selected_tool.is_active(ReportTypes::Dpi) {
-                self.do_dpi_tool(new_events, movement_happened);
-            }
-            if self.selected_tool.is_active(ReportTypes::AreaUsed) {
-                self.paint_area_used_tool(&painter, display_size);
-            }
-        });
     }
 
     fn handle_tshirt_button(
@@ -537,34 +645,6 @@ impl TShirtCheckerApp {
         }
     }
 
-    fn do_right_panel(&self, new_events: &mut AppEvents, ctx: &egui::Context) {
-        let screen = ctx.screen_rect();
-        let size = screen.max - screen.min;
-        let scale_x = (size.x * 0.33) / 260.0;
-        let scale_y = (size.y - 150.0) / 700.0;
-        let scale = scale_x.min(scale_y).clamp(0.20, 1.0);
-
-        let targetx = 50.0 + 260.0 * scale;
-
-        egui::SidePanel::right("stuff")
-            .resizable(true)
-            .min_width(targetx)
-            .max_width(targetx)
-            .show(ctx, |ui| {
-                ui.vertical(|ui| {
-                    self.display_title(ui, scale);
-                    self.report_metrics(new_events, ui, scale);
-                    self.tshirt_selection_panel(new_events, ui, scale);
-                    self.artwork_selection_panel(new_events, ui, ctx, scale);
-
-                    ui.horizontal(|ui| {
-                        self.import_button(ui, ctx, scale);
-                        self.partial_transparency_fix_button(ui, ctx, scale);
-                    });
-                })
-            });
-    }
-
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let (async_data_to_app_sender, async_data_to_app_receiver) =
@@ -601,62 +681,6 @@ impl TShirtCheckerApp {
 
 fn mtexts(text: &String, scale: f32) -> egui::widget_text::RichText {
     egui::widget_text::RichText::from(text).size(25.0 * scale)
-}
-
-impl eframe::App for TShirtCheckerApp {
-    /// Called each time the UI needs repainting, which may be many times per second.
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let mut new_events: AppEvents = Default::default();
-        let data_attempt = self.async_data_to_app_receiver.try_recv();
-        if data_attempt.is_ok() {
-            let loaded_result = data_attempt.unwrap();
-            match loaded_result {
-                Err(e) => {
-                    if e.id != ErrorTypes::FileImportAborted {
-                        new_events += Box::new(move |app: &mut Self| {
-                            app.notification_panel.add_notice(e.msg());
-                        });
-                    }
-                }
-                Ok(f) => {
-                    self.art_storage
-                        .set_art(f.artwork, f.image, f.dependent_data);
-                    self.selected_tool.reset();
-                }
-            }
-        }
-        self.do_bottom_panel(ctx);
-        self.do_right_panel(&mut new_events, ctx);
-        self.do_central_panel(&mut new_events, ctx);
-
-        self.display_loading_animation_instead_of_tools = false;
-        for closure in new_events.events.iter() {
-            closure(self);
-        }
-        self.icons.advance_cycle();
-        self.notification_panel.update();
-
-        let mut time_to_repaint: u32 = u32::MAX;
-        time_to_repaint = time_to_repaint.min(self.notification_panel.time_to_update());
-
-        if self.display_loading_animation_instead_of_tools {
-            time_to_repaint = time_to_repaint.min(ICON_LOAD_ANIMATION_IN_MILLIS);
-        }
-
-        if self
-            .selected_tool
-            .is_active(ReportTypes::PartialTransparency)
-            || self.selected_tool.is_active(ReportTypes::AreaUsed)
-            || self.selected_tool.is_active(ReportTypes::ThinLines)
-            || self.selected_tool.is_active(ReportTypes::Dpi)
-        {
-            time_to_repaint = time_to_repaint.min(self.selected_tool.time_to_next_epoch());
-        }
-
-        if time_to_repaint != u32::MAX {
-            ctx.request_repaint_after(std::time::Duration::from_millis(time_to_repaint.into()))
-        }
-    }
 }
 
 fn powered_by_egui_and_eframe(ui: &mut egui::Ui) {
