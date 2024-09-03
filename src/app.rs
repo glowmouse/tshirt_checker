@@ -43,10 +43,6 @@ pub struct TShirtCheckerApp {
     // Sender and receiver for image data that's computed asyncronously to improve load times
     async_data_to_app_sender: Sender,
     async_data_to_app_receiver: Receiver,
-    // When we first load there's image data that's computed asyncronously before we can
-    // display tool status.  If this flag is set display a loading animation instead of
-    // tool status.
-    display_loading_animation_instead_of_tools: bool,
     // What artwork tool is selected
     selected_tool: ToolSelection,
     // Bottom notification panel.  Used for events like image load failures
@@ -95,36 +91,9 @@ impl eframe::App for TShirtCheckerApp {
 
         self.recieve_asyncronous_data(&mut new_events);
         self.paint_all_panels(&mut new_events, ctx);
+        self.update_app_state(&new_events);
 
-        // TODO, refactor this.  The variable is set here and then updated in a lambda
-        // it just sucks.
-        self.display_loading_animation_instead_of_tools = false;
-        for closure in new_events.events.iter() {
-            closure(self);
-        }
-        self.icons.advance_cycle();
-        self.notification_panel.update();
-
-        let mut time_to_repaint: u32 = u32::MAX;
-        time_to_repaint = time_to_repaint.min(self.notification_panel.time_to_update());
-
-        if self.display_loading_animation_instead_of_tools {
-            time_to_repaint = time_to_repaint.min(ICON_LOAD_ANIMATION_IN_MILLIS);
-        }
-
-        if self
-            .selected_tool
-            .is_active(ReportTypes::PartialTransparency)
-            || self.selected_tool.is_active(ReportTypes::AreaUsed)
-            || self.selected_tool.is_active(ReportTypes::ThinLines)
-            || self.selected_tool.is_active(ReportTypes::Dpi)
-        {
-            time_to_repaint = time_to_repaint.min(self.selected_tool.time_to_next_epoch());
-        }
-
-        if time_to_repaint != u32::MAX {
-            ctx.request_repaint_after(std::time::Duration::from_millis(time_to_repaint.into()))
-        }
+        self.schedule_repaint_request_if_needed(ctx);
     }
 }
 
@@ -216,6 +185,38 @@ impl TShirtCheckerApp {
                     self.selected_tool.reset();
                 }
             }
+        }
+    }
+
+    fn update_app_state(&mut self, new_events: &AppEvents) {
+        for closure in new_events.events.iter() {
+            closure(self);
+        }
+        self.icons.advance_cycle();
+        self.notification_panel.update();
+    }
+
+    fn schedule_repaint_request_if_needed(&self, ctx: &egui::Context) {
+        let mut time_to_repaint: u32 = u32::MAX;
+        time_to_repaint = time_to_repaint.min(self.notification_panel.time_to_update());
+
+        let display_loading_animation_instead_of_tools = self.are_all_reports_ready();
+        if display_loading_animation_instead_of_tools {
+            time_to_repaint = time_to_repaint.min(ICON_LOAD_ANIMATION_IN_MILLIS);
+        }
+
+        if self
+            .selected_tool
+            .is_active(ReportTypes::PartialTransparency)
+            || self.selected_tool.is_active(ReportTypes::AreaUsed)
+            || self.selected_tool.is_active(ReportTypes::ThinLines)
+            || self.selected_tool.is_active(ReportTypes::Dpi)
+        {
+            time_to_repaint = time_to_repaint.min(self.selected_tool.time_to_next_epoch());
+        }
+
+        if time_to_repaint != u32::MAX {
+            ctx.request_repaint_after(std::time::Duration::from_millis(time_to_repaint.into()))
         }
     }
 
@@ -479,6 +480,23 @@ impl TShirtCheckerApp {
         }
     }
 
+    fn is_report_ready(&self, report_type: ReportTypes) -> bool {
+        let art = self.get_selected_art();
+        let art_dependent_data = self.art_storage.get_dependent_data(self.selected_art);
+        let report = self.report_templates.report_type_to_template(report_type);
+        let metric = (report.generate_metric)(art, art_dependent_data);
+        let status = (report.metric_to_status)(metric);
+        status != ReportStatus::Unknown
+    }
+
+    fn are_all_reports_ready(&self) -> bool {
+        self.is_report_ready(ReportTypes::Dpi)
+            && self.is_report_ready(ReportTypes::AreaUsed)
+            && self.is_report_ready(ReportTypes::Bib)
+            && self.is_report_ready(ReportTypes::ThinLines)
+            && self.is_report_ready(ReportTypes::PartialTransparency)
+    }
+
     fn report_metric(
         &self,
         mut new_events: &mut AppEvents,
@@ -500,11 +518,7 @@ impl TShirtCheckerApp {
                     let report = self.report_templates.report_type_to_template(report_type);
                     let metric = (report.generate_metric)(art, art_dependent_data);
                     let status = (report.metric_to_status)(metric);
-                    if status == ReportStatus::Unknown {
-                        new_events += Box::new(move |app: &mut Self| {
-                            app.display_loading_animation_instead_of_tools = true;
-                        })
-                    }
+
                     let status_icon = self
                         .icons
                         .status_icon(status)
@@ -673,7 +687,6 @@ impl TShirtCheckerApp {
             selected_tool: ToolSelection::new(),
             async_data_to_app_sender,
             async_data_to_app_receiver,
-            display_loading_animation_instead_of_tools: false,
             notification_panel: NoticePanel::new(notice_timer_ptr, null_log_ptr),
         }
     }
