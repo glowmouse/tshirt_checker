@@ -1,20 +1,16 @@
 extern crate nalgebra as na;
 use crate::artwork::*;
-use crate::async_tasks::*;
 use crate::error::*;
 use crate::icons::*;
 use crate::loaded_image::*;
-use crate::log::*;
 use crate::math::*;
 use crate::movement_state::MovementState;
 use crate::notice_panel::*;
 use crate::report_templates::*;
-use crate::time::*;
 use crate::tool_select::*;
 use crate::tshirt_storage::*;
 use egui_extras::{Size, StripBuilder};
 use na::{dvector, vector, Matrix3};
-use std::rc::Rc;
 
 const TOOL_WIDTH: f32 = 20.0;
 const STATUS_ICON_WIDTH: f32 = 25.0;
@@ -41,8 +37,8 @@ pub struct TShirtCheckerApp {
     // Template storage for the different tshirt arts report types
     report_templates: ReportTemplates,
     // Sender and receiver for image data that's computed asyncronously to improve load times
-    async_data_to_app_sender: Sender,
-    async_data_to_app_receiver: Receiver,
+    async_data_to_app_sender: crate::async_tasks::Sender,
+    async_data_to_app_receiver: crate::async_tasks::Receiver,
     // What artwork tool is selected
     selected_tool: ToolSelection,
     // Bottom notification panel.  Used for events like image load failures
@@ -94,20 +90,34 @@ impl TShirtCheckerApp {
     // Single TShirtCheckerApp creation point.
     //
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let (async_data_to_app_sender, async_data_to_app_receiver) =
-            std::sync::mpsc::channel::<Payload>();
+        //
+        // load the default artwork.  This will involved 3 in memory PNG decompressions,
+        // which isn't super best practice runtime wise. TODO, measure actual time.
+        //
         let art_storage = ArtStorage::new(&cc.egui_ctx);
+
+        //
+        // Choose the artwork in "slot 0" to be the initial selected art.
+        //
         let selected_art = Artwork::Artwork0;
-        cache_in_dependent_data(
+
+        //
+        // Create a pipe that will be used by computationally heavy tasks so we don't
+        // block the main thread during updates
+        //
+        let (async_data_to_app_sender, async_data_to_app_receiver) =
+            std::sync::mpsc::channel::<crate::async_tasks::Payload>();
+
+        //
+        // Schedule an asychronous task to create the artwork needed to display
+        // any reports for our initial piece of selected artwork.
+        //
+        crate::async_tasks::cache_in_dependent_data(
             &cc.egui_ctx,
             art_storage.get_art(selected_art),
             selected_art,
             &async_data_to_app_sender,
         );
-        let notice_timer = RealTime::default();
-        let notice_timer_ptr = Rc::<RealTime>::new(notice_timer);
-        let null_log = NullLog::default();
-        let null_log_ptr = Rc::<NullLog>::new(null_log);
 
         Self {
             art_storage,
@@ -120,7 +130,7 @@ impl TShirtCheckerApp {
             selected_tool: ToolSelection::new(),
             async_data_to_app_sender,
             async_data_to_app_receiver,
-            notification_panel: NoticePanel::new(notice_timer_ptr, null_log_ptr),
+            notification_panel: NoticePanel::new(),
         }
     }
 
@@ -143,8 +153,11 @@ impl TShirtCheckerApp {
         });
     }
 
+    ////////////////////////////////////////////////////////////////////////////////////
+    //
     // Paint the right panel (tool status, artwork and t-shirt selection
     //
+    ////////////////////////////////////////////////////////////////////////////////////
     fn paint_right_panel(&self, new_events: &mut AppEvents, ctx: &egui::Context) {
         let screen = ctx.screen_rect();
         let size = screen.max - screen.min;
@@ -160,17 +173,248 @@ impl TShirtCheckerApp {
             .max_width(targetx)
             .show(ctx, |ui| {
                 ui.vertical(|ui| {
-                    self.display_title(ui, scale);
-                    self.report_metrics(new_events, ui, scale);
-                    self.tshirt_selection_panel(new_events, ui, scale);
-                    self.artwork_selection_panel(new_events, ui, ctx, scale);
+                    self.paint_title(ui, scale);
+                    self.paint_reports(new_events, ui, scale);
+                    self.paint_tshirt_selection_panel(new_events, ui, scale);
+                    self.paint_artwork_selection_panel(new_events, ui, ctx, scale);
 
                     ui.horizontal(|ui| {
-                        self.import_button(ui, ctx, scale);
-                        self.partial_transparency_fix_button(ui, ctx, scale);
+                        self.paint_import_button(ui, ctx, scale);
+                        self.paint_partial_transparency_fix_button(ui, ctx, scale);
                     });
                 })
             });
+    }
+
+    fn paint_title(&self, ui: &mut egui::Ui, scale: f32) {
+        Self::panel_separator(ui, scale);
+        let width = 35.0 * scale;
+        let logo = self.icons.image(Icon::Logo, 85.0 * scale);
+        ui.vertical_centered(|ui| {
+            ui.horizontal(|ui| {
+                ui.add(logo);
+                ui.add_space(10.0 * scale);
+                ui.vertical(|ui| {
+                    ui.heading(egui::widget_text::RichText::from("T-Shirt Art").size(width));
+                    ui.heading(egui::widget_text::RichText::from("Checker").size(width))
+                });
+            });
+        });
+        Self::panel_separator(ui, scale);
+    }
+
+    fn paint_reports(&self, new_events: &mut AppEvents, ui: &mut egui::Ui, scale: f32) {
+        self.paint_report(new_events, ui, scale, ReportTypes::Dpi);
+        self.paint_report(new_events, ui, scale, ReportTypes::AreaUsed);
+        self.paint_report(new_events, ui, scale, ReportTypes::Bib);
+        self.paint_report(new_events, ui, scale, ReportTypes::ThinLines);
+        self.paint_report(new_events, ui, scale, ReportTypes::PartialTransparency);
+
+        Self::panel_separator(ui, scale);
+    }
+
+    fn paint_report(
+        &self,
+        mut new_events: &mut AppEvents,
+        ui: &mut egui::Ui,
+        scale: f32,
+        report_type: ReportTypes,
+    ) {
+        ui.horizontal(|ui| {
+            StripBuilder::new(ui)
+                .size(Size::exact(STATUS_ICON_WIDTH * scale))
+                .size(Size::exact(REPORT_TEXT_WIDTH * scale))
+                .size(Size::exact(REPORT_METRIC_WIDTH * scale))
+                .size(Size::exact(REPORT_PERCENT_WIDTH * scale))
+                .size(Size::exact(TOOL_WIDTH * scale))
+                .horizontal(|mut strip| {
+                    let art = self.get_selected_art();
+                    let art_dependent_data = self.art_storage.get_dependent_data(self.selected_art);
+
+                    let report = self.report_templates.report_type_to_template(report_type);
+                    let metric = (report.generate_metric)(art, art_dependent_data);
+                    let status = (report.metric_to_status)(metric);
+
+                    let status_icon = self
+                        .icons
+                        .status_icon(status)
+                        .max_width(STATUS_ICON_WIDTH * scale);
+                    let tool_tip = report.tool_tip.clone();
+                    let report_tip = report.report_tip.clone();
+
+                    strip.cell(|ui| {
+                        ui.add(status_icon).on_hover_text(&report_tip);
+                    });
+                    strip.cell(|ui| {
+                        ui.label(mtexts(&report.label.to_string(), scale))
+                            .on_hover_text(&report_tip);
+                    });
+                    strip.cell(|ui| {
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
+                            let text = match metric {
+                                Some(n) => format!("{}", n),
+                                None => "???".to_string(),
+                            };
+                            ui.label(mtexts(&text, scale)).on_hover_text(&report_tip);
+                        });
+                    });
+                    let cell_string = (if report.display_percent { "%" } else { "" }).to_string();
+                    strip.cell(|ui| {
+                        ui.label(mtexts(&cell_string, scale));
+                    });
+                    strip.cell(|ui| {
+                        if status != ReportStatus::Pass && status != ReportStatus::Unknown {
+                            let is_selected = self.selected_tool.is_active(report_type);
+                            if ui
+                                .add(
+                                    self.icons
+                                        .button(Icon::Tool, TOOL_WIDTH * scale)
+                                        .selected(is_selected),
+                                )
+                                .on_hover_text(tool_tip)
+                                .clicked()
+                            {
+                                new_events += Box::new(move |app: &mut Self| {
+                                    app.selected_tool.set(report_type, !is_selected);
+                                });
+                            }
+                        }
+                    });
+                });
+        });
+    }
+
+    fn paint_tshirt_selection_panel(
+        &self,
+        new_events: &mut AppEvents,
+        ui: &mut egui::Ui,
+        scale: f32,
+    ) {
+        ui.horizontal(|ui| {
+            self.paint_tshirt_select_button(new_events, ui, scale, TShirtColors::Red);
+            self.paint_tshirt_select_button(new_events, ui, scale, TShirtColors::Green);
+            self.paint_tshirt_select_button(new_events, ui, scale, TShirtColors::Blue);
+        });
+        ui.horizontal(|ui| {
+            self.paint_tshirt_select_button(new_events, ui, scale, TShirtColors::DRed);
+            self.paint_tshirt_select_button(new_events, ui, scale, TShirtColors::DGreen);
+            self.paint_tshirt_select_button(new_events, ui, scale, TShirtColors::DBlue);
+        });
+        Self::panel_separator(ui, scale);
+    }
+
+    fn paint_tshirt_select_button(
+        &self,
+        mut new_events: &mut AppEvents,
+        ui: &mut egui::Ui,
+        scale: f32,
+        color: TShirtColors,
+    ) {
+        let width = BUTTON_WIDTH * scale;
+        let image: &LoadedImage = self.tshirt_image_storage.tshirt_enum_to_image(color);
+        let egui_image = egui::Image::from_texture(image.texture_handle()).max_width(width);
+        let is_selected = self.selected_tshirt == color;
+        if ui
+            .add(egui::widgets::ImageButton::new(egui_image).selected(is_selected))
+            .clicked()
+        {
+            new_events += Box::new(move |app: &mut Self| {
+                app.selected_tshirt = color;
+            });
+        }
+    }
+
+    fn paint_artwork_selection_panel(
+        &self,
+        new_events: &mut AppEvents,
+        ui: &mut egui::Ui,
+        ctx: &egui::Context,
+        scale: f32,
+    ) {
+        ui.horizontal(|ui| {
+            self.paint_art_select_button(new_events, ui, ctx, scale, Artwork::Artwork0);
+            self.paint_art_select_button(new_events, ui, ctx, scale, Artwork::Artwork1);
+            self.paint_art_select_button(new_events, ui, ctx, scale, Artwork::Artwork2);
+        });
+        Self::panel_separator(ui, scale);
+    }
+
+    fn paint_art_select_button(
+        &self,
+        mut new_events: &mut AppEvents,
+        ui: &mut egui::Ui,
+        ctx: &egui::Context,
+        scale: f32,
+        artwork: Artwork,
+    ) {
+        let width = BUTTON_WIDTH * scale;
+        let image: &LoadedImage = self.art_storage.get_art(artwork);
+        let egui_image = egui::Image::from_texture(image.texture_handle()).max_width(width);
+        let is_selected = self.selected_art == artwork;
+        if ui
+            .add(egui::widgets::ImageButton::new(egui_image).selected(is_selected))
+            .clicked()
+        {
+            if self.art_storage.get_dependent_data(artwork).is_none() {
+                // schedule compute of cached data needed for reports.
+                // Some reports may not be available until the computation finishes
+                //
+                // TODO - if somebody spam clicks this we'll spam schedule an expensive
+                // and needless recomputation task.
+                crate::async_tasks::cache_in_dependent_data(
+                    ctx,
+                    self.art_storage.get_art(artwork),
+                    artwork,
+                    &self.async_data_to_app_sender,
+                );
+            }
+            new_events += Box::new(move |app: &mut Self| {
+                app.selected_art = artwork;
+                app.selected_tool.reset();
+            });
+        }
+    }
+
+    fn paint_import_button(&self, ui: &mut egui::Ui, ctx: &egui::Context, scale: f32) {
+        let width = BUTTON_WIDTH * scale;
+        if ui
+            .add(self.icons.button(Icon::Import, width))
+            .on_hover_text("Import an image to the selected artwork slot.")
+            .clicked()
+        {
+            // Start an asyncronous load task
+            crate::async_tasks::do_load(ctx, self.selected_art, &self.async_data_to_app_sender);
+        }
+    }
+
+    fn paint_partial_transparency_fix_button(
+        &self,
+        ui: &mut egui::Ui,
+        ctx: &egui::Context,
+        scale: f32,
+    ) {
+        let width = BUTTON_WIDTH * scale;
+        if ui
+            .add(self.icons.button(Icon::FixPT, width))
+            .on_hover_text(
+                "Fix partial transparency problems by mapping all alpha values to 0 or 1.",
+            )
+            .clicked()
+        {
+            // Start the partial transparency fix asyncronously.
+            crate::async_tasks::partialt_fix(
+                ctx,
+                self.art_storage.get_art(self.selected_art),
+                self.selected_art,
+                &self.async_data_to_app_sender,
+            );
+        }
+    }
+
+    fn panel_separator(ui: &mut egui::Ui, scale: f32) {
+        ui.add_space(5.0 * scale);
+        ui.separator();
+        ui.add_space(5.0 * scale);
     }
 
     // Paint the central panel (active t-shirt, art, and any tool output
@@ -403,58 +647,6 @@ impl TShirtCheckerApp {
         ));
     }
 
-    fn handle_tshirt_button(
-        &self,
-        mut new_events: &mut AppEvents,
-        ui: &mut egui::Ui,
-        scale: f32,
-        color: TShirtColors,
-    ) {
-        let width = BUTTON_WIDTH * scale;
-        let image: &LoadedImage = self.tshirt_image_storage.tshirt_enum_to_image(color);
-        let egui_image = egui::Image::from_texture(image.texture_handle()).max_width(width);
-        let is_selected = self.selected_tshirt == color;
-        if ui
-            .add(egui::widgets::ImageButton::new(egui_image).selected(is_selected))
-            .clicked()
-        {
-            new_events += Box::new(move |app: &mut Self| {
-                app.selected_tshirt = color;
-            });
-        }
-    }
-
-    fn handle_art_button(
-        &self,
-        mut new_events: &mut AppEvents,
-        ui: &mut egui::Ui,
-        ctx: &egui::Context,
-        scale: f32,
-        artwork: Artwork,
-    ) {
-        let width = BUTTON_WIDTH * scale;
-        let image: &LoadedImage = self.art_storage.get_art(artwork);
-        let egui_image = egui::Image::from_texture(image.texture_handle()).max_width(width);
-        let is_selected = self.selected_art == artwork;
-        if ui
-            .add(egui::widgets::ImageButton::new(egui_image).selected(is_selected))
-            .clicked()
-        {
-            if self.art_storage.get_dependent_data(artwork).is_none() {
-                cache_in_dependent_data(
-                    ctx,
-                    self.art_storage.get_art(artwork),
-                    artwork,
-                    &self.async_data_to_app_sender,
-                );
-            }
-            new_events += Box::new(move |app: &mut Self| {
-                app.selected_art = artwork;
-                app.selected_tool.reset();
-            });
-        }
-    }
-
     fn is_report_ready(&self, report_type: ReportTypes) -> bool {
         let art = self.get_selected_art();
         let art_dependent_data = self.art_storage.get_dependent_data(self.selected_art);
@@ -470,168 +662,6 @@ impl TShirtCheckerApp {
             && self.is_report_ready(ReportTypes::Bib)
             && self.is_report_ready(ReportTypes::ThinLines)
             && self.is_report_ready(ReportTypes::PartialTransparency)
-    }
-
-    fn report_metric(
-        &self,
-        mut new_events: &mut AppEvents,
-        ui: &mut egui::Ui,
-        scale: f32,
-        report_type: ReportTypes,
-    ) {
-        ui.horizontal(|ui| {
-            StripBuilder::new(ui)
-                .size(Size::exact(STATUS_ICON_WIDTH * scale))
-                .size(Size::exact(REPORT_TEXT_WIDTH * scale))
-                .size(Size::exact(REPORT_METRIC_WIDTH * scale))
-                .size(Size::exact(REPORT_PERCENT_WIDTH * scale))
-                .size(Size::exact(TOOL_WIDTH * scale))
-                .horizontal(|mut strip| {
-                    let art = self.get_selected_art();
-                    let art_dependent_data = self.art_storage.get_dependent_data(self.selected_art);
-
-                    let report = self.report_templates.report_type_to_template(report_type);
-                    let metric = (report.generate_metric)(art, art_dependent_data);
-                    let status = (report.metric_to_status)(metric);
-
-                    let status_icon = self
-                        .icons
-                        .status_icon(status)
-                        .max_width(STATUS_ICON_WIDTH * scale);
-                    let tool_tip = report.tool_tip.clone();
-                    let report_tip = report.report_tip.clone();
-
-                    strip.cell(|ui| {
-                        ui.add(status_icon).on_hover_text(&report_tip);
-                    });
-                    strip.cell(|ui| {
-                        ui.label(mtexts(&report.label.to_string(), scale))
-                            .on_hover_text(&report_tip);
-                    });
-                    strip.cell(|ui| {
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
-                            let text = match metric {
-                                Some(n) => format!("{}", n),
-                                None => "???".to_string(),
-                            };
-                            ui.label(mtexts(&text, scale)).on_hover_text(&report_tip);
-                        });
-                    });
-                    let cell_string = (if report.display_percent { "%" } else { "" }).to_string();
-                    strip.cell(|ui| {
-                        ui.label(mtexts(&cell_string, scale));
-                    });
-                    strip.cell(|ui| {
-                        if status != ReportStatus::Pass && status != ReportStatus::Unknown {
-                            let is_selected = self.selected_tool.is_active(report_type);
-                            if ui
-                                .add(
-                                    self.icons
-                                        .button(Icon::Tool, TOOL_WIDTH * scale)
-                                        .selected(is_selected),
-                                )
-                                .on_hover_text(tool_tip)
-                                .clicked()
-                            {
-                                new_events += Box::new(move |app: &mut Self| {
-                                    app.selected_tool.set(report_type, !is_selected);
-                                });
-                            }
-                        }
-                    });
-                });
-        });
-    }
-
-    fn panel_separator(ui: &mut egui::Ui, scale: f32) {
-        ui.add_space(5.0 * scale);
-        ui.separator();
-        ui.add_space(5.0 * scale);
-    }
-
-    fn display_title(&self, ui: &mut egui::Ui, scale: f32) {
-        Self::panel_separator(ui, scale);
-        let width = 35.0 * scale;
-        let logo = self.icons.image(Icon::Logo, 85.0 * scale);
-        ui.vertical_centered(|ui| {
-            ui.horizontal(|ui| {
-                ui.add(logo);
-                ui.add_space(10.0 * scale);
-                ui.vertical(|ui| {
-                    ui.heading(egui::widget_text::RichText::from("T-Shirt Art").size(width));
-                    ui.heading(egui::widget_text::RichText::from("Checker").size(width))
-                });
-            });
-        });
-        Self::panel_separator(ui, scale);
-    }
-
-    fn report_metrics(&self, new_events: &mut AppEvents, ui: &mut egui::Ui, scale: f32) {
-        self.report_metric(new_events, ui, scale, ReportTypes::Dpi);
-        self.report_metric(new_events, ui, scale, ReportTypes::AreaUsed);
-        self.report_metric(new_events, ui, scale, ReportTypes::Bib);
-        self.report_metric(new_events, ui, scale, ReportTypes::ThinLines);
-        self.report_metric(new_events, ui, scale, ReportTypes::PartialTransparency);
-
-        Self::panel_separator(ui, scale);
-    }
-
-    fn tshirt_selection_panel(&self, new_events: &mut AppEvents, ui: &mut egui::Ui, scale: f32) {
-        ui.horizontal(|ui| {
-            self.handle_tshirt_button(new_events, ui, scale, TShirtColors::Red);
-            self.handle_tshirt_button(new_events, ui, scale, TShirtColors::Green);
-            self.handle_tshirt_button(new_events, ui, scale, TShirtColors::Blue);
-        });
-        ui.horizontal(|ui| {
-            self.handle_tshirt_button(new_events, ui, scale, TShirtColors::DRed);
-            self.handle_tshirt_button(new_events, ui, scale, TShirtColors::DGreen);
-            self.handle_tshirt_button(new_events, ui, scale, TShirtColors::DBlue);
-        });
-        Self::panel_separator(ui, scale);
-    }
-
-    fn artwork_selection_panel(
-        &self,
-        new_events: &mut AppEvents,
-        ui: &mut egui::Ui,
-        ctx: &egui::Context,
-        scale: f32,
-    ) {
-        ui.horizontal(|ui| {
-            self.handle_art_button(new_events, ui, ctx, scale, Artwork::Artwork0);
-            self.handle_art_button(new_events, ui, ctx, scale, Artwork::Artwork1);
-            self.handle_art_button(new_events, ui, ctx, scale, Artwork::Artwork2);
-        });
-        Self::panel_separator(ui, scale);
-    }
-
-    fn import_button(&self, ui: &mut egui::Ui, ctx: &egui::Context, scale: f32) {
-        let width = BUTTON_WIDTH * scale;
-        if ui
-            .add(self.icons.button(Icon::Import, width))
-            .on_hover_text("Import an image to the selected artwork slot.")
-            .clicked()
-        {
-            do_load(ctx, self.selected_art, &self.async_data_to_app_sender);
-        }
-    }
-
-    fn partial_transparency_fix_button(&self, ui: &mut egui::Ui, ctx: &egui::Context, scale: f32) {
-        let width = BUTTON_WIDTH * scale;
-        if ui
-            .add(self.icons.button(Icon::FixPT, width))
-            .on_hover_text(
-                "Fix partial transparency problems by mapping all alpha values to 0 or 1.",
-            )
-            .clicked()
-        {
-            partialt_fix(
-                ctx,
-                self.art_storage.get_art(self.selected_art),
-                self.selected_art,
-                &self.async_data_to_app_sender,
-            );
-        }
     }
 
     //////////////////////////////////////////////////////////////////

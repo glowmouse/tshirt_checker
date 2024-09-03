@@ -19,7 +19,15 @@ pub struct NoticePanel {
 }
 
 impl NoticePanel {
-    pub fn new(timer: DisplayTimerPtr, log: LogPtr) -> Self {
+    /// Default Constructor
+    pub fn new() -> Self {
+        let notice_timer = Rc::<RealTime>::new(RealTime::default());
+        let null_log = Rc::<NullLog>::new(NullLog::default());
+        Self::new_unit_testable(notice_timer, null_log)
+    }
+
+    /// Constructor for unit tests that want to do dependency injection.
+    fn new_unit_testable(timer: DisplayTimerPtr, log: LogPtr) -> Self {
         let notifications = Vec::new();
         let current_time = timer.ms_since_start();
         Self {
@@ -134,7 +142,8 @@ mod notice_panel_should {
         let mut ctx = _create_test_context();
         let fake_time = Rc::new(FakeTime::default());
         let string_log = Rc::new(StringLog::default());
-        let mut notice_panel: NoticePanel = NoticePanel::new(fake_time.clone(), string_log.clone());
+        let mut notice_panel: NoticePanel =
+            NoticePanel::new_unit_testable(fake_time.clone(), string_log.clone());
 
         // Run display with initial state
         _run_code_with_context(&mut ctx, |ui| notice_panel.display(ui));
