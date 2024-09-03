@@ -79,31 +79,59 @@ impl std::ops::AddAssign<AppEvent> for AppEvents {
 
 // TShirt Checker App entry point for updates
 impl eframe::App for TShirtCheckerApp {
-    ///
-    /// Main (and only) application update function
-    ///
-    /// Called each time the UI needs repainting, which may be many times per second.
-    /// Ideally, any heavy computation should be done asyncronously so we can get in
-    /// and out of this function as quickly as possible.
-    ///
+    //
+    // Eframe's hook for updating the application.
+    //
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let mut new_events: AppEvents = Default::default();
-
-        self.recieve_asyncronous_data(&mut new_events);
-        self.paint_all_panels(&mut new_events, ctx);
-        self.update_app_state(&new_events);
-
+        let new_events = self.paint_all_panels(ctx);
+        self.update_app_state(new_events);
         self.schedule_repaint_request_if_needed(ctx);
     }
 }
 
 impl TShirtCheckerApp {
+    //
+    // Single TShirtCheckerApp creation point.
+    //
+    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        let (async_data_to_app_sender, async_data_to_app_receiver) =
+            std::sync::mpsc::channel::<Payload>();
+        let art_storage = ArtStorage::new(&cc.egui_ctx);
+        let selected_art = Artwork::Artwork0;
+        cache_in_dependent_data(
+            &cc.egui_ctx,
+            art_storage.get_art(selected_art),
+            selected_art,
+            &async_data_to_app_sender,
+        );
+        let notice_timer = RealTime::default();
+        let notice_timer_ptr = Rc::<RealTime>::new(notice_timer);
+        let null_log = NullLog::default();
+        let null_log_ptr = Rc::<NullLog>::new(null_log);
+
+        Self {
+            art_storage,
+            selected_art,
+            tshirt_image_storage: TShirtStorage::new(&cc.egui_ctx),
+            move_state: MovementState::new(),
+            icons: IconStorage::new(&cc.egui_ctx),
+            selected_tshirt: TShirtColors::Red,
+            report_templates: ReportTemplates::new(),
+            selected_tool: ToolSelection::new(),
+            async_data_to_app_sender,
+            async_data_to_app_receiver,
+            notification_panel: NoticePanel::new(notice_timer_ptr, null_log_ptr),
+        }
+    }
+
     // Paint everything in the GUI
     //
-    fn paint_all_panels(&self, new_events: &mut AppEvents, ctx: &egui::Context) {
+    fn paint_all_panels(&self, ctx: &egui::Context) -> AppEvents {
+        let mut new_events: AppEvents = Default::default();
         self.paint_bottom_panel(ctx);
-        self.paint_right_panel(new_events, ctx);
-        self.paint_central_panel(new_events, ctx);
+        self.paint_right_panel(&mut new_events, ctx);
+        self.paint_central_panel(&mut new_events, ctx);
+        new_events
     }
 
     // Display the bottom panel in the app - notifications & powered by egui and eframe
@@ -165,59 +193,6 @@ impl TShirtCheckerApp {
                 self.paint_area_used_tool(&painter, display_size);
             }
         });
-    }
-
-    fn recieve_asyncronous_data(&mut self, mut new_events: &mut AppEvents) {
-        let data_attempt = self.async_data_to_app_receiver.try_recv();
-        if data_attempt.is_ok() {
-            let loaded_result = data_attempt.unwrap();
-            match loaded_result {
-                Err(e) => {
-                    if e.id != ErrorTypes::FileImportAborted {
-                        new_events += Box::new(move |app: &mut Self| {
-                            app.notification_panel.add_notice(e.msg());
-                        });
-                    }
-                }
-                Ok(f) => {
-                    self.art_storage
-                        .set_art(f.artwork, f.image, f.dependent_data);
-                    self.selected_tool.reset();
-                }
-            }
-        }
-    }
-
-    fn update_app_state(&mut self, new_events: &AppEvents) {
-        for closure in new_events.events.iter() {
-            closure(self);
-        }
-        self.icons.advance_cycle();
-        self.notification_panel.update();
-    }
-
-    fn schedule_repaint_request_if_needed(&self, ctx: &egui::Context) {
-        let mut time_to_repaint: u32 = u32::MAX;
-        time_to_repaint = time_to_repaint.min(self.notification_panel.time_to_update());
-
-        let display_loading_animation_instead_of_tools = self.are_all_reports_ready();
-        if display_loading_animation_instead_of_tools {
-            time_to_repaint = time_to_repaint.min(ICON_LOAD_ANIMATION_IN_MILLIS);
-        }
-
-        if self
-            .selected_tool
-            .is_active(ReportTypes::PartialTransparency)
-            || self.selected_tool.is_active(ReportTypes::AreaUsed)
-            || self.selected_tool.is_active(ReportTypes::ThinLines)
-            || self.selected_tool.is_active(ReportTypes::Dpi)
-        {
-            time_to_repaint = time_to_repaint.min(self.selected_tool.time_to_next_epoch());
-        }
-
-        if time_to_repaint != u32::MAX {
-            ctx.request_repaint_after(std::time::Duration::from_millis(time_to_repaint.into()))
-        }
     }
 
     fn construct_viewport(&self, display_size: egui::Vec2) -> ViewPort {
@@ -659,35 +634,61 @@ impl TShirtCheckerApp {
         }
     }
 
-    /// Called once before the first frame.
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let (async_data_to_app_sender, async_data_to_app_receiver) =
-            std::sync::mpsc::channel::<Payload>();
-        let art_storage = ArtStorage::new(&cc.egui_ctx);
-        let selected_art = Artwork::Artwork0;
-        cache_in_dependent_data(
-            &cc.egui_ctx,
-            art_storage.get_art(selected_art),
-            selected_art,
-            &async_data_to_app_sender,
-        );
-        let notice_timer = RealTime::default();
-        let notice_timer_ptr = Rc::<RealTime>::new(notice_timer);
-        let null_log = NullLog::default();
-        let null_log_ptr = Rc::<NullLog>::new(null_log);
+    //////////////////////////////////////////////////////////////////
+    //
+    // All code that updates the application's state
+    //
+    //////////////////////////////////////////////////////////////////
 
-        Self {
-            art_storage,
-            selected_art,
-            tshirt_image_storage: TShirtStorage::new(&cc.egui_ctx),
-            move_state: MovementState::new(),
-            icons: IconStorage::new(&cc.egui_ctx),
-            selected_tshirt: TShirtColors::Red,
-            report_templates: ReportTemplates::new(),
-            selected_tool: ToolSelection::new(),
-            async_data_to_app_sender,
-            async_data_to_app_receiver,
-            notification_panel: NoticePanel::new(notice_timer_ptr, null_log_ptr),
+    fn update_app_state(&mut self, new_events: AppEvents) {
+        for event in new_events.events.iter() {
+            event(self);
+        }
+        self.recieve_asyncronous_data();
+        self.icons.advance_cycle();
+        self.notification_panel.update();
+    }
+
+    fn recieve_asyncronous_data(&mut self) {
+        let data_attempt = self.async_data_to_app_receiver.try_recv();
+        if data_attempt.is_ok() {
+            let loaded_result = data_attempt.unwrap();
+            match loaded_result {
+                Err(e) => {
+                    if e.id != ErrorTypes::FileImportAborted {
+                        self.notification_panel.add_notice(e.msg());
+                    }
+                }
+                Ok(f) => {
+                    self.art_storage
+                        .set_art(f.artwork, f.image, f.dependent_data);
+                    self.selected_tool.reset();
+                }
+            }
+        }
+    }
+
+    fn schedule_repaint_request_if_needed(&self, ctx: &egui::Context) {
+        let mut time_to_repaint: u32 = u32::MAX;
+        time_to_repaint = time_to_repaint.min(self.notification_panel.time_to_update());
+
+        let display_loading_animation_instead_of_tools = self.are_all_reports_ready();
+        if display_loading_animation_instead_of_tools {
+            time_to_repaint = time_to_repaint.min(ICON_LOAD_ANIMATION_IN_MILLIS);
+        }
+
+        if self
+            .selected_tool
+            .is_active(ReportTypes::PartialTransparency)
+            || self.selected_tool.is_active(ReportTypes::AreaUsed)
+            || self.selected_tool.is_active(ReportTypes::ThinLines)
+            || self.selected_tool.is_active(ReportTypes::Dpi)
+        {
+            time_to_repaint = time_to_repaint.min(self.selected_tool.time_to_next_epoch());
+        }
+
+        if time_to_repaint != u32::MAX {
+            ctx.request_repaint_after(std::time::Duration::from_millis(time_to_repaint.into()))
         }
     }
 }
