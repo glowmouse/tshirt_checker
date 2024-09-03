@@ -65,7 +65,7 @@ impl TShirtStorage {
         }
     }
 
-    pub fn size(&self) -> egui::Vec2 {
+    pub fn tshirt_image_size(&self) -> egui::Vec2 {
         self.blue_t_shirt.size() // any shirt will do.
     }
 }

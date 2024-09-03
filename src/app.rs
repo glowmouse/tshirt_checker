@@ -13,7 +13,7 @@ use crate::time::*;
 use crate::tool_select::*;
 use crate::tshirt_storage::*;
 use egui_extras::{Size, StripBuilder};
-use na::{dvector, vector};
+use na::{dvector, vector, Matrix3};
 use std::rc::Rc;
 
 const TOOL_WIDTH: f32 = 20.0;
@@ -23,22 +23,45 @@ const REPORT_METRIC_WIDTH: f32 = 40.0;
 const REPORT_PERCENT_WIDTH: f32 = 25.0;
 const BUTTON_WIDTH: f32 = 80.0;
 
-/// We derive Deserialize/Serialize so we can persist app state on shutdown.
+// State for the TShirt Artwork Checker app
+//
 pub struct TShirtCheckerApp {
+    // Storage for artwork the user may want to put on the t-shiurt
     art_storage: ArtStorage,
+    // Which of the 4 pieces of artwork from art_storage is currently selected.
     selected_art: Artwork,
+    // Storage for icons used by the app
     icons: IconStorage,
+    // Persistant state used to move or zoom the t-shirt and artwork
     move_state: MovementState,
-    tshirt_storage: TShirtStorage,
-    tshirt_selected_for: TShirtColors,
+    // Storage for the different color t-shirt images
+    tshirt_image_storage: TShirtStorage,
+    // Color of the tshirt that's currently selected
+    selected_tshirt: TShirtColors,
+    // Template storage for the different tshirt arts report types
     report_templates: ReportTemplates,
-    receiver: Receiver,
-    sender: Sender,
+    // Sender and receiver for image data that's computed asyncronously to improve load times
+    async_data_to_app_sender: Sender,
+    async_data_to_app_receiver: Receiver,
+    // When we first load there's image data that's computed asyncronously before we can
+    // display tool status.  If this flag is set display a loading animation instead of
+    // tool status.
+    display_loading_animation_instead_of_tools: bool,
+    // What artwork tool is selected
     selected_tool: ToolSelection,
-    animate_loading: bool,
-    notice_panel: NoticePanel,
+    // Bottom notification panel.  Used for events like image load failures
+    notification_panel: NoticePanel,
 }
 
+//
+// T-Shirt checker does its updating with TShirtCheckerApp in a read only state
+// Any changes that need to be made to the app are added to AppEvents and then made
+// when the update is done.
+//
+// It's a bit easier to reason about in the sense that the update is the most complicated
+// thing that's happening here - one part of the update won't interfer in a weird
+// way with another part of the update by modifying the TShirtCheckerApp state.
+//
 pub type AppEvent = Box<dyn Fn(&mut TShirtCheckerApp)>;
 
 #[derive(Default)]
@@ -59,9 +82,11 @@ impl std::ops::AddAssign<AppEvent> for AppEvents {
 }
 
 impl TShirtCheckerApp {
+    // Display the bottom panel in the app - notifications & powered by egui and eframe
+    //
     fn do_bottom_panel(&self, ctx: &egui::Context) {
         egui::TopBottomPanel::bottom("bot_panel").show(ctx, |ui| {
-            self.notice_panel.display(ui);
+            self.notification_panel.display(ui);
             powered_by_egui_and_eframe(ui);
         });
     }
@@ -71,12 +96,21 @@ impl TShirtCheckerApp {
             zoom: self.move_state.zoom,
             target: self.move_state.target,
             display_size,
-            tshirt_size: self.tshirt_storage.size(),
+            tshirt_size: self.tshirt_image_storage.tshirt_image_size(),
         }
     }
 
     fn get_selected_art(&self) -> &LoadedImage {
         self.art_storage.get_art(self.selected_art)
+    }
+
+    fn current_art_space_to_tshirt(&self) -> Matrix3<f32> {
+        art_space_to_tshirt(self.tshirt_image_storage.tshirt_image_size())
+    }
+
+    fn current_art_to_art_space(&self) -> Matrix3<f32> {
+        let art = self.get_selected_art();
+        art_to_art_space(art.size())
     }
 
     fn handle_central_movement_drag(
@@ -107,8 +141,9 @@ impl TShirtCheckerApp {
         ui: &egui::Ui,
         response: &egui::Response,
     ) -> bool {
+        const ZOOM_RATE: f32 = 200.0;
         if response.hovered() {
-            let zoom_delta_0 = 1.0 + ui.ctx().input(|i| i.smooth_scroll_delta)[1] / 200.0;
+            let zoom_delta_0 = 1.0 + ui.ctx().input(|i| i.smooth_scroll_delta)[1] / ZOOM_RATE;
             let zoom_delta_1 = ui.ctx().input(|i| i.zoom_delta());
             new_events += Box::new(move |app: &mut Self| {
                 app.move_state.handle_zoom(zoom_delta_0, zoom_delta_1);
@@ -142,8 +177,8 @@ impl TShirtCheckerApp {
         let s1 = v3_to_egui(tshirt_to_display * dvector![1.0, 1.0, 1.0]);
 
         let tshirt_art = self
-            .tshirt_storage
-            .tshirt_enum_to_image(self.tshirt_selected_for);
+            .tshirt_image_storage
+            .tshirt_enum_to_image(self.selected_tshirt);
 
         painter.image(
             tshirt_art.id(),
@@ -155,10 +190,8 @@ impl TShirtCheckerApp {
 
     fn paint_artwork(&self, painter: &egui::Painter, display_size: egui::Vec2) {
         let tshirt_to_display = tshirt_to_display(self.construct_viewport(display_size));
-        let art = self.get_selected_art();
-        let art_space_to_display =
-            tshirt_to_display * art_space_to_tshirt(self.tshirt_storage.size());
-        let art_to_display = art_space_to_display * art_to_art_space(art.size());
+        let art_space_to_display = tshirt_to_display * self.current_art_space_to_tshirt();
+        let art_to_display = art_space_to_display * self.current_art_to_art_space();
 
         let a0 = v3_to_egui(art_to_display * dvector![0.0, 0.0, 1.0]);
         let a1 = v3_to_egui(art_to_display * dvector![1.0, 1.0, 1.0]);
@@ -214,9 +247,7 @@ impl TShirtCheckerApp {
         let slot = cycle % (dependent_data.top_hot_spots.len() as u32);
         let hot_spot = &dependent_data.top_hot_spots[slot as usize];
         let art_location = vector![hot_spot.location.x, hot_spot.location.y, 1.0];
-        let art = self.get_selected_art();
-        let art_to_tshirt =
-            art_space_to_tshirt(self.tshirt_storage.size()) * art_to_art_space(art.size());
+        let art_to_tshirt = self.current_art_space_to_tshirt() * self.current_art_to_art_space();
         let display_location = art_to_tshirt * art_location;
 
         if !movement_happened {
@@ -232,9 +263,10 @@ impl TShirtCheckerApp {
     }
 
     fn paint_area_used_tool(&self, painter: &egui::Painter, display_size: egui::Vec2) {
+        const CYCLES_IN_AREA_USED_ANIMATION: u32 = 3;
+
         let tshirt_to_display = tshirt_to_display(self.construct_viewport(display_size));
-        let art_space_to_display =
-            tshirt_to_display * art_space_to_tshirt(self.tshirt_storage.size());
+        let art_space_to_display = tshirt_to_display * self.current_art_space_to_tshirt();
 
         let art_space_border = vec![
             v3_to_egui(art_space_to_display * dvector![0.0, 0.0, 1.0]),
@@ -250,17 +282,20 @@ impl TShirtCheckerApp {
         let dash_width = dash_dim.y;
         let gap_length = dash_length;
 
-        // animate with 3 cycles
-        let cycle = self.selected_tool.get_cycles() % 3;
-        let offset: f32 = (cycle as f32) / 3.0 * (dash_length + gap_length);
-        let stroke_1 = egui::Stroke::new(dash_width, egui::Color32::from_rgb(200, 200, 200));
+        // compute an offset in display units for a 3 cycle line animation
+        let cycle = self.selected_tool.get_cycles() % CYCLES_IN_AREA_USED_ANIMATION;
+        let percent_in_cycle: f32 = (cycle as f32) / (CYCLES_IN_AREA_USED_ANIMATION as f32);
+        let dash_offset: f32 = percent_in_cycle * (dash_length + gap_length);
+
+        let area_used_tool_dash_color = egui::Color32::from_rgb(200, 200, 200);
+        let stroke = egui::Stroke::new(dash_width, area_used_tool_dash_color);
 
         painter.add(egui::Shape::dashed_line_with_offset(
             &art_space_border,
-            stroke_1,
+            stroke,
             &[dash_length],
             &[gap_length],
-            offset,
+            dash_offset,
         ));
     }
 
@@ -292,15 +327,15 @@ impl TShirtCheckerApp {
         color: TShirtColors,
     ) {
         let width = BUTTON_WIDTH * scale;
-        let image: &LoadedImage = self.tshirt_storage.tshirt_enum_to_image(color);
+        let image: &LoadedImage = self.tshirt_image_storage.tshirt_enum_to_image(color);
         let egui_image = egui::Image::from_texture(image.texture_handle()).max_width(width);
-        let is_selected = self.tshirt_selected_for == color;
+        let is_selected = self.selected_tshirt == color;
         if ui
             .add(egui::widgets::ImageButton::new(egui_image).selected(is_selected))
             .clicked()
         {
             new_events += Box::new(move |app: &mut Self| {
-                app.tshirt_selected_for = color;
+                app.selected_tshirt = color;
             });
         }
     }
@@ -326,7 +361,7 @@ impl TShirtCheckerApp {
                     ctx,
                     self.art_storage.get_art(artwork),
                     artwork,
-                    &self.sender,
+                    &self.async_data_to_app_sender,
                 );
             }
             new_events += Box::new(move |app: &mut Self| {
@@ -359,7 +394,7 @@ impl TShirtCheckerApp {
                     let status = (report.metric_to_status)(metric);
                     if status == ReportStatus::Unknown {
                         new_events += Box::new(move |app: &mut Self| {
-                            app.animate_loading = true;
+                            app.display_loading_animation_instead_of_tools = true;
                         })
                     }
                     let status_icon = self
@@ -480,7 +515,7 @@ impl TShirtCheckerApp {
             .on_hover_text("Import an image to the selected artwork slot.")
             .clicked()
         {
-            do_load(ctx, self.selected_art, &self.sender);
+            do_load(ctx, self.selected_art, &self.async_data_to_app_sender);
         }
     }
 
@@ -497,7 +532,7 @@ impl TShirtCheckerApp {
                 ctx,
                 self.art_storage.get_art(self.selected_art),
                 self.selected_art,
-                &self.sender,
+                &self.async_data_to_app_sender,
             );
         }
     }
@@ -532,14 +567,15 @@ impl TShirtCheckerApp {
 
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let (sender, receiver) = std::sync::mpsc::channel::<Payload>();
+        let (async_data_to_app_sender, async_data_to_app_receiver) =
+            std::sync::mpsc::channel::<Payload>();
         let art_storage = ArtStorage::new(&cc.egui_ctx);
         let selected_art = Artwork::Artwork0;
         cache_in_dependent_data(
             &cc.egui_ctx,
             art_storage.get_art(selected_art),
             selected_art,
-            &sender,
+            &async_data_to_app_sender,
         );
         let notice_timer = RealTime::default();
         let notice_timer_ptr = Rc::<RealTime>::new(notice_timer);
@@ -549,16 +585,16 @@ impl TShirtCheckerApp {
         Self {
             art_storage,
             selected_art,
-            tshirt_storage: TShirtStorage::new(&cc.egui_ctx),
+            tshirt_image_storage: TShirtStorage::new(&cc.egui_ctx),
             move_state: MovementState::new(),
             icons: IconStorage::new(&cc.egui_ctx),
-            tshirt_selected_for: TShirtColors::Red,
+            selected_tshirt: TShirtColors::Red,
             report_templates: ReportTemplates::new(),
             selected_tool: ToolSelection::new(),
-            receiver,
-            sender,
-            animate_loading: false,
-            notice_panel: NoticePanel::new(notice_timer_ptr, null_log_ptr),
+            async_data_to_app_sender,
+            async_data_to_app_receiver,
+            display_loading_animation_instead_of_tools: false,
+            notification_panel: NoticePanel::new(notice_timer_ptr, null_log_ptr),
         }
     }
 }
@@ -571,14 +607,14 @@ impl eframe::App for TShirtCheckerApp {
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let mut new_events: AppEvents = Default::default();
-        let data_attempt = self.receiver.try_recv();
+        let data_attempt = self.async_data_to_app_receiver.try_recv();
         if data_attempt.is_ok() {
             let loaded_result = data_attempt.unwrap();
             match loaded_result {
                 Err(e) => {
                     if e.id != ErrorTypes::FileImportAborted {
                         new_events += Box::new(move |app: &mut Self| {
-                            app.notice_panel.add_notice(e.msg());
+                            app.notification_panel.add_notice(e.msg());
                         });
                     }
                 }
@@ -593,17 +629,17 @@ impl eframe::App for TShirtCheckerApp {
         self.do_right_panel(&mut new_events, ctx);
         self.do_central_panel(&mut new_events, ctx);
 
-        self.animate_loading = false;
+        self.display_loading_animation_instead_of_tools = false;
         for closure in new_events.events.iter() {
             closure(self);
         }
         self.icons.advance_cycle();
-        self.notice_panel.update();
+        self.notification_panel.update();
 
         let mut time_to_repaint: u32 = u32::MAX;
-        time_to_repaint = time_to_repaint.min(self.notice_panel.time_to_update());
+        time_to_repaint = time_to_repaint.min(self.notification_panel.time_to_update());
 
-        if self.animate_loading {
+        if self.display_loading_animation_instead_of_tools {
             time_to_repaint = time_to_repaint.min(ICON_LOAD_ANIMATION_IN_MILLIS);
         }
 

@@ -34,6 +34,9 @@ impl ToolSelection {
             self.reset();
         }
     }
+
+    /// Gets the number of 500ms cycles since tool selection.
+    ///
     pub fn get_cycles(&self) -> u32 {
         self.time_since_selection() / TOOL_TOGGLE_RATE
     }

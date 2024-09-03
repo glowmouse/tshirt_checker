@@ -24,15 +24,6 @@ pub struct Hsla {
     pub a: u8,
 }
 
-///
-/// Transformation between HSLA color spaces
-///
-struct HslaTransform {
-    pub ht: u16,
-    pub st: Vec<u16>,
-    pub lt: Vec<u16>,
-}
-
 /// Convert from an egui::Color32 to an Hsla color
 ///
 /// ```
@@ -342,14 +333,12 @@ impl Hsla {
         let target_l = (target_hsla.l as f32) / HSLA_ONE_F;
         let lt = Hsla::calc_gamma_table(source_l, target_l);
 
-        let transform = HslaTransform { ht, st, lt };
-
         Box::new(move |input: &egui::Color32| -> egui::Color32 {
             let input_hsla = Hsla::from(input);
 
-            let h = Hsla::hue_shift(input_hsla.h, transform.ht);
-            let s = transform.st[input_hsla.s as usize];
-            let l = transform.lt[input_hsla.l as usize];
+            let h = Hsla::hue_shift(input_hsla.h, ht);
+            let s = st[input_hsla.s as usize];
+            let l = lt[input_hsla.l as usize];
             let a = input_hsla.a;
             let adjusted_hsla = Hsla { h, s, l, a };
 
