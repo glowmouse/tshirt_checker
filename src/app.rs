@@ -187,7 +187,7 @@ impl TShirtCheckerApp {
     }
 
     fn paint_title(&self, ui: &mut egui::Ui, scale: f32) {
-        Self::panel_separator(ui, scale);
+        Self::paint_panel_separator(ui, scale);
         let width = 35.0 * scale;
         let logo = self.icons.image(Icon::Logo, 85.0 * scale);
         ui.vertical_centered(|ui| {
@@ -200,7 +200,7 @@ impl TShirtCheckerApp {
                 });
             });
         });
-        Self::panel_separator(ui, scale);
+        Self::paint_panel_separator(ui, scale);
     }
 
     fn paint_reports(&self, new_events: &mut AppEvents, ui: &mut egui::Ui, scale: f32) {
@@ -210,7 +210,7 @@ impl TShirtCheckerApp {
         self.paint_report(new_events, ui, scale, ReportTypes::ThinLines);
         self.paint_report(new_events, ui, scale, ReportTypes::PartialTransparency);
 
-        Self::panel_separator(ui, scale);
+        Self::paint_panel_separator(ui, scale);
     }
 
     fn paint_report(
@@ -300,7 +300,7 @@ impl TShirtCheckerApp {
             self.paint_tshirt_select_button(new_events, ui, scale, TShirtColors::DGreen);
             self.paint_tshirt_select_button(new_events, ui, scale, TShirtColors::DBlue);
         });
-        Self::panel_separator(ui, scale);
+        Self::paint_panel_separator(ui, scale);
     }
 
     fn paint_tshirt_select_button(
@@ -336,7 +336,7 @@ impl TShirtCheckerApp {
             self.paint_art_select_button(new_events, ui, ctx, scale, Artwork::Artwork1);
             self.paint_art_select_button(new_events, ui, ctx, scale, Artwork::Artwork2);
         });
-        Self::panel_separator(ui, scale);
+        Self::paint_panel_separator(ui, scale);
     }
 
     fn paint_art_select_button(
@@ -411,7 +411,7 @@ impl TShirtCheckerApp {
         }
     }
 
-    fn panel_separator(ui: &mut egui::Ui, scale: f32) {
+    fn paint_panel_separator(ui: &mut egui::Ui, scale: f32) {
         ui.add_space(5.0 * scale);
         ui.separator();
         ui.add_space(5.0 * scale);
