@@ -149,7 +149,21 @@ impl TShirtCheckerApp {
     fn paint_bottom_panel(&self, ctx: &egui::Context) {
         egui::TopBottomPanel::bottom("bot_panel").show(ctx, |ui| {
             self.notification_panel.display(ui);
-            powered_by_egui_and_eframe(ui);
+            Self::powered_by_egui_and_eframe(ui);
+        });
+    }
+
+    fn powered_by_egui_and_eframe(ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 0.0;
+            ui.label("Powered by ");
+            ui.hyperlink_to("egui", "https://github.com/emilk/egui");
+            ui.label(" and ");
+            ui.hyperlink_to(
+                "eframe",
+                "https://github.com/emilk/egui/tree/master/crates/eframe",
+            );
+            ui.label(".");
         });
     }
 
@@ -158,6 +172,7 @@ impl TShirtCheckerApp {
     // Paint the right panel (tool status, artwork and t-shirt selection
     //
     ////////////////////////////////////////////////////////////////////////////////////
+
     fn paint_right_panel(&self, new_events: &mut AppEvents, ctx: &egui::Context) {
         let screen = ctx.screen_rect();
         let size = screen.max - screen.min;
@@ -417,8 +432,12 @@ impl TShirtCheckerApp {
         ui.add_space(5.0 * scale);
     }
 
+    ////////////////////////////////////////////////////////////////////////////////////
+    //
     // Paint the central panel (active t-shirt, art, and any tool output
     //
+    ////////////////////////////////////////////////////////////////////////////////////
+
     fn paint_central_panel(&self, new_events: &mut AppEvents, ctx: &egui::Context) {
         egui::CentralPanel::default().show(ctx, |ui| {
             let display_size = ui.available_size_before_wrap();
@@ -437,6 +456,19 @@ impl TShirtCheckerApp {
                 self.paint_area_used_tool(&painter, display_size);
             }
         });
+    }
+
+    fn handle_central_movement(
+        &self,
+        events: &mut AppEvents,
+        ui: &egui::Ui,
+        response: egui::Response,
+        display_size: egui::Vec2,
+    ) -> bool {
+        let dragged = self.handle_central_movement_drag(events, &response, display_size);
+        let zoomed = self.handle_central_movement_zoom(events, ui, &response);
+
+        dragged || zoomed
     }
 
     fn construct_viewport(&self, display_size: egui::Vec2) -> ViewPort {
@@ -500,19 +532,6 @@ impl TShirtCheckerApp {
         } else {
             false
         }
-    }
-
-    fn handle_central_movement(
-        &self,
-        events: &mut AppEvents,
-        ui: &egui::Ui,
-        response: egui::Response,
-        display_size: egui::Vec2,
-    ) -> bool {
-        let dragged = self.handle_central_movement_drag(events, &response, display_size);
-        let zoomed = self.handle_central_movement_zoom(events, ui, &response);
-
-        dragged || zoomed
     }
 
     fn paint_tshirt(&self, painter: &egui::Painter, display_size: egui::Vec2) {
@@ -725,18 +744,4 @@ impl TShirtCheckerApp {
 
 fn mtexts(text: &String, scale: f32) -> egui::widget_text::RichText {
     egui::widget_text::RichText::from(text).size(25.0 * scale)
-}
-
-fn powered_by_egui_and_eframe(ui: &mut egui::Ui) {
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 0.0;
-        ui.label("Powered by ");
-        ui.hyperlink_to("egui", "https://github.com/emilk/egui");
-        ui.label(" and ");
-        ui.hyperlink_to(
-            "eframe",
-            "https://github.com/emilk/egui/tree/master/crates/eframe",
-        );
-        ui.label(".");
-    });
 }
