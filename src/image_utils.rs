@@ -83,6 +83,15 @@ pub fn compute_percent_opaque(img: &[egui::Color32]) -> u32 {
     (100 * num_opaque_pixels).div_ceil(num_pixels)
 }
 
+pub fn opaque_to_mask(input: &egui::Color32) -> egui::Color32 {
+    let is_opaque = input.a() > 0;
+    if is_opaque {
+        egui::Color32::from_rgba_premultiplied(0, 0, 0, 255)
+    } else {
+        egui::Color32::from_rgba_premultiplied(0, 0, 0, 0)
+    }
+}
+
 #[derive(Eq, Clone)]
 pub struct HotSpot {
     pub strength: u8,

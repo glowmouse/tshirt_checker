@@ -18,6 +18,7 @@ pub enum Artwork {
 pub struct ArtworkDependentData {
     pub partial_transparency_percent: u32,
     pub opaque_percent: u32,
+    pub opaque_mask: LoadedImage,
     pub thin_line_percent: u32,
     pub fixed_artwork: LoadedImage,
     pub flagged_artwork: LoadedImage,
@@ -42,10 +43,13 @@ impl ArtworkDependentData {
             "flagged default art",
             ctx,
         );
+
         async_std::task::sleep(one_milli).await;
         let heat_map = heat_map_from_image(artwork, "heatmap", ctx);
         async_std::task::sleep(one_milli).await;
         let opaque_percent = compute_percent_opaque(artwork.pixels());
+        async_std::task::sleep(one_milli).await;
+        let opaque_mask = load_image_from_existing_image(artwork, &opaque_to_mask, "bib_mask", ctx);
         async_std::task::sleep(one_milli).await;
         let partial_transparency_percent = compute_bad_tpixels(artwork.pixels());
         async_std::task::sleep(one_milli).await;
@@ -68,6 +72,7 @@ impl ArtworkDependentData {
         Self {
             partial_transparency_percent,
             opaque_percent,
+            opaque_mask,
             fixed_artwork: default_fixed_art,
             flagged_artwork: default_flagged_art,
             top_hot_spots,

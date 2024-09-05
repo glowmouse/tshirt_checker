@@ -616,7 +616,7 @@ impl TShirtCheckerApp {
         let uv0 = egui::Pos2 { x: 0.0, y: 0.0 };
         let uv1 = egui::Pos2 { x: 1.0, y: 1.0 };
 
-        let cycle = self.selected_tool.get_cycles() % 2;
+        let cycle = self.selected_tool.get_cycles();
         let texture_to_display = if self
             .selected_tool
             .is_active(ReportTypes::PartialTransparency)
@@ -625,7 +625,7 @@ impl TShirtCheckerApp {
                 .art_storage
                 .get_dependent_data(self.selected_art)
                 .unwrap();
-            match cycle {
+            match cycle % 2 {
                 0 => dependent_data.flagged_artwork.id(),
                 _ => dependent_data.fixed_artwork.id(),
             }
@@ -640,9 +640,18 @@ impl TShirtCheckerApp {
                 .art_storage
                 .get_dependent_data(self.selected_art)
                 .unwrap();
-            match cycle {
+            match cycle % 2 {
                 0 => dependent_data.thin_lines.id(),
                 _ => dependent_data.fixed_artwork.id(),
+            }
+        } else if self.selected_tool.is_active(ReportTypes::Bib) {
+            let dependent_data = self
+                .art_storage
+                .get_dependent_data(self.selected_art)
+                .unwrap();
+            match (cycle / 2) % 2 {
+                0 => dependent_data.opaque_mask.id(),
+                _ => self.get_selected_art().id(),
             }
         } else {
             self.get_selected_art().id()
@@ -815,6 +824,7 @@ impl TShirtCheckerApp {
             || self.selected_tool.is_active(ReportTypes::AreaUsed)
             || self.selected_tool.is_active(ReportTypes::ThinLines)
             || self.selected_tool.is_active(ReportTypes::Dpi)
+            || self.selected_tool.is_active(ReportTypes::Bib)
         {
             time_to_repaint = time_to_repaint.min(self.selected_tool.time_to_next_epoch());
         }
