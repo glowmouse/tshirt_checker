@@ -31,6 +31,16 @@ pub struct ReportTemplate {
         fn(art: &LoadedImage, art_dependent_data: Option<&ArtworkDependentData>) -> Option<u32>,
 }
 
+impl ReportTemplate {
+    pub fn postfix_string(&self) -> String {
+        if self.display_percent {
+            "%".to_string()
+        } else {
+            "".to_string()
+        }
+    }
+}
+
 fn dpi_to_status(dpi: Option<u32>) -> ReportStatus {
     match dpi {
         None => ReportStatus::Unknown,
