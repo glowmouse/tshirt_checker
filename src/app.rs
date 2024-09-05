@@ -41,7 +41,7 @@ pub struct TShirtCheckerApp {
     async_data_to_app_receiver: crate::async_tasks::Receiver,
     // What artwork tool is selected
     selected_tool: ToolSelection,
-    // Bottom notification panel.  Used for events like image load failures
+    // Bottom notification panel.  Used for changes like image load failures
     notification_panel: NoticePanel,
 }
 
@@ -58,18 +58,18 @@ pub type ChangeToBeMade = Box<dyn Fn(&mut TShirtCheckerApp)>;
 
 #[derive(Default)]
 pub struct ChangesToBeMade {
-    events: Vec<ChangeToBeMade>,
+    changes: Vec<ChangeToBeMade>,
 }
 
 impl std::ops::AddAssign<ChangeToBeMade> for &mut ChangesToBeMade {
     fn add_assign(&mut self, rhs: ChangeToBeMade) {
-        self.events.push(rhs);
+        self.changes.push(rhs);
     }
 }
 
 impl std::ops::AddAssign<ChangeToBeMade> for ChangesToBeMade {
     fn add_assign(&mut self, rhs: ChangeToBeMade) {
-        self.events.push(rhs);
+        self.changes.push(rhs);
     }
 }
 
@@ -523,7 +523,7 @@ impl TShirtCheckerApp {
             self.paint_artwork(&painter, display_size);
 
             if self.selected_tool.is_active(ReportTypes::Dpi) {
-                self.do_dpi_tool(changes, movement_happened);
+                self.paint_dpi_tool(changes, movement_happened);
             }
             if self.selected_tool.is_active(ReportTypes::AreaUsed) {
                 self.paint_area_used_tool(&painter, display_size);
@@ -533,41 +533,15 @@ impl TShirtCheckerApp {
 
     fn handle_central_movement(
         &self,
-        events: &mut ChangesToBeMade,
+        changes: &mut ChangesToBeMade,
         ui: &egui::Ui,
         response: egui::Response,
         display_size: egui::Vec2,
     ) -> bool {
-        let dragged = self.handle_central_movement_drag(events, &response, display_size);
-        let zoomed = self.handle_central_movement_zoom(events, ui, &response);
+        let dragged = self.handle_central_movement_drag(changes, &response, display_size);
+        let zoomed = self.handle_central_movement_zoom(changes, ui, &response);
 
         dragged || zoomed
-    }
-
-    fn construct_viewport(&self, display_size: egui::Vec2) -> ViewPort {
-        ViewPort {
-            zoom: self.move_state.zoom,
-            target: self.move_state.target,
-            display_size,
-            tshirt_size: self.tshirt_image_storage.tshirt_image_size(),
-        }
-    }
-
-    fn get_selected_art(&self) -> &LoadedImage {
-        self.art_storage.get_art(self.selected_art)
-    }
-
-    fn get_selected_dependent_data(&self) -> Option<&ArtworkDependentData> {
-        self.art_storage.get_dependent_data(self.selected_art)
-    }
-
-    fn current_art_space_to_tshirt(&self) -> Matrix3<f32> {
-        art_space_to_tshirt(self.tshirt_image_storage.tshirt_image_size())
-    }
-
-    fn current_art_to_art_space(&self) -> Matrix3<f32> {
-        let art = self.get_selected_art();
-        art_to_art_space(art.size())
     }
 
     fn handle_central_movement_drag(
@@ -578,7 +552,7 @@ impl TShirtCheckerApp {
     ) -> bool {
         if let Some(pointer_pos) = response.interact_pointer_pos() {
             let mouse_down_pos = vector!(pointer_pos[0], pointer_pos[1], 1.0);
-            let tshirt_to_display = tshirt_to_display(self.construct_viewport(display_size));
+            let tshirt_to_display = tshirt_to_display(self.central_viewport(display_size));
             changes += Box::new(move |app: &mut Self| {
                 app.move_state
                     .event_mouse_down_movement(mouse_down_pos, tshirt_to_display);
@@ -612,7 +586,7 @@ impl TShirtCheckerApp {
     }
 
     fn paint_tshirt(&self, painter: &egui::Painter, display_size: egui::Vec2) {
-        let tshirt_to_display = tshirt_to_display(self.construct_viewport(display_size));
+        let tshirt_to_display = tshirt_to_display(self.central_viewport(display_size));
 
         let uv0 = egui::Pos2 { x: 0.0, y: 0.0 };
         let uv1 = egui::Pos2 { x: 1.0, y: 1.0 };
@@ -633,9 +607,9 @@ impl TShirtCheckerApp {
     }
 
     fn paint_artwork(&self, painter: &egui::Painter, display_size: egui::Vec2) {
-        let tshirt_to_display = tshirt_to_display(self.construct_viewport(display_size));
-        let art_space_to_display = tshirt_to_display * self.current_art_space_to_tshirt();
-        let art_to_display = art_space_to_display * self.current_art_to_art_space();
+        let tshirt_to_display = tshirt_to_display(self.central_viewport(display_size));
+        let art_space_to_display = tshirt_to_display * self.art_space_to_shirt_matrix();
+        let art_to_display = art_space_to_display * self.art_to_art_space_matrix();
 
         let a0 = v3_to_egui(art_to_display * dvector![0.0, 0.0, 1.0]);
         let a1 = v3_to_egui(art_to_display * dvector![1.0, 1.0, 1.0]);
@@ -682,7 +656,7 @@ impl TShirtCheckerApp {
         );
     }
 
-    fn do_dpi_tool(&self, mut changes: &mut ChangesToBeMade, movement_happened: bool) {
+    fn paint_dpi_tool(&self, mut changes: &mut ChangesToBeMade, movement_happened: bool) {
         let dependent_data = self
             .art_storage
             .get_dependent_data(self.selected_art)
@@ -691,7 +665,7 @@ impl TShirtCheckerApp {
         let slot = cycle % (dependent_data.top_hot_spots.len() as u32);
         let hot_spot = &dependent_data.top_hot_spots[slot as usize];
         let art_location = vector![hot_spot.location.x, hot_spot.location.y, 1.0];
-        let art_to_tshirt = self.current_art_space_to_tshirt() * self.current_art_to_art_space();
+        let art_to_tshirt = self.art_space_to_shirt_matrix() * self.art_to_art_space_matrix();
         let display_location = art_to_tshirt * art_location;
 
         if !movement_happened {
@@ -709,8 +683,8 @@ impl TShirtCheckerApp {
     fn paint_area_used_tool(&self, painter: &egui::Painter, display_size: egui::Vec2) {
         const CYCLES_IN_AREA_USED_ANIMATION: u32 = 3;
 
-        let tshirt_to_display = tshirt_to_display(self.construct_viewport(display_size));
-        let art_space_to_display = tshirt_to_display * self.current_art_space_to_tshirt();
+        let tshirt_to_display = tshirt_to_display(self.central_viewport(display_size));
+        let art_space_to_display = tshirt_to_display * self.art_space_to_shirt_matrix();
 
         let art_space_border = vec![
             v3_to_egui(art_space_to_display * dvector![0.0, 0.0, 1.0]),
@@ -743,6 +717,29 @@ impl TShirtCheckerApp {
         ));
     }
 
+    fn central_viewport(&self, display_size: egui::Vec2) -> ViewPort {
+        ViewPort {
+            zoom: self.move_state.zoom,
+            target: self.move_state.target,
+            display_size,
+            tshirt_size: self.tshirt_image_storage.tshirt_image_size(),
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Common Utiltiies
+    //
+    ////////////////////////////////////////////////////////////////////////////////////
+
+    fn get_selected_art(&self) -> &LoadedImage {
+        self.art_storage.get_art(self.selected_art)
+    }
+
+    fn get_selected_dependent_data(&self) -> Option<&ArtworkDependentData> {
+        self.art_storage.get_dependent_data(self.selected_art)
+    }
+
     fn is_report_ready(&self, report_type: ReportTypes) -> bool {
         let art = self.get_selected_art();
         let art_dependent_data = self.art_storage.get_dependent_data(self.selected_art);
@@ -760,6 +757,15 @@ impl TShirtCheckerApp {
             && self.is_report_ready(ReportTypes::PartialTransparency)
     }
 
+    fn art_space_to_shirt_matrix(&self) -> Matrix3<f32> {
+        art_space_to_tshirt(self.tshirt_image_storage.tshirt_image_size())
+    }
+
+    fn art_to_art_space_matrix(&self) -> Matrix3<f32> {
+        let art = self.get_selected_art();
+        art_to_art_space(art.size())
+    }
+
     //////////////////////////////////////////////////////////////////
     //
     // All code that updates the application's state
@@ -767,7 +773,7 @@ impl TShirtCheckerApp {
     //////////////////////////////////////////////////////////////////
 
     fn journal_changes_to_app_state(&mut self, changes: ChangesToBeMade) {
-        for change in changes.events.iter() {
+        for change in changes.changes.iter() {
             change(self);
         }
         self.recieve_asyncronous_data();
