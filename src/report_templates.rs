@@ -142,7 +142,7 @@ fn compute_bib_score(
 ) -> Option<u32> {
     let art_dependent_data = optional_art_dependent_data?;
     let area_used = compute_area_used(art, Some(art_dependent_data))?;
-    let bib_score = area_used * art_dependent_data.opaque_percent / 100;
+    let bib_score = area_used * art_dependent_data.bib_opaque_percent / 100;
     Some(bib_score)
 }
 

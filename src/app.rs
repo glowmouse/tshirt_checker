@@ -626,23 +626,23 @@ impl TShirtCheckerApp {
                 .get_dependent_data(self.selected_art)
                 .unwrap();
             match cycle % 2 {
-                0 => dependent_data.flagged_artwork.id(),
-                _ => dependent_data.fixed_artwork.id(),
+                0 => dependent_data.partial_transparency_problems.id(),
+                _ => dependent_data.partial_transparency_fixed.id(),
             }
         } else if self.selected_tool.is_active(ReportTypes::Dpi) {
             let dependent_data = self
                 .art_storage
                 .get_dependent_data(self.selected_art)
                 .unwrap();
-            dependent_data.fixed_artwork.id()
+            dependent_data.partial_transparency_fixed.id()
         } else if self.selected_tool.is_active(ReportTypes::ThinLines) {
             let dependent_data = self
                 .art_storage
                 .get_dependent_data(self.selected_art)
                 .unwrap();
             match cycle % 2 {
-                0 => dependent_data.thin_lines.id(),
-                _ => dependent_data.fixed_artwork.id(),
+                0 => dependent_data.thin_line_problems.id(),
+                _ => self.get_selected_art().id(),
             }
         } else if self.selected_tool.is_active(ReportTypes::Bib) {
             let dependent_data = self
@@ -650,7 +650,7 @@ impl TShirtCheckerApp {
                 .get_dependent_data(self.selected_art)
                 .unwrap();
             match (cycle / 2) % 2 {
-                0 => dependent_data.opaque_mask.id(),
+                0 => dependent_data.bib_opaque_mask.id(),
                 _ => self.get_selected_art().id(),
             }
         } else {
@@ -671,8 +671,8 @@ impl TShirtCheckerApp {
             .get_dependent_data(self.selected_art)
             .unwrap();
         let cycle = self.selected_tool.get_cycles() / 10;
-        let slot = cycle % (dependent_data.top_hot_spots.len() as u32);
-        let hot_spot = &dependent_data.top_hot_spots[slot as usize];
+        let slot = cycle % (dependent_data.dpi_top_hot_spots.len() as u32);
+        let hot_spot = &dependent_data.dpi_top_hot_spots[slot as usize];
         let art_location = vector![hot_spot.location.x, hot_spot.location.y, 1.0];
         let art_to_tshirt = self.art_space_to_shirt_matrix() * self.art_to_art_space_matrix();
         let display_location = art_to_tshirt * art_location;

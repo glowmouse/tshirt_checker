@@ -16,44 +16,52 @@ pub enum Artwork {
 
 /// Analysis data that depends on the t-shirt artwork
 pub struct ArtworkDependentData {
+    // Data for DPI tool
+    pub dpi_top_hot_spots: Vec<HotSpot>,
+
+    // Data for Partial Transparency report/ tool
     pub partial_transparency_percent: u32,
-    pub opaque_percent: u32,
-    pub opaque_mask: LoadedImage,
+    pub partial_transparency_problems: LoadedImage,
+    pub partial_transparency_fixed: LoadedImage,
+
+    // Data for Bib report/ tool
+    pub bib_opaque_percent: u32,
+    pub bib_opaque_mask: LoadedImage,
+
+    // Data for Thin Line tool
     pub thin_line_percent: u32,
-    pub fixed_artwork: LoadedImage,
-    pub flagged_artwork: LoadedImage,
-    pub thin_lines: LoadedImage,
-    pub top_hot_spots: Vec<HotSpot>,
+    pub thin_line_problems: LoadedImage,
 }
 
 impl ArtworkDependentData {
     pub async fn new(ctx: &egui::Context, artwork: &LoadedImage) -> Self {
         let one_milli = std::time::Duration::from_millis(1);
         async_std::task::sleep(one_milli).await;
-        let default_fixed_art: LoadedImage = load_image_from_existing_image(
+        let partial_transparency_fixed: LoadedImage = load_image_from_existing_image(
             artwork,
             &correct_alpha_for_tshirt,
-            "fixed default art",
+            "partial_transparency_fixed",
             ctx,
         );
         async_std::task::sleep(one_milli).await;
-        let default_flagged_art: LoadedImage = load_image_from_existing_image(
+        let partial_transparency_problems: LoadedImage = load_image_from_existing_image(
             artwork,
             &flag_alpha_for_shirt,
-            "flagged default art",
+            "partial_transparency_problems",
             ctx,
         );
 
         async_std::task::sleep(one_milli).await;
         let heat_map = heat_map_from_image(artwork, "heatmap", ctx);
         async_std::task::sleep(one_milli).await;
-        let opaque_percent = compute_percent_opaque(artwork.pixels());
+        let bib_opaque_percent = compute_percent_opaque(artwork.pixels());
         async_std::task::sleep(one_milli).await;
-        let opaque_mask = load_image_from_existing_image(artwork, &opaque_to_mask, "bib_mask", ctx);
+        let bib_opaque_mask =
+            load_image_from_existing_image(artwork, &opaque_to_mask, "bib_mask", ctx);
         async_std::task::sleep(one_milli).await;
         let partial_transparency_percent = compute_bad_tpixels(artwork.pixels());
         async_std::task::sleep(one_milli).await;
-        let top_hot_spots = hot_spots_from_heat_map(&heat_map);
+        let dpi_top_hot_spots = hot_spots_from_heat_map(&heat_map);
         async_std::task::sleep(one_milli).await;
 
         // Cut and paste from report_templates.rs, should refactor.
@@ -64,20 +72,23 @@ impl ArtworkDependentData {
         // going to say that 1/64 inches is too thin for now
         let dots = (dpi * (1.0 / 64.0)).ceil() as usize;
 
-        let thin_lines = flag_thin_lines(artwork, ctx, dots).await;
+        let thin_line_problems = flag_thin_lines(artwork, ctx, dots).await;
         async_std::task::sleep(one_milli).await;
-        let thin_line_percent = compute_percent_diff(&thin_lines, artwork);
+        let thin_line_percent = compute_percent_diff(&thin_line_problems, artwork);
         async_std::task::sleep(one_milli).await;
 
         Self {
+            dpi_top_hot_spots,
+
             partial_transparency_percent,
-            opaque_percent,
-            opaque_mask,
-            fixed_artwork: default_fixed_art,
-            flagged_artwork: default_flagged_art,
-            top_hot_spots,
-            thin_lines,
+            partial_transparency_problems,
+            partial_transparency_fixed,
+
+            bib_opaque_percent,
+            bib_opaque_mask,
+
             thin_line_percent,
+            thin_line_problems,
         }
     }
 }
