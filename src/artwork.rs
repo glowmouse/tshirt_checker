@@ -34,15 +34,35 @@ pub struct ArtworkDependentData {
 }
 
 impl ArtworkDependentData {
+    // Compute data for reports and report tools asyncronously.
+    //
+    // My understanding is that the tranditional web server model is single
+    // threaded.  Refreshes shouldn't block for long chunks of time.
+    //
+    // This code is a best effort to compute data t-shirt checker needs for reports
+    // asyncronously.  When run as a native app on Linux this is actually concurrent.
+    // When run in web assembly on a browser it's more of a co-operative multi-tasking
+    // model.
+    //
+    // In Web Assenbly, the "async_std::task::sleep(one_milli).await" calls are the points
+    // where the computation tasks switches out and lets something else have a chance to
+    // update.
+    //
     pub async fn new(ctx: &egui::Context, artwork: &LoadedImage) -> Self {
         let one_milli = std::time::Duration::from_millis(1);
         async_std::task::sleep(one_milli).await;
-        let partial_transparency_fixed: LoadedImage = load_image_from_existing_image(
-            artwork,
-            &correct_alpha_for_tshirt,
-            "partial_transparency_fixed",
-            ctx,
-        );
+
+        //
+        // Compute interesting hot spots for the DPI tool using a heat map based
+        // on a simple edge detection algorithm,
+        //
+        async_std::task::sleep(one_milli).await;
+        let heat_map = heat_map_from_image(artwork, "heatmap", ctx);
+        let dpi_top_hot_spots = hot_spots_from_heat_map(&heat_map);
+
+        //
+        // Create images and metrics for the partial transparency tool
+        //
         async_std::task::sleep(one_milli).await;
         let partial_transparency_problems: LoadedImage = load_image_from_existing_image(
             artwork,
@@ -50,21 +70,29 @@ impl ArtworkDependentData {
             "partial_transparency_problems",
             ctx,
         );
-
         async_std::task::sleep(one_milli).await;
-        let heat_map = heat_map_from_image(artwork, "heatmap", ctx);
+        let partial_transparency_fixed: LoadedImage = load_image_from_existing_image(
+            artwork,
+            &correct_alpha_for_tshirt,
+            "partial_transparency_fixed",
+            ctx,
+        );
+        let partial_transparency_percent = compute_bad_tpixels(artwork.pixels());
+        async_std::task::sleep(one_milli).await;
+
+        //
+        // Compute images and metrics for the bib report.
+        //
         async_std::task::sleep(one_milli).await;
         let bib_opaque_percent = compute_percent_opaque(artwork.pixels());
         async_std::task::sleep(one_milli).await;
         let bib_opaque_mask =
             load_image_from_existing_image(artwork, &opaque_to_mask, "bib_mask", ctx);
-        async_std::task::sleep(one_milli).await;
-        let partial_transparency_percent = compute_bad_tpixels(artwork.pixels());
-        async_std::task::sleep(one_milli).await;
-        let dpi_top_hot_spots = hot_spots_from_heat_map(&heat_map);
-        async_std::task::sleep(one_milli).await;
 
-        // Cut and paste from report_templates.rs, should refactor.
+        //
+        // Compute images and metrics for the thin line report & tool
+        //
+        async_std::task::sleep(one_milli).await;
         let top_corner = art_to_art_space(artwork.size()) * dvector![0.0, 0.0, 1.0];
         let bot_corner = art_to_art_space(artwork.size()) * dvector![1.0, 1.0, 1.0];
         let dim_in_inches = bot_corner - top_corner;
