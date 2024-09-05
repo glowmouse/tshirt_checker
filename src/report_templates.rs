@@ -39,6 +39,25 @@ impl ReportTemplate {
             "".to_string()
         }
     }
+    pub fn status(
+        &self,
+        art: &LoadedImage,
+        art_dependent_data: Option<&ArtworkDependentData>,
+    ) -> ReportStatus {
+        let metric = (self.generate_metric)(art, art_dependent_data);
+        (self.metric_to_status)(metric)
+    }
+    pub fn metric_text(
+        &self,
+        art: &LoadedImage,
+        art_dependent_data: Option<&ArtworkDependentData>,
+    ) -> String {
+        let metric = (self.generate_metric)(art, art_dependent_data);
+        match metric {
+            Some(n) => format!("{}", n),
+            None => "???".to_string(),
+        }
+    }
 }
 
 fn dpi_to_status(dpi: Option<u32>) -> ReportStatus {

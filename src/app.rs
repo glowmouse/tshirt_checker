@@ -79,8 +79,8 @@ impl eframe::App for TShirtCheckerApp {
     // Eframe's hook for updating the application.
     //
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let changes_to_be_made = self.paint_all_panels(ctx);
-        self.journal_changes_to_app_state(changes_to_be_made);
+        let changes = self.paint_all_panels(ctx);
+        self.journal_changes_to_app_state(changes);
         self.schedule_repaint_request_if_needed(ctx);
     }
 }
@@ -137,11 +137,11 @@ impl TShirtCheckerApp {
     // Paint everything in the GUI
     //
     fn paint_all_panels(&self, ctx: &egui::Context) -> ChangesToBeMade {
-        let mut changes_to_be_made: ChangesToBeMade = Default::default();
+        let mut changes: ChangesToBeMade = Default::default();
         self.paint_bottom_panel(ctx);
-        self.paint_right_panel(&mut changes_to_be_made, ctx);
-        self.paint_central_panel(&mut changes_to_be_made, ctx);
-        changes_to_be_made
+        self.paint_right_panel(&mut changes, ctx);
+        self.paint_central_panel(&mut changes, ctx);
+        changes
     }
 
     // Display the bottom panel in the app - notifications & powered by egui and eframe
@@ -179,7 +179,7 @@ impl TShirtCheckerApp {
     //        (i.e.,  a cell phone display or something) the target size gets reduced
     //        so the entire app fits on the screen.
     //
-    // changes_to_be_made - This is a list of all the changes that need to be made to
+    // changes - This is a list of all the changes that need to be made to
     //        the application state after everything is painted.  All paints in the app
     //        are read only.
     //
@@ -187,7 +187,7 @@ impl TShirtCheckerApp {
 
     // Paint the panel on the right hand side.
     //
-    fn paint_right_panel(&self, changes_to_be_made: &mut ChangesToBeMade, ctx: &egui::Context) {
+    fn paint_right_panel(&self, changes: &mut ChangesToBeMade, ctx: &egui::Context) {
         let screen = ctx.screen_rect();
         let size = screen.max - screen.min;
         let scale_x = (size.x * 0.33) / 260.0;
@@ -203,9 +203,9 @@ impl TShirtCheckerApp {
             .show(ctx, |ui| {
                 ui.vertical(|ui| {
                     self.paint_title(ui, scale);
-                    self.paint_reports(changes_to_be_made, ui, scale);
-                    self.paint_tshirt_selection_panel(changes_to_be_made, ui, scale);
-                    self.paint_artwork_selection_panel(changes_to_be_made, ui, ctx, scale);
+                    self.paint_reports(changes, ui, scale);
+                    self.paint_tshirt_selection_panel(changes, ui, scale);
+                    self.paint_artwork_selection_panel(changes, ui, ctx, scale);
 
                     ui.horizontal(|ui| {
                         self.paint_import_button(ui, ctx, scale);
@@ -236,54 +236,43 @@ impl TShirtCheckerApp {
 
     // Display the 5 reports for the selected artwork
     //
-    fn paint_reports(
-        &self,
-        changes_to_be_made: &mut ChangesToBeMade,
-        ui: &mut egui::Ui,
-        scale: f32,
-    ) {
-        self.paint_report(changes_to_be_made, ui, scale, ReportTypes::Dpi);
-        self.paint_report(changes_to_be_made, ui, scale, ReportTypes::AreaUsed);
-        self.paint_report(changes_to_be_made, ui, scale, ReportTypes::Bib);
-        self.paint_report(changes_to_be_made, ui, scale, ReportTypes::ThinLines);
-        self.paint_report(
-            changes_to_be_made,
-            ui,
-            scale,
-            ReportTypes::PartialTransparency,
-        );
+    fn paint_reports(&self, changes: &mut ChangesToBeMade, ui: &mut egui::Ui, scale: f32) {
+        self.paint_report(changes, ui, scale, ReportTypes::Dpi);
+        self.paint_report(changes, ui, scale, ReportTypes::AreaUsed);
+        self.paint_report(changes, ui, scale, ReportTypes::Bib);
+        self.paint_report(changes, ui, scale, ReportTypes::ThinLines);
+        self.paint_report(changes, ui, scale, ReportTypes::PartialTransparency);
 
         Self::paint_panel_separator(ui, scale);
     }
 
-    // Paint one report
+    // Paint one report line
     //
     fn paint_report(
         &self,
-        changes_to_be_made: &mut ChangesToBeMade,
+        changes: &mut ChangesToBeMade,
         ui: &mut egui::Ui,
         scale: f32,
         report_type: ReportTypes,
     ) {
         let report_template = self.report_templates.report_type_to_template(report_type);
-        let report_tip = &(report_template.report_tip);
-
         let art = self.get_selected_art();
-        let art_dependent_data = self.art_storage.get_dependent_data(self.selected_art);
+        let dependent_data = self.get_selected_dependent_data();
 
-        let metric = (report_template.generate_metric)(art, art_dependent_data);
-        let status = (report_template.metric_to_status)(metric);
-
+        // Column 1 - Name of the report
         let report_name = mtexts(&report_template.label, scale);
+
+        // Column 2 - The status of the report (i.e., pass/ warn, fail)
         let status_icon = self
             .icons
-            .status_icon(status)
+            .status_icon(report_template.status(art, dependent_data))
             .max_width(STATUS_ICON_WIDTH * scale);
-        let metric_text = match metric {
-            Some(n) => format!("{}", n),
-            None => "???".to_string(),
-        };
+
+        // Column 3 - The text for the score of the report's metric
+        let metric_text = report_template.metric_text(art, dependent_data);
         let metric = mtexts(&metric_text, scale);
+
+        // Column 4 - The postfix after the matrix (either a % or nothing)
         let metrix_postfix = mtexts(&report_template.postfix_string(), scale);
 
         ui.horizontal(|ui| {
@@ -294,77 +283,103 @@ impl TShirtCheckerApp {
                 .size(Size::exact(REPORT_PERCENT_WIDTH * scale))
                 .size(Size::exact(TOOL_WIDTH * scale))
                 .horizontal(|mut strip| {
+                    let report_tip = &(report_template.report_tip);
+
+                    // Column 1 - Name of the report
                     strip.cell(|ui| {
                         ui.add(status_icon).on_hover_text(report_tip);
                     });
+
+                    // Column 2 - The status of the report (i.e., pass/ warn, fail)
                     strip.cell(|ui| {
                         ui.label(report_name).on_hover_text(report_tip);
                     });
+
+                    // Column 3 - The text for the score of the report's metric
                     strip.cell(|ui| {
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
                             ui.label(metric).on_hover_text(report_tip);
                         });
                     });
+
+                    // Column 4 - The postfix after the matrix (either a % or nothing)
                     strip.cell(|ui| {
                         ui.label(metrix_postfix);
                     });
+
+                    // Column 5 - The tool select button (painted separately)
                     strip.cell(|ui| {
-                        self.paint_tool_button(changes_to_be_made, ui, scale, report_type, status);
+                        let status = report_template.status(art, dependent_data);
+                        self.paint_tool_button(changes, ui, scale, report_type, status);
                     });
                 });
         });
     }
 
+    // Paint the button that turns the report's helper tool on or off
+    //
     fn paint_tool_button(
         &self,
-        mut changes_to_be_made: &mut ChangesToBeMade,
+        mut changes: &mut ChangesToBeMade,
         ui: &mut egui::Ui,
         scale: f32,
         report_type: ReportTypes,
         status: ReportStatus,
     ) {
+        // Skip if there's no problem or if we're still computing report data
+        let skip_button_paint = status == ReportStatus::Pass || status == ReportStatus::Unknown;
+        if skip_button_paint {
+            return;
+        }
+
+        // Grab tool tip and "is the report already selected (running) status
         let report_template = self.report_templates.report_type_to_template(report_type);
         let tool_tip = &(report_template.tool_tip);
-        if status != ReportStatus::Pass && status != ReportStatus::Unknown {
-            let is_selected = self.selected_tool.is_active(report_type);
-            if ui
-                .add(
-                    self.icons
-                        .button(Icon::Tool, TOOL_WIDTH * scale)
-                        .selected(is_selected),
-                )
-                .on_hover_text(tool_tip)
-                .clicked()
-            {
-                changes_to_be_made += Box::new(move |app: &mut Self| {
-                    app.selected_tool.set(report_type, !is_selected);
-                });
-            }
+        let is_selected = self.selected_tool.is_active(report_type);
+
+        // Paint the button
+        if ui
+            .add(
+                self.icons
+                    .button(Icon::Tool, TOOL_WIDTH * scale)
+                    .selected(is_selected),
+            )
+            .on_hover_text(tool_tip)
+            .clicked()
+        {
+            // If the button's clicked, schedule a tool select event.
+            changes += Box::new(move |app: &mut Self| {
+                app.selected_tool.set(report_type, !is_selected);
+            });
         }
     }
 
+    // Paint all the t-hsirts in two rows
+    //
     fn paint_tshirt_selection_panel(
         &self,
-        changes_to_be_made: &mut ChangesToBeMade,
+        changes: &mut ChangesToBeMade,
         ui: &mut egui::Ui,
         scale: f32,
     ) {
         ui.horizontal(|ui| {
-            self.paint_tshirt_select_button(changes_to_be_made, ui, scale, TShirtColors::Red);
-            self.paint_tshirt_select_button(changes_to_be_made, ui, scale, TShirtColors::Green);
-            self.paint_tshirt_select_button(changes_to_be_made, ui, scale, TShirtColors::Blue);
+            self.paint_tshirt_select_button(changes, ui, scale, TShirtColors::Red);
+            self.paint_tshirt_select_button(changes, ui, scale, TShirtColors::Green);
+            self.paint_tshirt_select_button(changes, ui, scale, TShirtColors::Blue);
         });
         ui.horizontal(|ui| {
-            self.paint_tshirt_select_button(changes_to_be_made, ui, scale, TShirtColors::DRed);
-            self.paint_tshirt_select_button(changes_to_be_made, ui, scale, TShirtColors::DGreen);
-            self.paint_tshirt_select_button(changes_to_be_made, ui, scale, TShirtColors::DBlue);
+            self.paint_tshirt_select_button(changes, ui, scale, TShirtColors::DRed);
+            self.paint_tshirt_select_button(changes, ui, scale, TShirtColors::DGreen);
+            self.paint_tshirt_select_button(changes, ui, scale, TShirtColors::DBlue);
         });
         Self::paint_panel_separator(ui, scale);
     }
 
+    // Paint one t-shirt
+    //
     fn paint_tshirt_select_button(
         &self,
-        mut changes_to_be_made: &mut ChangesToBeMade,
+        mut changes: &mut ChangesToBeMade,
         ui: &mut egui::Ui,
         scale: f32,
         color: TShirtColors,
@@ -377,30 +392,36 @@ impl TShirtCheckerApp {
             .add(egui::widgets::ImageButton::new(egui_image).selected(is_selected))
             .clicked()
         {
-            changes_to_be_made += Box::new(move |app: &mut Self| {
+            // If the t-shirt button is clicked, schedule the t-shirt change
+            changes += Box::new(move |app: &mut Self| {
                 app.selected_tshirt = color;
             });
         }
     }
 
+    // Paint the three potential pieces of art-work
+    //
     fn paint_artwork_selection_panel(
         &self,
-        changes_to_be_made: &mut ChangesToBeMade,
+        changes: &mut ChangesToBeMade,
         ui: &mut egui::Ui,
         ctx: &egui::Context,
         scale: f32,
     ) {
         ui.horizontal(|ui| {
-            self.paint_art_select_button(changes_to_be_made, ui, ctx, scale, Artwork::Artwork0);
-            self.paint_art_select_button(changes_to_be_made, ui, ctx, scale, Artwork::Artwork1);
-            self.paint_art_select_button(changes_to_be_made, ui, ctx, scale, Artwork::Artwork2);
+            self.paint_art_select_button(changes, ui, ctx, scale, Artwork::Artwork0);
+            self.paint_art_select_button(changes, ui, ctx, scale, Artwork::Artwork1);
+            self.paint_art_select_button(changes, ui, ctx, scale, Artwork::Artwork2);
         });
         Self::paint_panel_separator(ui, scale);
     }
 
+    //
+    // Paint the button for one piece of artwork
+    //
     fn paint_art_select_button(
         &self,
-        mut changes_to_be_made: &mut ChangesToBeMade,
+        mut changes: &mut ChangesToBeMade,
         ui: &mut egui::Ui,
         ctx: &egui::Context,
         scale: f32,
@@ -420,6 +441,7 @@ impl TShirtCheckerApp {
                 //
                 // TODO - if somebody spam clicks this we'll spam schedule an expensive
                 // and needless recomputation task.
+                //
                 crate::async_tasks::cache_in_dependent_data(
                     ctx,
                     self.art_storage.get_art(artwork),
@@ -427,13 +449,16 @@ impl TShirtCheckerApp {
                     &self.async_data_to_app_sender,
                 );
             }
-            changes_to_be_made += Box::new(move |app: &mut Self| {
+            // Schedule the artwork change after the paint is done
+            changes += Box::new(move |app: &mut Self| {
                 app.selected_art = artwork;
                 app.selected_tool.reset();
             });
         }
     }
 
+    // The import button (so people can load their own artwork)
+    //
     fn paint_import_button(&self, ui: &mut egui::Ui, ctx: &egui::Context, scale: f32) {
         let width = BUTTON_WIDTH * scale;
         if ui
@@ -446,6 +471,8 @@ impl TShirtCheckerApp {
         }
     }
 
+    // A simple tool to fix partial transparency problems
+    //
     fn paint_partial_transparency_fix_button(
         &self,
         ui: &mut egui::Ui,
@@ -470,6 +497,8 @@ impl TShirtCheckerApp {
         }
     }
 
+    // A separator for the panels on the right hand side.
+    //
     fn paint_panel_separator(ui: &mut egui::Ui, scale: f32) {
         ui.add_space(5.0 * scale);
         ui.separator();
@@ -482,19 +511,19 @@ impl TShirtCheckerApp {
     //
     ////////////////////////////////////////////////////////////////////////////////////
 
-    fn paint_central_panel(&self, changes_to_be_made: &mut ChangesToBeMade, ctx: &egui::Context) {
+    fn paint_central_panel(&self, changes: &mut ChangesToBeMade, ctx: &egui::Context) {
         egui::CentralPanel::default().show(ctx, |ui| {
             let display_size = ui.available_size_before_wrap();
             let (response, painter) =
                 ui.allocate_painter(display_size, egui::Sense::click_and_drag());
 
             let movement_happened =
-                self.handle_central_movement(changes_to_be_made, ui, response, display_size);
+                self.handle_central_movement(changes, ui, response, display_size);
             self.paint_tshirt(&painter, display_size);
             self.paint_artwork(&painter, display_size);
 
             if self.selected_tool.is_active(ReportTypes::Dpi) {
-                self.do_dpi_tool(changes_to_be_made, movement_happened);
+                self.do_dpi_tool(changes, movement_happened);
             }
             if self.selected_tool.is_active(ReportTypes::AreaUsed) {
                 self.paint_area_used_tool(&painter, display_size);
@@ -528,6 +557,10 @@ impl TShirtCheckerApp {
         self.art_storage.get_art(self.selected_art)
     }
 
+    fn get_selected_dependent_data(&self) -> Option<&ArtworkDependentData> {
+        self.art_storage.get_dependent_data(self.selected_art)
+    }
+
     fn current_art_space_to_tshirt(&self) -> Matrix3<f32> {
         art_space_to_tshirt(self.tshirt_image_storage.tshirt_image_size())
     }
@@ -539,20 +572,20 @@ impl TShirtCheckerApp {
 
     fn handle_central_movement_drag(
         &self,
-        mut changes_to_be_made: &mut ChangesToBeMade,
+        mut changes: &mut ChangesToBeMade,
         response: &egui::Response,
         display_size: egui::Vec2,
     ) -> bool {
         if let Some(pointer_pos) = response.interact_pointer_pos() {
             let mouse_down_pos = vector!(pointer_pos[0], pointer_pos[1], 1.0);
             let tshirt_to_display = tshirt_to_display(self.construct_viewport(display_size));
-            changes_to_be_made += Box::new(move |app: &mut Self| {
+            changes += Box::new(move |app: &mut Self| {
                 app.move_state
                     .event_mouse_down_movement(mouse_down_pos, tshirt_to_display);
             });
             true
         } else {
-            changes_to_be_made += Box::new(move |app: &mut Self| {
+            changes += Box::new(move |app: &mut Self| {
                 app.move_state.event_mouse_released();
             });
             false
@@ -561,7 +594,7 @@ impl TShirtCheckerApp {
 
     fn handle_central_movement_zoom(
         &self,
-        mut changes_to_be_made: &mut ChangesToBeMade,
+        mut changes: &mut ChangesToBeMade,
         ui: &egui::Ui,
         response: &egui::Response,
     ) -> bool {
@@ -569,7 +602,7 @@ impl TShirtCheckerApp {
         if response.hovered() {
             let zoom_delta_0 = 1.0 + ui.ctx().input(|i| i.smooth_scroll_delta)[1] / ZOOM_RATE;
             let zoom_delta_1 = ui.ctx().input(|i| i.zoom_delta());
-            changes_to_be_made += Box::new(move |app: &mut Self| {
+            changes += Box::new(move |app: &mut Self| {
                 app.move_state.handle_zoom(zoom_delta_0, zoom_delta_1);
             });
             zoom_delta_0 != 1.0 || zoom_delta_1 != 1.0
@@ -649,7 +682,7 @@ impl TShirtCheckerApp {
         );
     }
 
-    fn do_dpi_tool(&self, mut changes_to_be_made: &mut ChangesToBeMade, movement_happened: bool) {
+    fn do_dpi_tool(&self, mut changes: &mut ChangesToBeMade, movement_happened: bool) {
         let dependent_data = self
             .art_storage
             .get_dependent_data(self.selected_art)
@@ -662,12 +695,12 @@ impl TShirtCheckerApp {
         let display_location = art_to_tshirt * art_location;
 
         if !movement_happened {
-            changes_to_be_made += Box::new(move |app: &mut Self| {
+            changes += Box::new(move |app: &mut Self| {
                 app.move_state.zoom = 10.0;
                 app.move_state.target = display_location;
             });
         } else {
-            changes_to_be_made += Box::new(move |app: &mut Self| {
+            changes += Box::new(move |app: &mut Self| {
                 app.selected_tool.reset();
             });
         }
@@ -733,8 +766,8 @@ impl TShirtCheckerApp {
     //
     //////////////////////////////////////////////////////////////////
 
-    fn journal_changes_to_app_state(&mut self, changes_to_be_made: ChangesToBeMade) {
-        for change in changes_to_be_made.events.iter() {
+    fn journal_changes_to_app_state(&mut self, changes: ChangesToBeMade) {
+        for change in changes.events.iter() {
             change(self);
         }
         self.recieve_asyncronous_data();
