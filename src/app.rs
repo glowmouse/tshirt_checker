@@ -37,8 +37,8 @@ pub struct TShirtCheckerApp {
     // Template storage for the different tshirt arts report types
     report_templates: ReportTemplates,
     // Sender and receiver for image data that's computed asyncronously to improve load times
-    async_data_to_app_sender: crate::async_tasks::Sender,
-    async_data_to_app_receiver: crate::async_tasks::Receiver,
+    async_data_to_app_sender: crate::async_tasks::AsyncImageSender,
+    async_data_to_app_receiver: crate::async_tasks::AsyncImageReceiver,
     // What artwork tool is selected
     selected_tool: ToolSelection,
     // Bottom notification panel.  Used for changes like image load failures

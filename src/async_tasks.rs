@@ -4,10 +4,21 @@ use crate::image_utils::*;
 use crate::loaded_image::*;
 use std::future::Future;
 
+// Concurrent pipe and payload definition for asyncronous jobs
 pub type AsyncImageLoadResult = Result<AsyncImageLoadPayload, Error>;
-pub type Sender = std::sync::mpsc::Sender<AsyncImageLoadResult>;
-pub type Receiver = std::sync::mpsc::Receiver<AsyncImageLoadResult>;
+pub type AsyncImageSender = std::sync::mpsc::Sender<AsyncImageLoadResult>;
+pub type AsyncImageReceiver = std::sync::mpsc::Receiver<AsyncImageLoadResult>;
 
+//
+// Asyncronous Image Data Payload
+//
+// art_id         - The art slot the image is destined for
+// art            - The artwork :)
+// dependent_data - The artwork's dependent data.  An operation that generates artwork
+//                  doesn't have to compute the dependent data.  For example, it may want
+//                  to send the core artwork first, so it's visible quickly, and then
+//                  compute dependent data later.
+//
 pub struct AsyncImageLoadPayload {
     pub art_id: ArtEnum,
     pub art: LoadedImage,
@@ -62,13 +73,29 @@ pub async fn load_image(ctx: &egui::Context) -> Result<LoadedImage, Error> {
     Ok(image)
 }
 
-pub fn do_load(main_thread_ctx: &egui::Context, art_id: ArtEnum, main_thread_sender: &Sender) {
+//
+// The main image load/ image function.
+//
+// Schedules an asyncronous task to do the actual load work so we don't block the main thread.
+//
+pub fn do_load(
+    main_thread_ctx: &egui::Context,
+    art_id: ArtEnum,
+    main_thread_sender: &AsyncImageSender,
+) {
     let ctx = main_thread_ctx.clone();
     let sender = main_thread_sender.clone();
 
     // Execute the load asyncronously so we don't block the main thread.
     //
+    // 1.  Load the image from the user.  Handle any failures
+    // 2.  Send the result of that load to the main app so the user sees it quickly
+    // 3.  Compute dependent data for the art we just loaded
+    // 4.  Send the artwork and the dependent data to the main app
+    //
     app_execute(async move {
+        // 1.  Load the image from the user.  Handle any failures
+        //
         let art_maybe = load_image(&ctx).await;
         if art_maybe.is_err() {
             sender.send(Err(art_maybe.err().unwrap())).unwrap();
@@ -77,6 +104,8 @@ pub fn do_load(main_thread_ctx: &egui::Context, art_id: ArtEnum, main_thread_sen
         }
         let art = art_maybe.unwrap();
 
+        // 2.  Send the result of that load to the main app so the user sees it quickly
+        //
         context_switch(&ctx).await;
         let send_image = Ok(AsyncImageLoadPayload {
             art_id,
@@ -85,25 +114,34 @@ pub fn do_load(main_thread_ctx: &egui::Context, art_id: ArtEnum, main_thread_sen
         });
         sender.send(send_image).unwrap();
 
+        // 3.  Compute dependent data for the art we just loaded
+        //
         context_switch(&ctx).await;
         let dependent_data = ArtworkDependentData::new(&ctx, &art).await;
 
+        // 4.  Send the artwork and the dependent data to the main app
+        //
         let send_image_and_dep_data = Ok(AsyncImageLoadPayload {
             art_id,
             art,
             dependent_data: Some(dependent_data),
         });
-
         sender.send(send_image_and_dep_data).unwrap();
         context_switch(&ctx).await;
     });
 }
 
+//
+// A utility to fix partial transparency problems.
+//
+// Schedules an asyncronous task to modify the artwork and update the dependent
+// data.
+//
 pub fn partialt_fix(
     main_thread_ctx: &egui::Context,
     main_thread_art: &LoadedImage,
     art_id: ArtEnum,
-    main_thread_sender: &Sender,
+    main_thread_sender: &AsyncImageSender,
 ) {
     //
     // Clone data because we're going to do the heavy listing asyncronously
@@ -131,11 +169,14 @@ pub fn partialt_fix(
     });
 }
 
+//
+// Compute art dependent data asyncronously, then send it to the main thread
+//
 pub fn cache_in_dependent_data(
     main_thread_ctx: &egui::Context,
     main_thread_art: &LoadedImage,
     art_id: ArtEnum,
-    main_thread_sender: &Sender,
+    main_thread_sender: &AsyncImageSender,
 ) {
     let art = main_thread_art.clone();
     let ctx = main_thread_ctx.clone();
