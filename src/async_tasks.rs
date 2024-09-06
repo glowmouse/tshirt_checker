@@ -143,5 +143,6 @@ pub fn cache_in_dependent_data(
             dependent_data: Some(dependent_data),
         });
         thread_sender.send(image_to_send).unwrap();
+        context_switch(&thread_ctx).await;
     });
 }
