@@ -17,20 +17,20 @@ pub enum ArtEnum {
 /// Analysis data that depends on the t-shirt artwork
 pub struct ArtworkDependentData {
     // Data for DPI tool
-    pub dpi_top_hot_spots: Vec<HotSpot>,
+    dpi_top_hot_spots: Vec<HotSpot>,
 
     // Data for Partial Transparency report/ tool
-    pub partial_transparency_percent: u32,
-    pub partial_transparency_problems: LoadedImage,
-    pub partial_transparency_fixed: LoadedImage,
+    partial_transparency_percent: u32,
+    partial_transparency_problems: LoadedImage,
+    partial_transparency_fixed: LoadedImage,
 
     // Data for Bib report/ tool
-    pub bib_opaque_percent: u32,
-    pub bib_opaque_mask: LoadedImage,
+    bib_opaque_percent: u32,
+    bib_opaque_mask: LoadedImage,
 
     // Data for Thin Line tool
-    pub thin_line_percent: u32,
-    pub thin_line_problems: LoadedImage,
+    thin_line_percent: u32,
+    thin_line_problems: LoadedImage,
 }
 
 impl ArtworkDependentData {
@@ -113,6 +113,38 @@ impl ArtworkDependentData {
             thin_line_percent,
             thin_line_problems,
         }
+    }
+
+    pub fn dpi_top_hot_spots(&self) -> &Vec<HotSpot> {
+        &self.dpi_top_hot_spots
+    }
+
+    pub fn partial_transparency_percent(&self) -> u32 {
+        self.partial_transparency_percent
+    }
+
+    pub fn partial_transparency_problems(&self) -> &LoadedImage {
+        &self.partial_transparency_problems
+    }
+
+    pub fn partial_transparency_fixed(&self) -> &LoadedImage {
+        &self.partial_transparency_fixed
+    }
+
+    pub fn bib_opaque_percent(&self) -> u32 {
+        self.bib_opaque_percent
+    }
+
+    pub fn bib_opaque_mask(&self) -> &LoadedImage {
+        &self.bib_opaque_mask
+    }
+
+    pub fn thin_line_percent(&self) -> u32 {
+        self.thin_line_percent
+    }
+
+    pub fn thin_line_problems(&self) -> &LoadedImage {
+        &self.thin_line_problems
     }
 }
 

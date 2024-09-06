@@ -142,7 +142,7 @@ fn compute_bib_score(
 ) -> Option<u32> {
     let art_dependent_data = optional_art_dependent_data?;
     let area_used = compute_area_used(art, Some(art_dependent_data))?;
-    let bib_score = area_used * art_dependent_data.bib_opaque_percent / 100;
+    let bib_score = area_used * art_dependent_data.bib_opaque_percent() / 100;
     Some(bib_score)
 }
 
@@ -151,7 +151,7 @@ fn compute_badtransparency_pixels(
     optional_art_dependent_data: Option<&ArtworkDependentData>,
 ) -> Option<u32> {
     let art_dependent_data = optional_art_dependent_data?;
-    Some(art_dependent_data.partial_transparency_percent)
+    Some(art_dependent_data.partial_transparency_percent())
 }
 
 fn compute_thin_line(
@@ -159,7 +159,7 @@ fn compute_thin_line(
     optional_art_dependent_data: Option<&ArtworkDependentData>,
 ) -> Option<u32> {
     let art_dependent_data = optional_art_dependent_data?;
-    Some(art_dependent_data.thin_line_percent)
+    Some(art_dependent_data.thin_line_percent())
 }
 
 pub struct ReportTemplates {
