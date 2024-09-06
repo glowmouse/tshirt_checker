@@ -781,7 +781,7 @@ impl TShirtCheckerApp {
             let loaded_result = data_attempt.unwrap();
             match loaded_result {
                 Err(e) => {
-                    if e.id != ErrorTypes::FileImportAborted {
+                    if e.id() != ErrorTypes::FileImportAborted {
                         self.notification_panel.add_notice(e.msg());
                     }
                 }
