@@ -25,7 +25,7 @@ pub struct TShirtCheckerApp {
     // Storage for artwork the user may want to put on the t-shiurt
     art_storage: ArtStorage,
     // Which of the 4 pieces of artwork from art_storage is currently selected.
-    selected_art: Artwork,
+    selected_art_id: ArtEnum,
     // Storage for icons used by the app
     icons: IconStorage,
     // Persistant state used to move or zoom the t-shirt and artwork
@@ -99,7 +99,7 @@ impl TShirtCheckerApp {
         //
         // Choose the artwork in "slot 0" to be the initial selected art.
         //
-        let selected_art = Artwork::Artwork0;
+        let selected_art_id = ArtEnum::Artwork0;
 
         //
         // Create a pipe that will be used by computationally heavy tasks so we don't
@@ -114,14 +114,14 @@ impl TShirtCheckerApp {
         //
         crate::async_tasks::cache_in_dependent_data(
             &cc.egui_ctx,
-            art_storage.get_art(selected_art),
-            selected_art,
+            art_storage.get_art(selected_art_id),
+            selected_art_id,
             &async_data_to_app_sender,
         );
 
         Self {
             art_storage,
-            selected_art,
+            selected_art_id,
             tshirt_image_storage: TShirtStorage::new(&cc.egui_ctx),
             move_state: MovementState::new(),
             icons: IconStorage::new(&cc.egui_ctx),
@@ -409,9 +409,9 @@ impl TShirtCheckerApp {
         scale: f32,
     ) {
         ui.horizontal(|ui| {
-            self.paint_art_select_button(changes, ui, ctx, scale, Artwork::Artwork0);
-            self.paint_art_select_button(changes, ui, ctx, scale, Artwork::Artwork1);
-            self.paint_art_select_button(changes, ui, ctx, scale, Artwork::Artwork2);
+            self.paint_art_select_button(changes, ui, ctx, scale, ArtEnum::Artwork0);
+            self.paint_art_select_button(changes, ui, ctx, scale, ArtEnum::Artwork1);
+            self.paint_art_select_button(changes, ui, ctx, scale, ArtEnum::Artwork2);
         });
         Self::paint_panel_separator(ui, scale);
     }
@@ -425,12 +425,12 @@ impl TShirtCheckerApp {
         ui: &mut egui::Ui,
         ctx: &egui::Context,
         scale: f32,
-        artwork: Artwork,
+        artwork: ArtEnum,
     ) {
         let width = BUTTON_WIDTH * scale;
         let image: &LoadedImage = self.art_storage.get_art(artwork);
         let egui_image = egui::Image::from_texture(image.texture_handle()).max_width(width);
-        let is_selected = self.selected_art == artwork;
+        let is_selected = self.selected_art_id == artwork;
         if ui
             .add(egui::widgets::ImageButton::new(egui_image).selected(is_selected))
             .clicked()
@@ -451,7 +451,7 @@ impl TShirtCheckerApp {
             }
             // Schedule the artwork change after the paint is done
             changes += Box::new(move |app: &mut Self| {
-                app.selected_art = artwork;
+                app.selected_art_id = artwork;
                 app.selected_tool.reset();
             });
         }
@@ -467,7 +467,7 @@ impl TShirtCheckerApp {
             .clicked()
         {
             // Start an asyncronous load task
-            crate::async_tasks::do_load(ctx, self.selected_art, &self.async_data_to_app_sender);
+            crate::async_tasks::do_load(ctx, self.selected_art_id, &self.async_data_to_app_sender);
         }
     }
 
@@ -490,8 +490,8 @@ impl TShirtCheckerApp {
             // Start the partial transparency fix asyncronously.
             crate::async_tasks::partialt_fix(
                 ctx,
-                self.art_storage.get_art(self.selected_art),
-                self.selected_art,
+                self.get_selected_art(),
+                self.selected_art_id,
                 &self.async_data_to_app_sender,
             );
         }
@@ -621,34 +621,22 @@ impl TShirtCheckerApp {
             .selected_tool
             .is_active(ReportTypes::PartialTransparency)
         {
-            let dependent_data = self
-                .art_storage
-                .get_dependent_data(self.selected_art)
-                .unwrap();
+            let dependent_data = self.get_selected_dependent_data().unwrap();
             match cycle % 2 {
                 0 => dependent_data.partial_transparency_problems.id(),
                 _ => dependent_data.partial_transparency_fixed.id(),
             }
         } else if self.selected_tool.is_active(ReportTypes::Dpi) {
-            let dependent_data = self
-                .art_storage
-                .get_dependent_data(self.selected_art)
-                .unwrap();
+            let dependent_data = self.get_selected_dependent_data().unwrap();
             dependent_data.partial_transparency_fixed.id()
         } else if self.selected_tool.is_active(ReportTypes::ThinLines) {
-            let dependent_data = self
-                .art_storage
-                .get_dependent_data(self.selected_art)
-                .unwrap();
+            let dependent_data = self.get_selected_dependent_data().unwrap();
             match cycle % 2 {
                 0 => dependent_data.thin_line_problems.id(),
                 _ => self.get_selected_art().id(),
             }
         } else if self.selected_tool.is_active(ReportTypes::Bib) {
-            let dependent_data = self
-                .art_storage
-                .get_dependent_data(self.selected_art)
-                .unwrap();
+            let dependent_data = self.get_selected_dependent_data().unwrap();
             match (cycle / 2) % 2 {
                 0 => dependent_data.bib_opaque_mask.id(),
                 _ => self.get_selected_art().id(),
@@ -666,10 +654,7 @@ impl TShirtCheckerApp {
     }
 
     fn paint_dpi_tool(&self, mut changes: &mut ChangesToBeMade, movement_happened: bool) {
-        let dependent_data = self
-            .art_storage
-            .get_dependent_data(self.selected_art)
-            .unwrap();
+        let dependent_data = self.get_selected_dependent_data().unwrap();
         let cycle = self.selected_tool.get_cycles() / 10;
         let slot = cycle % (dependent_data.dpi_top_hot_spots.len() as u32);
         let hot_spot = &dependent_data.dpi_top_hot_spots[slot as usize];
@@ -742,16 +727,16 @@ impl TShirtCheckerApp {
     ////////////////////////////////////////////////////////////////////////////////////
 
     fn get_selected_art(&self) -> &LoadedImage {
-        self.art_storage.get_art(self.selected_art)
+        self.art_storage.get_art(self.selected_art_id)
     }
 
     fn get_selected_dependent_data(&self) -> Option<&ArtworkDependentData> {
-        self.art_storage.get_dependent_data(self.selected_art)
+        self.art_storage.get_dependent_data(self.selected_art_id)
     }
 
     fn is_report_ready(&self, report_type: ReportTypes) -> bool {
         let art = self.get_selected_art();
-        let art_dependent_data = self.art_storage.get_dependent_data(self.selected_art);
+        let art_dependent_data = self.get_selected_dependent_data();
         let report = self.report_templates.report_type_to_template(report_type);
         let metric = (report.generate_metric)(art, art_dependent_data);
         let status = (report.metric_to_status)(metric);
@@ -802,7 +787,7 @@ impl TShirtCheckerApp {
                 }
                 Ok(f) => {
                     self.art_storage
-                        .set_art(f.artwork, f.image, f.dependent_data);
+                        .set_art(f.art_id, f.image, f.dependent_data);
                     self.selected_tool.reset();
                 }
             }

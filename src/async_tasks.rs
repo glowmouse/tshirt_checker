@@ -8,7 +8,7 @@ pub type Sender = std::sync::mpsc::Sender<Payload>;
 pub type Receiver = std::sync::mpsc::Receiver<Payload>;
 
 pub struct ImageLoad {
-    pub artwork: Artwork,
+    pub art_id: ArtEnum,
     pub image: LoadedImage,
     pub dependent_data: Option<ArtworkDependentData>,
 }
@@ -49,7 +49,7 @@ pub async fn load_image(ctx: &egui::Context) -> Result<LoadedImage, Error> {
     Ok(image)
 }
 
-pub fn do_load(ctx: &egui::Context, art_slot: Artwork, sender: &Sender) {
+pub fn do_load(ctx: &egui::Context, art_id: ArtEnum, sender: &Sender) {
     let thread_ctx = ctx.clone();
     let thread_sender = sender.clone();
 
@@ -64,7 +64,7 @@ pub fn do_load(ctx: &egui::Context, art_slot: Artwork, sender: &Sender) {
         let image = image_maybe.unwrap();
 
         let send_image = Ok(ImageLoad {
-            artwork: art_slot,
+            art_id,
             image: image.clone(),
             dependent_data: None,
         });
@@ -74,7 +74,7 @@ pub fn do_load(ctx: &egui::Context, art_slot: Artwork, sender: &Sender) {
         let dependent_data = ArtworkDependentData::new(&thread_ctx, &image).await;
 
         let send_image_and_dep_data = Ok(ImageLoad {
-            artwork: art_slot,
+            art_id,
             image,
             dependent_data: Some(dependent_data),
         });
@@ -84,7 +84,7 @@ pub fn do_load(ctx: &egui::Context, art_slot: Artwork, sender: &Sender) {
     });
 }
 
-pub fn partialt_fix(ctx: &egui::Context, art: &LoadedImage, art_id: Artwork, sender: &Sender) {
+pub fn partialt_fix(ctx: &egui::Context, art: &LoadedImage, art_id: ArtEnum, sender: &Sender) {
     // Execute in another thread
     let thread_art = art.clone();
     let thread_ctx = ctx.clone();
@@ -99,7 +99,7 @@ pub fn partialt_fix(ctx: &egui::Context, art: &LoadedImage, art_id: Artwork, sen
         );
         let dependent_data = ArtworkDependentData::new(&thread_ctx, &fixed_art).await;
         let image_to_send = Ok(ImageLoad {
-            artwork: art_id,
+            art_id,
             image: fixed_art,
             dependent_data: Some(dependent_data),
         });
@@ -111,7 +111,7 @@ pub fn partialt_fix(ctx: &egui::Context, art: &LoadedImage, art_id: Artwork, sen
 pub fn cache_in_dependent_data(
     ctx: &egui::Context,
     art: &LoadedImage,
-    art_id: Artwork,
+    art_id: ArtEnum,
     sender: &Sender,
 ) {
     let thread_art = art.clone();
@@ -123,7 +123,7 @@ pub fn cache_in_dependent_data(
         let dependent_data = ArtworkDependentData::new(&thread_ctx, &thread_art).await;
         async_std::task::yield_now().await;
         let image_to_send = Ok(ImageLoad {
-            artwork: art_id,
+            art_id,
             image: thread_art,
             dependent_data: Some(dependent_data),
         });

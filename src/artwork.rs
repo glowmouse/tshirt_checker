@@ -8,7 +8,7 @@ use nalgebra::dvector;
 
 /// Artwork slot - one of three.
 #[derive(PartialEq, Copy, Clone)]
-pub enum Artwork {
+pub enum ArtEnum {
     Artwork0,
     Artwork1,
     Artwork2,
@@ -154,38 +154,38 @@ impl ArtStorage {
             artwork_2,
         }
     }
-    pub fn get_dependent_data(&self, artwork: Artwork) -> Option<&ArtworkDependentData> {
-        match artwork {
-            Artwork::Artwork0 => self.art_dependent_data_0.as_ref(),
-            Artwork::Artwork1 => self.art_dependent_data_1.as_ref(),
-            Artwork::Artwork2 => self.art_dependent_data_2.as_ref(),
+    pub fn get_dependent_data(&self, art_id: ArtEnum) -> Option<&ArtworkDependentData> {
+        match art_id {
+            ArtEnum::Artwork0 => self.art_dependent_data_0.as_ref(),
+            ArtEnum::Artwork1 => self.art_dependent_data_1.as_ref(),
+            ArtEnum::Artwork2 => self.art_dependent_data_2.as_ref(),
         }
     }
 
-    pub fn get_art(&self, artwork: Artwork) -> &LoadedImage {
-        match artwork {
-            Artwork::Artwork0 => &self.artwork_0,
-            Artwork::Artwork1 => &self.artwork_1,
-            Artwork::Artwork2 => &self.artwork_2,
+    pub fn get_art(&self, art_id: ArtEnum) -> &LoadedImage {
+        match art_id {
+            ArtEnum::Artwork0 => &self.artwork_0,
+            ArtEnum::Artwork1 => &self.artwork_1,
+            ArtEnum::Artwork2 => &self.artwork_2,
         }
     }
 
     pub fn set_art(
         &mut self,
-        slot: Artwork,
+        art_id: ArtEnum,
         image: LoadedImage,
         dependent_data: Option<ArtworkDependentData>,
     ) {
-        match slot {
-            Artwork::Artwork0 => {
+        match art_id {
+            ArtEnum::Artwork0 => {
                 self.artwork_0 = image;
                 self.art_dependent_data_0 = dependent_data;
             }
-            Artwork::Artwork1 => {
+            ArtEnum::Artwork1 => {
                 self.artwork_1 = image;
                 self.art_dependent_data_1 = dependent_data;
             }
-            Artwork::Artwork2 => {
+            ArtEnum::Artwork2 => {
                 self.artwork_2 = image;
                 self.art_dependent_data_2 = dependent_data;
             }
