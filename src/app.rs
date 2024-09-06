@@ -106,7 +106,7 @@ impl TShirtCheckerApp {
         // block the main thread during updates
         //
         let (async_data_to_app_sender, async_data_to_app_receiver) =
-            std::sync::mpsc::channel::<crate::async_tasks::Payload>();
+            std::sync::mpsc::channel::<crate::async_tasks::AsyncImageLoadResult>();
 
         //
         // Schedule an asychronous task to create the artwork needed to display
@@ -786,8 +786,7 @@ impl TShirtCheckerApp {
                     }
                 }
                 Ok(f) => {
-                    self.art_storage
-                        .set_art(f.art_id, f.image, f.dependent_data);
+                    self.art_storage.set_art(f.art_id, f.art, f.dependent_data);
                     self.selected_tool.reset();
                 }
             }

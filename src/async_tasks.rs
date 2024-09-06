@@ -4,13 +4,13 @@ use crate::image_utils::*;
 use crate::loaded_image::*;
 use std::future::Future;
 
-pub type Payload = Result<ImageLoad, Error>;
-pub type Sender = std::sync::mpsc::Sender<Payload>;
-pub type Receiver = std::sync::mpsc::Receiver<Payload>;
+pub type AsyncImageLoadResult = Result<AsyncImageLoadPayload, Error>;
+pub type Sender = std::sync::mpsc::Sender<AsyncImageLoadResult>;
+pub type Receiver = std::sync::mpsc::Receiver<AsyncImageLoadResult>;
 
-pub struct ImageLoad {
+pub struct AsyncImageLoadPayload {
     pub art_id: ArtEnum,
-    pub image: LoadedImage,
+    pub art: LoadedImage,
     pub dependent_data: Option<ArtworkDependentData>,
 }
 
@@ -62,87 +62,93 @@ pub async fn load_image(ctx: &egui::Context) -> Result<LoadedImage, Error> {
     Ok(image)
 }
 
-pub fn do_load(ctx: &egui::Context, art_id: ArtEnum, sender: &Sender) {
-    let thread_ctx = ctx.clone();
-    let thread_sender = sender.clone();
+pub fn do_load(main_thread_ctx: &egui::Context, art_id: ArtEnum, main_thread_sender: &Sender) {
+    let ctx = main_thread_ctx.clone();
+    let sender = main_thread_sender.clone();
 
     // Execute the load asyncronously so we don't block the main thread.
     //
     app_execute(async move {
-        let image_maybe = load_image(&thread_ctx).await;
-        if image_maybe.is_err() {
-            thread_sender.send(Err(image_maybe.err().unwrap())).unwrap();
-            thread_ctx.request_repaint();
+        let art_maybe = load_image(&ctx).await;
+        if art_maybe.is_err() {
+            sender.send(Err(art_maybe.err().unwrap())).unwrap();
+            ctx.request_repaint();
             return;
         }
-        let image = image_maybe.unwrap();
+        let art = art_maybe.unwrap();
 
-        context_switch(&thread_ctx).await;
-        let send_image = Ok(ImageLoad {
+        context_switch(&ctx).await;
+        let send_image = Ok(AsyncImageLoadPayload {
             art_id,
-            image: image.clone(),
+            art: art.clone(),
             dependent_data: None,
         });
-        thread_sender.send(send_image).unwrap();
+        sender.send(send_image).unwrap();
 
-        context_switch(&thread_ctx).await;
-        let dependent_data = ArtworkDependentData::new(&thread_ctx, &image).await;
+        context_switch(&ctx).await;
+        let dependent_data = ArtworkDependentData::new(&ctx, &art).await;
 
-        let send_image_and_dep_data = Ok(ImageLoad {
+        let send_image_and_dep_data = Ok(AsyncImageLoadPayload {
             art_id,
-            image,
+            art,
             dependent_data: Some(dependent_data),
         });
 
-        thread_sender.send(send_image_and_dep_data).unwrap();
-        context_switch(&thread_ctx).await;
+        sender.send(send_image_and_dep_data).unwrap();
+        context_switch(&ctx).await;
     });
 }
 
-pub fn partialt_fix(ctx: &egui::Context, art: &LoadedImage, art_id: ArtEnum, sender: &Sender) {
+pub fn partialt_fix(
+    main_thread_ctx: &egui::Context,
+    main_thread_art: &LoadedImage,
+    art_id: ArtEnum,
+    main_thread_sender: &Sender,
+) {
+    //
     // Clone data because we're going to do the heavy listing asyncronously
     //
-    let thread_art = art.clone();
-    let thread_ctx = ctx.clone();
-    let thread_sender = sender.clone();
+    let orig_art = main_thread_art.clone();
+    let ctx = main_thread_ctx.clone();
+    let sender = main_thread_sender.clone();
 
     app_execute(async move {
-        let fixed_art = load_image_from_existing_image(
-            &thread_art,
+        let art = load_image_from_existing_image(
+            &orig_art,
             &correct_alpha_for_tshirt,
             "blah_blah_fixed_art", // todo, better name...
-            &thread_ctx,
+            &ctx,
         );
-        context_switch(&thread_ctx).await;
-        let dependent_data = ArtworkDependentData::new(&thread_ctx, &fixed_art).await;
-        let image_to_send = Ok(ImageLoad {
+        context_switch(&ctx).await;
+        let dependent_data = ArtworkDependentData::new(&ctx, &art).await;
+        let image_to_send = Ok(AsyncImageLoadPayload {
             art_id,
-            image: fixed_art,
+            art,
             dependent_data: Some(dependent_data),
         });
-        thread_sender.send(image_to_send).unwrap();
-        context_switch(&thread_ctx).await;
+        sender.send(image_to_send).unwrap();
+        context_switch(&ctx).await;
     });
 }
 
 pub fn cache_in_dependent_data(
-    ctx: &egui::Context,
-    art: &LoadedImage,
+    main_thread_ctx: &egui::Context,
+    main_thread_art: &LoadedImage,
     art_id: ArtEnum,
-    sender: &Sender,
+    main_thread_sender: &Sender,
 ) {
-    let thread_art = art.clone();
-    let thread_ctx = ctx.clone();
-    let thread_sender = sender.clone();
+    let art = main_thread_art.clone();
+    let ctx = main_thread_ctx.clone();
+    let sender = main_thread_sender.clone();
 
     app_execute(async move {
-        let dependent_data = ArtworkDependentData::new(&thread_ctx, &thread_art).await;
-        let image_to_send = Ok(ImageLoad {
+        let dependent_data = ArtworkDependentData::new(&ctx, &art).await;
+        let image_to_send = Ok(AsyncImageLoadPayload {
             art_id,
-            image: thread_art,
+            art,
             dependent_data: Some(dependent_data),
         });
-        thread_sender.send(image_to_send).unwrap();
-        context_switch(&thread_ctx).await;
+        sender.send(image_to_send).unwrap();
+        context_switch(&ctx).await;
     });
 }
