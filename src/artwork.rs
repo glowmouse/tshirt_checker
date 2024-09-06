@@ -44,55 +44,51 @@ impl ArtworkDependentData {
     // When run in web assembly on a browser it's more of a co-operative multi-tasking
     // model.
     //
-    // In Web Assenbly, the "async_std::task::sleep(one_milli).await" calls are the points
-    // where the computation tasks switches out and lets something else have a chance to
-    // update.
+    // The context_switch().await calls let the web assembly build know this is a spot where
+    // it can give something else a change to run
     //
     pub async fn new(ctx: &egui::Context, artwork: &LoadedImage) -> Self {
-        let one_milli = std::time::Duration::from_millis(1);
-        async_std::task::sleep(one_milli).await;
-
         //
         // Compute interesting hot spots for the DPI tool using a heat map based
         // on a simple edge detection algorithm,
         //
-        async_std::task::sleep(one_milli).await;
+        crate::async_tasks::context_switch(ctx).await;
         let heat_map = heat_map_from_image(artwork, "heatmap", ctx);
         let dpi_top_hot_spots = hot_spots_from_heat_map(&heat_map);
 
         //
         // Create images and metrics for the partial transparency tool
         //
-        async_std::task::sleep(one_milli).await;
+        crate::async_tasks::context_switch(ctx).await;
         let partial_transparency_problems: LoadedImage = load_image_from_existing_image(
             artwork,
             &flag_alpha_for_shirt,
             "partial_transparency_problems",
             ctx,
         );
-        async_std::task::sleep(one_milli).await;
+        crate::async_tasks::context_switch(ctx).await;
         let partial_transparency_fixed: LoadedImage = load_image_from_existing_image(
             artwork,
             &correct_alpha_for_tshirt,
             "partial_transparency_fixed",
             ctx,
         );
+        crate::async_tasks::context_switch(ctx).await;
         let partial_transparency_percent = compute_bad_tpixels(artwork.pixels());
-        async_std::task::sleep(one_milli).await;
 
         //
         // Compute images and metrics for the bib report.
         //
-        async_std::task::sleep(one_milli).await;
+        crate::async_tasks::context_switch(ctx).await;
         let bib_opaque_percent = compute_percent_opaque(artwork.pixels());
-        async_std::task::sleep(one_milli).await;
+        crate::async_tasks::context_switch(ctx).await;
         let bib_opaque_mask =
             load_image_from_existing_image(artwork, &opaque_to_mask, "bib_mask", ctx);
 
         //
         // Compute images and metrics for the thin line report & tool
         //
-        async_std::task::sleep(one_milli).await;
+        crate::async_tasks::context_switch(ctx).await;
         let top_corner = art_to_art_space(artwork.size()) * dvector![0.0, 0.0, 1.0];
         let bot_corner = art_to_art_space(artwork.size()) * dvector![1.0, 1.0, 1.0];
         let dim_in_inches = bot_corner - top_corner;
@@ -101,9 +97,8 @@ impl ArtworkDependentData {
         let dots = (dpi * (1.0 / 64.0)).ceil() as usize;
 
         let thin_line_problems = flag_thin_lines(artwork, ctx, dots).await;
-        async_std::task::sleep(one_milli).await;
+        crate::async_tasks::context_switch(ctx).await;
         let thin_line_percent = compute_percent_diff(&thin_line_problems, artwork);
-        async_std::task::sleep(one_milli).await;
 
         Self {
             dpi_top_hot_spots,

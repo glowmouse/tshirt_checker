@@ -329,6 +329,7 @@ async fn thin_line_detect(
     input: &Vec<egui::Color32>,
     size: [usize; 2],
     min_pixels: usize,
+    ctx: &egui::Context,
 ) -> Vec<egui::Color32> {
     let xdim = size[0] as i32;
     let ydim = size[1] as i32;
@@ -340,21 +341,21 @@ async fn thin_line_detect(
         ThinLineState::new(input, &mut output, min_pixels, xdim);
 
     thin_line_vertical(&mut thin_line_state, xdim, ydim);
-    async_std::task::sleep(one_milli).await;
+    crate::async_tasks::context_switch(ctx).await;
     thin_line_horizontal(&mut thin_line_state, xdim, ydim);
-    async_std::task::sleep(one_milli).await;
+    crate::async_tasks::context_switch(ctx).await;
     thin_line_diag::<256, 256>(&mut thin_line_state, xdim, ydim);
-    async_std::task::sleep(one_milli).await;
+    crate::async_tasks::context_switch(ctx).await;
     thin_line_diag::<256, -256>(&mut thin_line_state, xdim, ydim);
-    async_std::task::sleep(one_milli).await;
+    crate::async_tasks::context_switch(ctx).await;
     thin_line_diag::<256, 128>(&mut thin_line_state, xdim, ydim);
-    async_std::task::sleep(one_milli).await;
+    crate::async_tasks::context_switch(ctx).await;
     thin_line_diag::<256, -128>(&mut thin_line_state, xdim, ydim);
-    async_std::task::sleep(one_milli).await;
+    crate::async_tasks::context_switch(ctx).await;
     thin_line_diag::<128, 256>(&mut thin_line_state, xdim, ydim);
-    async_std::task::sleep(one_milli).await;
+    crate::async_tasks::context_switch(ctx).await;
     thin_line_diag::<-128, 256>(&mut thin_line_state, xdim, ydim);
-    async_std::task::sleep(one_milli).await;
+    crate::async_tasks::context_switch(ctx).await;
 
     let mut thin_line_state: Vec<_> = input
         .iter()
@@ -395,7 +396,7 @@ pub async fn flag_thin_lines(
     ctx: &egui::Context,
     min_pixels: usize,
 ) -> LoadedImage {
-    let output = thin_line_detect(input.pixels(), *input.size_as_array(), min_pixels).await;
+    let output = thin_line_detect(input.pixels(), *input.size_as_array(), min_pixels, ctx).await;
     return load_image_from_pixels(output, *input.size_as_array(), "thin_lines", ctx);
 }
 
